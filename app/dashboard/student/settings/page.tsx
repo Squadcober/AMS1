@@ -1,0 +1,802 @@
+"use client"
+
+import { useEffect, useState } from "react"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Button } from "@/components/ui/button"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Switch } from "@/components/ui/switch"
+import Sidebar from "@/components/Sidebar"
+import { useAuth } from "@/contexts/AuthContext"
+import { toast } from "@/components/ui/use-toast"
+import { FileUp } from "lucide-react" // Add this import
+
+interface StudentInfo {
+  pid: string
+  name: string
+  dob: string
+  position: string // added
+  secondaryPosition: string
+  strongFoot: string
+  enrollmentDate: string
+  createdAt?: string // Add this field
+  height: string
+  weight: string
+  hasDisability: boolean
+  disabilityType: string
+  status: string
+  school: string
+  gender: string
+  age: string
+  bloodGroup: string
+  primaryGuardian: string
+  secondaryGuardian: string
+  email: string
+  primaryPhone: string
+  secondaryPhone: string
+  address: string
+  personalInformation?: {
+    pid: string
+    name: string
+    dob: string
+    gender: string
+    age: string
+    enrollmentDate: string
+    height: string
+    weight: string
+    school: string
+    primaryGuardian: string
+    secondaryGuardian: string
+    email: string
+    primaryPhone: string
+    secondaryPhone: string
+    address: string
+    bloodGroup: string
+  }
+  photoUrl?: string;
+}
+
+const positions = [
+  "Goalkeeper",
+  "Center Back",
+  "Right Back",
+  "Left Back",
+  "Defensive Midfielder",
+  "Central Midfielder",
+  "Attacking Midfielder",
+  "Right Winger",
+  "Left Winger",
+  "Striker",
+  "Forward"
+]
+
+export default function StudentSettings() {
+  const { user } = useAuth()
+  const [studentInfo, setStudentInfo] = useState<StudentInfo>({
+    pid: "",
+    name: "",
+    dob: "",
+    position: "", // replaced primaryPosition
+    secondaryPosition: "",
+    strongFoot: "",
+    enrollmentDate: "",
+    createdAt: "", // Initialize createdAt
+    height: "",
+    weight: "",
+    hasDisability: false,
+    disabilityType: "",
+    status: "Active",
+    school: "",
+    gender: "",
+    age: "",
+    bloodGroup: "",
+    primaryGuardian: "",
+    secondaryGuardian: "",
+    email: "",
+    primaryPhone: "",
+    secondaryPhone: "",
+    address: ""
+  })
+  const [isLoading, setIsLoading] = useState(true)
+  const [isSaving, setIsSaving] = useState(false)
+  const [canSave, setCanSave] = useState(false)
+  const [isEditing, setIsEditing] = useState(false) // Add isEditing state
+
+  useEffect(() => {
+    setCanSave(
+      Boolean(user?.id) && 
+      Boolean(user?.academyId) && 
+      !isLoading && 
+      !isSaving
+    )
+  }, [user?.id, user?.academyId, isLoading, isSaving])
+
+  const fetchUserIdentifiers = async () => {
+    try {
+      if (!user?.id || !user?.academyId) {
+        console.warn("User data missing:", { id: user?.id, academyId: user?.academyId })
+        throw new Error("User ID or Academy ID is missing")
+      }
+
+      const playerResponse = await fetch(
+        `/api/db/ams-player-data?academyId=${encodeURIComponent(user.academyId)}&userId=${encodeURIComponent(user.id)}`
+      )
+      const playerData = await playerResponse.json()
+      console.log("Player API Response:", playerData)
+
+      if (playerData.success && playerData.data?.[0]) {
+        console.log("Found player data:", playerData.data[0])
+        return {
+          playerId: playerData.data[0].id,
+          userId: user.id,
+          source: "player"
+        }
+      }
+
+      const userResponse = await fetch(`/api/db/ams-users?userId=${user.id}`)
+      const userData = await userResponse.json()
+      console.log("User API Response:", userData)
+
+      if (userData.success && userData.data) {
+        return {
+          playerId: userData.data._id,
+          userId: user.id,
+          source: "user"
+        }
+      }
+
+      return {
+        playerId: user.id,
+        userId: user.id,
+        source: "auth"
+      }
+    } catch (error) {
+      console.error("Error in fetchUserIdentifiers:", error)
+      throw error
+    }
+  }
+
+  // Helper function to format date as YYYY-MM-DD
+  function formatDate(dateString: string): string {
+    if (!dateString) return "";
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return "";
+    return date.toISOString().split("T")[0];
+  }
+
+  // Move loadStudentData outside useEffect so it can be called elsewhere
+  const loadStudentData = async () => {
+    try {
+      setIsLoading(true);
+
+      if (!user?.username || !user?.academyId || !user?.email || !user?.id) {
+        throw new Error("User data is incomplete");
+      }
+
+      // Fetch player data first using the same endpoint as profile page
+      const playerResponse = await fetch(
+        `/api/db/ams-player-data/user/${encodeURIComponent(user.username)}`,
+        { credentials: 'include' }
+      );
+
+      if (!playerResponse.ok) {
+        throw new Error('Failed to fetch player data');
+      }
+
+      const playerData = await playerResponse.json();
+      console.log('Received player data:', playerData);
+
+      // Rest of parallel fetches
+      const [academyResponse, userResponse] = await Promise.all([
+        fetch(
+          `/api/db/ams-academy/${encodeURIComponent(user.academyId)}`,
+          { credentials: 'include' }
+        ),
+        fetch(
+          `/api/db/ams-users/${encodeURIComponent(user.id)}`,
+          { credentials: 'include' }
+        )
+      ]);
+
+      if (!academyResponse.ok || !userResponse.ok) {
+        throw new Error('Failed to fetch required data');
+      }
+
+      const [academyResult, userResult] = await Promise.all([
+        academyResponse.json(),
+        userResponse.json()
+      ]);
+
+      const academyData = academyResult.data;
+      const userData = userResult.data;
+
+      setStudentInfo(prev => ({
+        ...prev,
+        pid: playerData.id || "",
+        photoUrl: playerData.photoUrl || "",  // Set photo URL from player data
+        name: playerData.name || "",
+        email: user.email,
+        // Use enrollment date from user data
+        enrollmentDate: userData?.createdAt 
+          ? new Date(userData.createdAt).toISOString().split('T')[0]
+          : '',
+        // Properly format DOB from player data
+        dob: formatDate(playerData?.dob || ""),
+        age: playerData?.age?.toString() || "",
+        position: playerData?.position || "",
+        secondaryPosition: playerData?.secondaryPosition || "",
+        strongFoot: playerData?.strongFoot || "",
+        height: playerData?.height || "",
+        weight: playerData?.weight || "",
+        hasDisability: playerData?.hasDisability || false,
+        disabilityType: playerData?.disabilityType || "",
+        status: playerData?.status || "Active",
+        school: academyData.name || "Academy not found", // Set academy name from academy data
+        gender: playerData?.gender || "",
+        bloodGroup: playerData?.bloodGroup || "",
+        primaryGuardian: playerData?.primaryGuardian || "",
+        secondaryGuardian: playerData?.secondaryGuardian || "",
+        primaryPhone: playerData?.primaryPhone || "",
+        secondaryPhone: playerData?.secondaryPhone || "",
+        address: playerData?.address || "",
+      }));
+
+      setIsLoading(false);
+    } catch (error) {
+      console.error("Error loading data:", error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to load data",
+        variant: "destructive"
+      });
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadStudentData();
+  }, [user?.username, user?.academyId, user?.id, user?.email]); // Add user.email to dependencies
+
+  const handleEdit = () => {
+    setIsEditing(true);
+  };
+
+  const handleSave = async () => {
+    try {
+      if (!user?.username) {
+        throw new Error("Missing user information");
+      }
+
+      setIsSaving(true);
+
+      // Structure updates with $set operator like profile page
+      const updates = {
+        $set: {
+          name: studentInfo.name,
+          email: user.email,
+          photoUrl: studentInfo.photoUrl,
+          position: studentInfo.position,
+          secondaryPosition: studentInfo.secondaryPosition,
+          strongFoot: studentInfo.strongFoot,
+          dob: studentInfo.dob,
+          age: parseInt(studentInfo.age) || 0,
+          gender: studentInfo.gender,
+          height: studentInfo.height,
+          weight: studentInfo.weight,
+          primaryGuardian: studentInfo.primaryGuardian,
+          secondaryGuardian: studentInfo.secondaryGuardian,
+          primaryPhone: studentInfo.primaryPhone,
+          secondaryPhone: studentInfo.secondaryPhone,
+          address: studentInfo.address,
+          bloodGroup: studentInfo.bloodGroup,
+          hasDisability: studentInfo.hasDisability,
+          disabilityType: studentInfo.disabilityType,
+          status: studentInfo.status,
+          enrollmentDate: studentInfo.enrollmentDate,
+          updatedAt: new Date().toISOString(),
+          lastUpdated: new Date().toISOString()
+        }
+      };
+
+      // Use same endpoint and method as profile page
+      const response = await fetch(`/api/db/ams-player-data/${encodeURIComponent(studentInfo.pid)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(updates)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update profile');
+      }
+
+      const updatedPlayer = await response.json();
+      
+      // Update local state with response data
+      setStudentInfo(prev => ({
+        ...prev,
+        ...updatedPlayer
+      }));
+
+      toast({
+        title: "Success",
+        description: "Changes saved successfully"
+      });
+
+      setIsEditing(false);
+
+    } catch (error) {
+      console.error("Save error:", error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to save changes",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleCancel = () => {
+    setIsEditing(false);
+    loadStudentData(); // Reload original data
+  };
+
+  const calculateAge = (dob: string): number => {
+    if (!dob) return 0;
+    const birthDate = new Date(dob);
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    return age;
+  };
+
+  // Update the handleDOBChange function
+  const handleDOBChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newDOB = e.target.value;
+    const calculatedAge = calculateAge(newDOB);
+    setStudentInfo(prev => ({
+      ...prev,
+      dob: newDOB,
+      age: calculatedAge.toString()
+    }));
+  };
+
+  // Modify input props to be disabled when not editing
+  const inputProps = {
+    disabled: !isEditing,
+    className: !isEditing ? "bg-muted cursor-not-allowed" : ""
+  };
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>, field: 'primaryPhone' | 'secondaryPhone') => {
+    const value = e.target.value;
+    // Only allow digits and limit to 10 characters
+    if (/^\d{0,10}$/.test(value)) {
+      setStudentInfo(prev => ({ ...prev, [field]: value }));
+    }
+  };
+
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const photoUrl = reader.result as string;
+        setStudentInfo(prev => ({
+          ...prev,
+          photoUrl
+        }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  return (
+    <div className="flex h-screen overflow-hidden">
+      <Sidebar />
+      <div className="flex-1 p-8 overflow-y-auto">
+        <h1 className="text-3xl font-bold mb-8">Student Settings</h1>
+
+        <div className="space-y-6">
+          {/* Add Photo Card before Personal Information */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Profile Photo</CardTitle>
+            </CardHeader>
+            <CardContent className="flex items-center gap-6">
+              <div className="w-32 h-32 relative rounded-lg overflow-hidden bg-secondary">
+                {studentInfo.photoUrl ? (
+                  <img
+                    src={studentInfo.photoUrl}
+                    alt="Profile"
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      console.error("Image load error:", e);
+                      e.currentTarget.src = "/placeholder.svg";
+                    }}
+                  />
+                ) : (
+                  <div className="flex items-center justify-center w-full h-full text-muted-foreground">
+                    No photo
+                  </div>
+                )}
+              </div>
+              
+              {isEditing && (
+                <label className="cursor-pointer">
+                  <div className="flex items-center gap-2 p-2 border-2 border-dashed rounded-lg hover:bg-secondary">
+                    <FileUp className="h-4 w-4" />
+                    <span>Upload new photo</span>
+                  </div>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handlePhotoChange}
+                    {...inputProps}
+                  />
+                </label>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Personal Information</CardTitle>
+            </CardHeader>
+            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <Label htmlFor="pid" className="flex items-center gap-2">
+                  PID
+                  <span className="text-xs text-muted-foreground">(System-assigned)</span>
+                </Label>
+                <Input
+                  id="pid"
+                  value={studentInfo.pid}
+                  readOnly
+                  className="bg-muted cursor-not-allowed"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="name" className="flex items-center gap-2">
+                  Name
+                  <span className="text-xs text-muted-foreground">(System-assigned)</span>
+                </Label>
+                <Input
+                  id="name"
+                  value={studentInfo.name}
+                  readOnly
+                  className="bg-muted cursor-not-allowed"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="dob">Date of Birth</Label>
+                <Input
+                  id="dob"
+                  type="date"
+                  value={studentInfo.dob}
+                  onChange={handleDOBChange}
+                  {...inputProps}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="gender">Gender</Label>
+                <Select
+                  value={studentInfo.gender}
+                  onValueChange={(value) => setStudentInfo(prev => ({ ...prev, gender: value }))}
+                  {...inputProps}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select gender" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="male">Male</SelectItem>
+                    <SelectItem value="female">Female</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="position">Primary Position</Label>
+                <Select
+                  value={studentInfo.position}
+                  onValueChange={(value) => setStudentInfo(prev => ({ ...prev, position: value }))}
+                  {...inputProps}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select position" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {positions.map(position => (
+                      <SelectItem key={position} value={position.toLowerCase()}>
+                        {position}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="secondaryPosition">Secondary Position</Label>
+                <Select
+                  value={studentInfo.secondaryPosition}
+                  onValueChange={(value) => setStudentInfo(prev => ({ ...prev, secondaryPosition: value }))}
+                  {...inputProps}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select position" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {positions.map(position => (
+                      <SelectItem key={position} value={position.toLowerCase()}>
+                        {position}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="strongFoot">Strong Foot</Label>
+                <Select
+                  value={studentInfo.strongFoot}
+                  onValueChange={(value) => setStudentInfo(prev => ({ ...prev, strongFoot: value }))}
+                  {...inputProps}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select foot" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="left">Left</SelectItem>
+                    <SelectItem value="right">Right</SelectItem>
+                    <SelectItem value="both">Both</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="status">Status</Label>
+                <Select
+                  value={studentInfo.status}
+                  onValueChange={(value) => setStudentInfo(prev => ({ ...prev, status: value }))}
+                  {...inputProps}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Active">Active</SelectItem>
+                    <SelectItem value="Inactive">Inactive</SelectItem>
+                    <SelectItem value="Suspended">Suspended</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="enrollmentDate">Enrollment Date</Label>
+                <Input
+                  id="enrollmentDate"
+                  type="date"
+                  value={studentInfo.enrollmentDate}
+                  onChange={(e) => setStudentInfo(prev => ({ ...prev, enrollmentDate: e.target.value }))}
+                  {...inputProps}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="height">Height (cm)</Label>
+                <Input
+                  id="height"
+                  type="number"
+                  value={studentInfo.height}
+                  onChange={(e) => setStudentInfo(prev => ({ ...prev, height: e.target.value }))}
+                  {...inputProps}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="weight">Weight (kg)</Label>
+                <Input
+                  id="weight"
+                  type="number"
+                  value={studentInfo.weight}
+                  onChange={(e) => setStudentInfo(prev => ({ ...prev, weight: e.target.value }))}
+                  {...inputProps}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="school" className="flex items-center gap-2">
+                  Academy
+                  <span className="text-xs text-muted-foreground">(System-assigned)</span>
+                </Label>
+                <Input
+                  id="school"
+                  value={studentInfo.school}
+                  readOnly
+                  className="bg-muted cursor-not-allowed"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="age">Age (Auto-calculated)</Label>
+                <Input
+                  id="age"
+                  value={studentInfo.age}
+                  readOnly
+                  className="bg-muted cursor-not-allowed"
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Medical Information</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="hasDisability"
+                  checked={studentInfo.hasDisability}
+                  onCheckedChange={(checked) => 
+                    setStudentInfo(prev => ({ ...prev, hasDisability: checked }))
+                  }
+                />
+                <Label htmlFor="hasDisability">Has Disability</Label>
+              </div>
+
+              {studentInfo.hasDisability && (
+                <div className="space-y-2">
+                  <Label htmlFor="disabilityType">Disability Type</Label>
+                  <Input
+                    id="disabilityType"
+                    value={studentInfo.disabilityType}
+                    onChange={(e) => setStudentInfo(prev => ({ ...prev, disabilityType: e.target.value }))}
+                    {...inputProps}
+                  />
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <Label htmlFor="bloodGroup">Blood Group</Label>
+                <Select
+                  value={studentInfo.bloodGroup}
+                  onValueChange={(value) => setStudentInfo(prev => ({ ...prev, bloodGroup: value }))}
+                  {...inputProps}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select blood group" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="A+">A+</SelectItem>
+                    <SelectItem value="A-">A-</SelectItem>
+                    <SelectItem value="B+">B+</SelectItem>
+                    <SelectItem value="B-">B-</SelectItem>
+                    <SelectItem value="O+">O+</SelectItem>
+                    <SelectItem value="O-">O-</SelectItem>
+                    <SelectItem value="AB+">AB+</SelectItem>
+                    <SelectItem value="AB-">AB-</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Contact Information</CardTitle>
+            </CardHeader>
+            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <Label htmlFor="primaryGuardian">Primary Guardian Name</Label>
+                <Input
+                  id="primaryGuardian"
+                  value={studentInfo.primaryGuardian}
+                  onChange={(e) => setStudentInfo(prev => ({ ...prev, primaryGuardian: e.target.value }))}
+                  {...inputProps}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="secondaryGuardian">Secondary Guardian Name</Label>
+                <Input
+                  id="secondaryGuardian"
+                  value={studentInfo.secondaryGuardian}
+                  onChange={(e) => setStudentInfo(prev => ({ ...prev, secondaryGuardian: e.target.value }))}
+                  {...inputProps}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="email" className="flex items-center gap-2">
+                  Email
+                  <span className="text-xs text-muted-foreground">(System-assigned)</span>
+                </Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={studentInfo.email}
+                  readOnly
+                  className="bg-muted cursor-not-allowed"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="primaryPhone">Primary Phone</Label>
+                <Input
+                  id="primaryPhone"
+                  type="tel"
+                  value={studentInfo.primaryPhone}
+                  onChange={(e) => handlePhoneChange(e, 'primaryPhone')}
+                  maxLength={10}
+                  placeholder="Enter 10 digit number"
+                  {...inputProps}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="secondaryPhone">Secondary Phone</Label>
+                <Input
+                  id="secondaryPhone"
+                  type="tel"
+                  value={studentInfo.secondaryPhone}
+                  onChange={(e) => handlePhoneChange(e, 'secondaryPhone')}
+                  maxLength={10}
+                  placeholder="Enter 10 digit number"
+                  {...inputProps}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="address">Address</Label>
+                <Input
+                  id="address"
+                  value={studentInfo.address}
+                  onChange={(e) => setStudentInfo(prev => ({ ...prev, address: e.target.value }))}
+                  {...inputProps}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="flex justify-end space-x-4">
+            {isEditing ? (
+              <>
+                <Button
+                  size="lg"
+                  variant="outline"
+                  onClick={handleCancel}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  size="lg"
+                  onClick={handleSave}
+                  disabled={!canSave || isSaving}
+                >
+                  {isSaving ? "Saving..." : "Save Changes"}
+                </Button>
+              </>
+            ) : (
+              <Button
+                size="lg"
+                onClick={handleEdit}
+              >
+                Edit
+              </Button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
