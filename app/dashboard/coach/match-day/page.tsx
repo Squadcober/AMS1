@@ -251,6 +251,7 @@ export default function MatchDay() {
   }>({});
 
   const [isLoading, setIsLoading] = useState(false);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -315,15 +316,20 @@ export default function MatchDay() {
 
   useEffect(() => {
     if (viewDetailsMatchId) {
-      const match = matches.find(m => m.id === viewDetailsMatchId);
+      const match = matches.find(m => m && (m.id === viewDetailsMatchId || m._id === viewDetailsMatchId));
       if (match) {
         const currentPoints: { [playerId: string]: { current: number } } = {};
-        match.players.forEach(playerId => {
-          const playerData = JSON.parse(localStorage.getItem('ams-player-data') || '[]')
-            .find((p: any) => p.id === playerId);
-          currentPoints[playerId] = {
-            current: playerData?.attributes?.matchPoints || 0
-          };
+        const playerIds = Array.isArray(match.players) ? match.players : [];
+        playerIds.forEach(playerId => {
+          try {
+            const playerData = JSON.parse(localStorage.getItem('ams-player-data') || '[]')
+              .find((p: any) => (p?.id || p?._id)?.toString() === playerId?.toString());
+            currentPoints[playerId] = {
+              current: playerData?.attributes?.matchPoints || 0
+            };
+          } catch {
+            currentPoints[playerId] = { current: 0 };
+          }
         });
         setPlayerMatchPoints(currentPoints);
       }
@@ -332,23 +338,22 @@ export default function MatchDay() {
 
   useEffect(() => {
     if (viewDetailsMatchId) {
-      const match = matches.find(m => m.id === viewDetailsMatchId);
+      const match = matches.find(m => m && (m.id === viewDetailsMatchId || m._id === viewDetailsMatchId));
       if (match) {
         const initialStats: { [key: string]: PlayerMatchStats } = {};
-        match.players.forEach(playerId => {
+        const playerIds = Array.isArray(match.players) ? match.players : [];
+        playerIds.forEach(playerId => {
           const currentStats = getPlayerCurrentStats(playerId);
           const matchStats = match.playerStats?.[playerId];
-          
           initialStats[playerId] = {
             matchPoints: {
-              current: matchStats?.matchPoints || currentStats.matchPoints,
+              current: matchStats?.matchPoints?.current ?? currentStats.matchPoints,
             },
-            goals: matchStats?.goals || 0,
-            assists: matchStats?.assists || 0,
-            cleanSheets: matchStats?.cleanSheets || 0
+            goals: matchStats?.goals ?? 0,
+            assists: matchStats?.assists ?? 0,
+            cleanSheets: matchStats?.cleanSheets ?? 0
           };
         });
-        
         setPlayerStats(initialStats);
       }
     }
@@ -446,7 +451,61 @@ export default function MatchDay() {
       const result = await response.json();
       
       if (result.success) {
-        setMatches(prev => [...prev, result.data]);
+        // Normalize the created match to the same shape we use elsewhere
+        const created = result.data || {};
+        const transformed = {
+          ...created,
+          _id: created._id || created.id || "",
+          id: created._id || created.id || "",
+          date: created.date ? new Date(created.date) : new Date(newMatch.date),
+          players: Array.isArray(created.players) ? created.players : (newMatch.players || []),
+          playerRatings: created.playerRatings || {},
+          startTime: created.startTime || newMatch.startTime || "",
+          endTime: created.endTime || calculateEndTime(created.startTime || newMatch.startTime || "", created.duration ?? newMatch.duration ?? 90),
+          status: calculateMatchStatus({
+            ...created,
+            date: created.date ? new Date(created.date) : new Date(newMatch.date),
+            startTime: created.startTime || newMatch.startTime || "",
+            endTime: created.endTime || ""
+          }),
+          playerStats: created.playerStats || {}
+        };
+
+        // Append transformed match so the page reflects it immediately and all handlers work
+        setMatches(prev => [...prev, transformed]);
+        // close create dialog on success
+        setIsCreateDialogOpen(false);
+
+        // Refresh matches from server to ensure authoritative/normalized data (avoids needing a manual reload)
+        try {
+          if (user?.academyId) {
+            const refreshResp = await fetch(`/api/db/ams-match-day?academyId=${user.academyId}`);
+            if (refreshResp.ok) {
+              const refreshJson = await refreshResp.json();
+              if (refreshJson.success && Array.isArray(refreshJson.data)) {
+                const refreshed = refreshJson.data.map((match: any) => ({
+                  ...match,
+                  id: match._id,
+                  date: new Date(match.date),
+                  players: match.players || [],
+                  playerRatings: match.playerRatings || {},
+                  startTime: match.startTime || '',
+                  endTime: match.endTime || '',
+                  status: calculateMatchStatus({
+                    ...match,
+                    date: new Date(match.date),
+                    startTime: match.startTime || '',
+                    endTime: match.endTime || ''
+                  })
+                }));
+                setMatches(refreshed);
+              }
+            }
+          }
+        } catch (refreshErr) {
+          console.error('Error refreshing matches after create:', refreshErr);
+        }
+        
         setNewMatch({
           _id: "", // This is fine for local state, but will be stripped on next submit
           date: new Date(),
@@ -491,7 +550,7 @@ export default function MatchDay() {
 
       if (!response.ok) throw new Error('Failed to delete match');
 
-      setMatches(prev => prev.filter((match: Match) => match._id !== matchId));
+      setMatches(prev => prev.filter((match: Match | undefined) => !!match && (match._id !== matchId)));
       
       toast({
         title: "Success",
@@ -585,9 +644,10 @@ export default function MatchDay() {
       const result = await response.json();
       
       if (result.success && result.data) {
-        setMatches(prev => prev.map(match => 
-          match._id === matchId ? { ...match, ...updates } : match
-        ));
+        setMatches(prev => prev.map(m => {
+          if (!m) return m;
+          return m._id === matchId ? { ...m, ...updates } : m;
+        }));
 
         toast({
           title: "Success",
@@ -624,6 +684,7 @@ export default function MatchDay() {
   const handleExtraTimeChange = (matchId: string, extraMinutes: number) => {
     setMatches(prevMatches => {
       return prevMatches.map(match => {
+        if (!match) return match;
         if (match.id === matchId) {
           const newEndTime = calculateEndTime(match.startTime, (match.duration || 90) + extraMinutes);
           return {
@@ -637,6 +698,7 @@ export default function MatchDay() {
     });
     const allMatches = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || '[]');
     const newAllMatches = allMatches.map((match: Match) => {
+      if (!match) return match;
       if (match.id === matchId) {
         const newEndTime = calculateEndTime(match.startTime, (match.duration || 90) + extraMinutes);
         return {
@@ -820,9 +882,10 @@ export default function MatchDay() {
           )
         );
   
-        setMatches(prev => prev.map(match => 
-          match._id === matchId ? { ...match, playerStats: updatedStats } : match
-        ));
+        setMatches(prev => prev.map(m => {
+          if (!m) return m;
+          return m._id === matchId ? { ...m, playerStats: updatedStats } : m;
+        }));
   
         // ...existing code for updating player stats and refreshing matches...
         await Promise.all(
@@ -1024,34 +1087,19 @@ export default function MatchDay() {
 
     console.log('Found match:', match);
     
-    const matchPlayers = match.players.map(playerId => {
-      const player = players.find(p => p.id.toString() === playerId);
+    const matchPlayers = (Array.isArray(match.players) ? match.players : []).map(playerId => {
+      const player = players.find(p => p.id?.toString() === playerId?.toString());
       if (!player) return null;
 
       const playerMatchStats = match.playerStats?.[playerId];
       const latestMatchPoints = playerMatchStats?.matchPoints?.current || 0;
-
-      if (!playerStats[playerId]) {
-        setPlayerStats(prev => ({
-          ...prev,
-          [playerId]: {
-            matchPoints: {
-              current: latestMatchPoints,
-              edited: undefined
-            },
-            goals: playerMatchStats?.goals || 0,
-            assists: playerMatchStats?.assists || 0,
-            cleanSheets: playerMatchStats?.cleanSheets || 0
-          }
-        }));
-      }
 
       const position = player.position || player.attributes?.position || "N/A";
 
       return {
         ...player,
         position,
-        stats: playerStats[player.id.toString()] || {
+        stats: playerStats[player.id?.toString()] || {
           matchPoints: { 
             current: latestMatchPoints,
             edited: undefined
@@ -1444,24 +1492,24 @@ export default function MatchDay() {
       <div className="flex-1 space-y-6 p-4">
         <div className="flex justify-between items-center">
           <h1 className="text-3xl font-bold text-white">Match Day</h1>
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button>Create New Match</Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-3xl max-h-[90vh]">
-              <DialogHeader>
-                <DialogTitle>Create New Match</DialogTitle>
-              </DialogHeader>
-              <ScrollArea className="h-[calc(90vh-120px)] pr-4">
-                <div className="grid gap-6 py-4">
-                  {renderNewMatchForm()}
-                </div>
-              </ScrollArea>
-              <div className="flex justify-end pt-0 pb-0 px-0 py-0 ">
+          <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+             <DialogTrigger asChild>
+               <Button>Create New Match</Button>
+             </DialogTrigger>
+             <DialogContent className="max-w-3xl max-h-[90vh]">
+               <DialogHeader>
+                 <DialogTitle>Create New Match</DialogTitle>
+               </DialogHeader>
+               <ScrollArea className="h-[calc(90vh-120px)] pr-4">
+                 <div className="grid gap-6 py-4">
+                   {renderNewMatchForm()}
+                 </div>
+               </ScrollArea>
+               <div className="flex justify-end pt-0 pb-0 px-0 py-0 ">
                 <Button onClick={handleCreateMatch}>Create Match</Button>
-              </div>
-            </DialogContent>
-          </Dialog>
+               </div>
+             </DialogContent>
+           </Dialog>
         </div>
 
         <div className="flex justify-between items-center">

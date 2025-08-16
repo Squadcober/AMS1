@@ -1147,7 +1147,7 @@ export default function BatchesPage() {
                         <div key={index} className="p-3 bg-secondary/50 rounded-lg">
                           <div className="flex justify-between items-center mb-2">
                             <div className="font-semibold">
-                              {review.playerName || 'Anonymous player'}
+                              {review.studentName || 'Anonymous Student'}
                             </div>
                             <div className="text-lg font-bold">{review.rating}/5</div>
                           </div>

@@ -83,9 +83,7 @@ export const PlayerProvider = ({ children }: { children: ReactNode }) => {
 
 export const usePlayers = () => {
   const context = useContext(PlayerContext);
-  if (context === undefined) {
-    throw new Error('usePlayers must be used within a PlayerProvider');
-  }
+  if (!context) throw new Error("usePlayers must be used within PlayerProvider");
   return context;
 };
 

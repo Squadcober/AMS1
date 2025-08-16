@@ -21,46 +21,63 @@ export async function GET(request: NextRequest) {
 
     const client = await getClientPromise();
     const db = client.db(process.env.MONGODB_DB);
-    let query = {};
+    let query: any = {};
 
     if (academyId) {
-      // Fetch all players for academy
-      query = { academyId: academyId.trim() };
-    } else if (ids) {
-      // Fetch specific players using both _id and userId fields
-      const playerIds = ids.split(',');
+      // Return players for academy — include active players (most common case).
       query = {
-        $or: [
-          { id: { $in: playerIds.map(id => {
-            try { return new ObjectId(id); } catch { return null; }
-          }).filter(Boolean) } },
-          { userId: { $in: playerIds } },
-          { id: { $in: playerIds } }
-        ]
+        academyId: academyId.trim(),
+        status: { $in: ['active'] } // ensure active players are returned
       };
+    } else if (ids) {
+      const playerIds = ids.split(',').map(s => s.trim()).filter(Boolean);
+      // Attempt to convert any valid ObjectId strings
+      const objectIds = playerIds
+        .filter(id => ObjectId.isValid(id))
+        .map(id => new ObjectId(id));
+
+      const orConditions: any[] = [];
+      if (playerIds.length) {
+        orConditions.push(
+          { id: { $in: playerIds } },
+          { pid: { $in: playerIds } },
+          { userId: { $in: playerIds } },
+          { username: { $in: playerIds } }
+        );
+      }
+      if (objectIds.length) {
+        orConditions.push({ _id: { $in: objectIds } });
+      }
+
+      query = orConditions.length === 1 ? orConditions[0] : { $or: orConditions };
     }
 
     const players = await db.collection('ams-player-data')
       .find(query)
       .toArray();
 
-    // Ensure consistent data structure
-    const formattedPlayers = players.map(player => ({
-      id: player.id || player.id.toString(),
-      userId: player.userId,
-      username: player.username,
-      name: player.name || player.username || 'Unknown Player',
-      position: player.position || 'Not specified',
-      photoUrl: player.photoUrl || '/default-avatar.png',
-      academyId: player.academyId,
-      age: player.age || null,
-      attributes: player.attributes || {},
-      performanceHistory: Array.isArray(player.performanceHistory) ? player.performanceHistory : [],
-      trainingHistory: Array.isArray(player.trainingHistory) ? player.trainingHistory : [],
-      phone: player.phone || null,
-      emergencyContact: player.emergencyContact || null,
-      sessionsAttended: player.sessionsAttended || 0
-    }));
+    const formattedPlayers = players.map(player => {
+      const idVal = player.id || player.pid || (player._id ? player._id.toString() : undefined) || player.userId;
+      return {
+        id: idVal,
+        _id: player._id ? player._id.toString() : undefined,
+        pid: player.pid || undefined,
+        userId: player.userId || undefined,
+        username: player.username || undefined,
+        name: player.name || player.username || 'Unknown Player',
+        position: player.position || 'Not specified',
+        photoUrl: player.photoUrl || '/default-avatar.png',
+        academyId: player.academyId,
+        age: player.age || null,
+        attributes: player.attributes || {},
+        performanceHistory: Array.isArray(player.performanceHistory) ? player.performanceHistory : [],
+        trainingHistory: Array.isArray(player.trainingHistory) ? player.trainingHistory : [],
+        phone: player.phone || null,
+        emergencyContact: player.emergencyContact || null,
+        sessionsAttended: player.sessionsAttended || 0,
+        status: player.status || 'active'
+      };
+    });
 
     return NextResponse.json({
       success: true,

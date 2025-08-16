@@ -27,8 +27,19 @@ import dynamic from 'next/dynamic'
 const AchievementsTab = dynamic(() => import('./tabs/AchievementsTab'), {
   loading: () => <p>Loading achievements...</p>
 })
+// Update the dynamic import for InjuryRehabTab
 const InjuryRehabTab = dynamic(() => import('./tabs/InjuryRehabTab'), {
-  loading: () => <p>Loading Injury Rehab...</p>
+  loading: () => (
+    <Card className="w-full h-[300px] flex items-center justify-center">
+      <CardContent>
+        <div className="flex flex-col items-center gap-4">
+          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
+          <p className="text-muted-foreground">Loading injury and rehab data...</p>
+        </div>
+      </CardContent>
+    </Card>
+  ),
+  ssr: false
 })
 ChartJS.register(RadialLinearScale, PointElement, LineElement, Filler, Tooltip, Legend)
 
@@ -608,7 +619,23 @@ export default function playerProfile() {
                 </TabsContent>
 
                 <TabsContent value="injury-rehab" className="m-0 p-0">
-                  <InjuryRehabTab />
+                  {playerData ? (
+                    <InjuryRehabTab playerData={playerData} />
+                  ) : (
+                    <Card className="w-full h-[300px] flex items-center justify-center">
+                      <CardContent>
+                        <div className="flex flex-col items-center gap-4">
+                          <p className="text-muted-foreground">No player data available</p>
+                          <Button 
+                            variant="outline" 
+                            onClick={() => window.location.reload()}
+                          >
+                            Retry Loading
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
                 </TabsContent>
 
                 <TabsContent value="achievements" className="m-0 p-0">

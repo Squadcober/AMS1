@@ -16,6 +16,7 @@ export default function SettingsPage() {
   const { user } = useAuth()
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
+  const [isEditing, setIsEditing] = useState(false)
   const [formData, setFormData] = useState({
     phone: "",
     address: "",
@@ -38,7 +39,7 @@ export default function SettingsPage() {
 
       try {
         setIsLoading(true);
-        const response = await fetch(`/api/db/ams-user-info/${user.id}`);
+        const response = await fetch(`/api/db/ams-users-info?userId=${encodeURIComponent(user.id)}`);
         
         if (response.ok) {
           const result = await response.json();
@@ -64,11 +65,32 @@ export default function SettingsPage() {
     fetchUserInfo();
   }, [user?.id]);
 
+  const handleEdit = () => setIsEditing(true);
+
+  const handleCancel = () => {
+    setIsEditing(false);
+    // Reload user info to revert changes
+    if (user?.id) {
+      setIsLoading(true);
+      fetch(`/api/db/ams-users-info?userId=${encodeURIComponent(user.id)}`)
+        .then(res => res.json())
+        .then(result => {
+          if (result.success) {
+            setFormData(prev => ({
+              ...prev,
+              ...result.data
+            }));
+          }
+        })
+        .finally(() => setIsLoading(false));
+    }
+  };
+
   const handleSave = async () => {
-    if (!user?.id) {
+    if (!user?.id || !user?.academyId) {
       toast({
         title: "Error",
-        description: "User ID is missing",
+        description: "User ID or Academy ID is missing",
         variant: "destructive",
       });
       return;
@@ -77,37 +99,52 @@ export default function SettingsPage() {
     try {
       setIsSaving(true);
       
-      // Prepare the data object
+      // Only include the fields we want to update
+      const { 
+        phone, 
+        address, 
+        bio, 
+        photoUrl, 
+        experience, 
+        specializations,
+        socialLinks,
+        certificates
+      } = formData;
+
       const dataToSave = {
         userId: user.id,
-        ...formData,
-        updatedAt: new Date().toISOString(),
-        // Add createdAt only for new documents
-        ...(formData.id ? {} : { createdAt: new Date().toISOString() })
+        academyId: user.academyId,
+        phone,
+        address,
+        bio,
+        photoUrl,
+        experience,
+        specializations,
+        socialLinks,
+        certificates,
+        updatedAt: new Date().toISOString()
       };
 
-      const response = await fetch('/api/db/ams-user-info', {
-        method: 'PUT', // Changed to PUT to handle both create and update
+      const response = await fetch('/api/db/ams-users-info', {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(dataToSave),
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to save settings');
-      }
-
       const result = await response.json();
 
-      if (result.success) {
-        // Update local state with the saved data
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to save settings');
+      }
+
+      if (result.success && result.data) {
         setFormData(prev => ({
           ...prev,
-          ...result.data
+          ...result.data,
         }));
-        
+        setIsEditing(false);
         toast({
           title: "Success",
           description: "Settings saved successfully",
@@ -127,6 +164,11 @@ export default function SettingsPage() {
     }
   };
 
+  const inputProps = {
+    disabled: !isEditing,
+    className: !isEditing ? "bg-muted cursor-not-allowed" : ""
+  };
+
   if (isLoading) {
     return <div className="flex items-center justify-center h-screen">Loading...</div>;
   }
@@ -137,12 +179,16 @@ export default function SettingsPage() {
       <div className="flex-1 space-y-8 p-8 pt-6">
         <div className="flex items-center justify-between">
           <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
-          <Button 
-            onClick={handleSave} 
-            disabled={isSaving}
-          >
-            {isSaving ? "Saving..." : "Save changes"}
-          </Button>
+          {isEditing ? (
+            <div className="flex gap-2">
+              <Button onClick={handleCancel} variant="outline" disabled={isSaving}>Cancel</Button>
+              <Button onClick={handleSave} disabled={isSaving}>
+                {isSaving ? "Saving..." : "Save changes"}
+              </Button>
+            </div>
+          ) : (
+            <Button onClick={handleEdit}>Edit</Button>
+          )}
         </div>
 
         <Tabs defaultValue="profile" className="space-y-6">
@@ -165,6 +211,7 @@ export default function SettingsPage() {
                       id="bio"
                       value={formData.bio}
                       onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
+                      {...inputProps}
                     />
                   </div>
                   <div className="grid gap-2">
@@ -173,6 +220,7 @@ export default function SettingsPage() {
                       id="phone"
                       value={formData.phone}
                       onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                      {...inputProps}
                     />
                   </div>
                   <div className="grid gap-2">
@@ -181,6 +229,7 @@ export default function SettingsPage() {
                       id="address"
                       value={formData.address}
                       onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                      {...inputProps}
                     />
                   </div>
                   <div className="grid gap-2">
@@ -189,6 +238,7 @@ export default function SettingsPage() {
                       id="experience"
                       value={formData.experience}
                       onChange={(e) => setFormData({ ...formData, experience: e.target.value })}
+                      {...inputProps}
                     />
                   </div>
                 </div>
@@ -212,6 +262,7 @@ export default function SettingsPage() {
                         ...formData,
                         socialLinks: { ...formData.socialLinks, twitter: e.target.value }
                       })}
+                      {...inputProps}
                     />
                   </div>
                   <div className="grid gap-2">
@@ -223,6 +274,7 @@ export default function SettingsPage() {
                         ...formData,
                         socialLinks: { ...formData.socialLinks, linkedin: e.target.value }
                       })}
+                      {...inputProps}
                     />
                   </div>
                   <div className="grid gap-2">
@@ -234,6 +286,7 @@ export default function SettingsPage() {
                         ...formData,
                         socialLinks: { ...formData.socialLinks, website: e.target.value }
                       })}
+                      {...inputProps}
                     />
                   </div>
                 </div>
@@ -257,6 +310,7 @@ export default function SettingsPage() {
                         newCerts[index] = { ...cert, name: e.target.value };
                         setFormData({ ...formData, certificates: newCerts });
                       }}
+                      {...inputProps}
                     />
                     <div className="flex gap-4">
                       <Input
@@ -267,6 +321,7 @@ export default function SettingsPage() {
                           newCerts[index] = { ...cert, issueDate: e.target.value };
                           setFormData({ ...formData, certificates: newCerts });
                         }}
+                        {...inputProps}
                       />
                       <Input
                         placeholder="Issuing Authority"
@@ -276,33 +331,38 @@ export default function SettingsPage() {
                           newCerts[index] = { ...cert, issuingAuthority: e.target.value };
                           setFormData({ ...formData, certificates: newCerts });
                         }}
+                        {...inputProps}
                       />
-                      <Button
-                        variant="destructive"
-                        onClick={() => {
-                          const newCerts = formData.certificates.filter((_, i) => i !== index);
-                          setFormData({ ...formData, certificates: newCerts });
-                        }}
-                      >
-                        Remove
-                      </Button>
+                      {isEditing && (
+                        <Button
+                          variant="destructive"
+                          onClick={() => {
+                            const newCerts = formData.certificates.filter((_, i) => i !== index);
+                            setFormData({ ...formData, certificates: newCerts });
+                          }}
+                        >
+                          Remove
+                        </Button>
+                      )}
                     </div>
                   </div>
                 ))}
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setFormData({
-                      ...formData,
-                      certificates: [
-                        ...formData.certificates,
-                        { name: "", issueDate: "", issuingAuthority: "" }
-                      ]
-                    });
-                  }}
-                >
-                  Add Certificate
-                </Button>
+                {isEditing && (
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setFormData({
+                        ...formData,
+                        certificates: [
+                          ...formData.certificates,
+                          { name: "", issueDate: "", issuingAuthority: "" }
+                        ]
+                      });
+                    }}
+                  >
+                    Add Certificate
+                  </Button>
+                )}
               </CardContent>
             </Card>
           </TabsContent>

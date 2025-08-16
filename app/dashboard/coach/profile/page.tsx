@@ -26,6 +26,13 @@ export default function CoachProfilePage() {
   const { user } = useAuth()
   const [isEditing, setIsEditing] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+  const [tempPhotoUrl, setTempPhotoUrl] = useState<string>("")
+  const [editFormData, setEditFormData] = useState({
+    name: "",
+    age: 0,
+    license: "",
+    about: ""
+  })
   const [coachData, setCoachData] = useState({
     name: "",
     age: 0,
@@ -61,64 +68,115 @@ export default function CoachProfilePage() {
     })
   }
 
-  const fetchUserData = async (username: string) => {
-    try {
-      const response = await fetch(`/api/db/coach-profile/ams-users?username=${encodeURIComponent(username)}`)
-      const { success, data } = await response.json()
-      console.log('User data fetch response:', { success, data })
+// --- NEW: simple caching helpers to show cached profile/ratings immediately ---
+const CACHE_KEY_PREFIX = "ams_coach_profile_"
 
-      if (success && data?.id) {
-        setUserId(data.id)
-        return data.id
-      }
-      throw new Error('Failed to fetch user ID')
-    } catch (error) {
-      console.error('Error fetching user ID:', error)
-      return null
-    }
+const loadFromCache = (key: string) => {
+  try {
+    const raw = localStorage.getItem(`${CACHE_KEY_PREFIX}${key}`)
+    if (!raw) return null
+    return JSON.parse(raw)
+  } catch {
+    return null
   }
+}
 
+const saveToCache = (key: string, data: any) => {
+  try {
+    localStorage.setItem(`${CACHE_KEY_PREFIX}${key}`, JSON.stringify(data))
+  } catch {
+    // ignore
+  }
+}
+// --- end new helpers ---
+
+  // Replace the two existing useEffect hooks (profile + ratings) with one optimized effect
   useEffect(() => {
-    const loadCoachData = async () => {
+    if (!user?.username || !user?.academyId) {
+      // Pre-fill visible fields from user context so UI is responsive immediately
+      setCoachData(prev => ({
+        ...prev,
+        name: user?.name || prev.name,
+        photoUrl: (user as any)?.photoUrl || prev.photoUrl
+      }))
+      setIsLoading(false)
+      return
+    }
+
+    const controller = new AbortController()
+    const signal = controller.signal
+
+    const fetchAll = async () => {
       try {
         setIsLoading(true)
-        console.log('Loading coach data for user:', user)
 
-        if (!user?.username || !user?.academyId) {
-          console.warn('Missing user data:', { username: user?.username, academyId: user?.academyId })
-          throw new Error("User data is incomplete")
-        }
+        // 1) fetch user id
+        const idResp = await fetch(`/api/db/coach-profile/ams-users?username=${encodeURIComponent(user.username)}`, { signal })
+        if (!idResp.ok) throw new Error("Failed to fetch user id")
+        const idJson = await idResp.json()
+        const id = idJson?.data?.id
+        if (!id) throw new Error("No user id returned")
+        setUserId(id)
 
-        const id = await fetchUserData(user.username)
-        if (!id) {
-          throw new Error('Could not fetch user ID')
-        }
-
-        const response = await fetch(`/api/db/coach-profile/${id}`)
-        const { success, data } = await response.json()
-        console.log('Coach API Response:', { success, data })
-
-        if (success && data) {
-          const processedRatings = processRatings(data.ratings || [])
-          setCoachData({
-            name: data.name || user.name || "",
-            age: data.age || 0,
-            license: data.license || "",
-            ratings: processedRatings,
-            about: data.about || "",
-            photoUrl: data.photoUrl || "/placeholder.svg",
-            sessionsCount: data.sessionsCount || 0
-          })
-          
-          if (data.ratings?.length > 0) {
-            setRatings(processedRatings)
+        // 2) try to show cached data immediately
+        const cached = loadFromCache(id)
+        if (cached) {
+          setCoachData(prev => ({
+            ...prev,
+            ...cached.profile
+          }))
+          if (cached.ratings) {
+            setRatings(processRatings(cached.ratings))
           }
+        } else {
+          // quick prefill from user while we fetch full data
+          setCoachData(prev => ({
+            ...prev,
+            name: user.name || prev.name,
+            photoUrl: (user as any)?.photoUrl || prev.photoUrl
+          }))
         }
-      } catch (error) {
-        console.error('Error loading coach data:', error)
+
+        // 3) fetch profile and ratings in parallel to save time
+        const [profileResp, ratingsResp] = await Promise.all([
+          fetch(`/api/db/coach-profile/${id}`, { signal }),
+          fetch(`/api/db/coach-ratings?coachId=${id}`, { signal })
+        ])
+
+        if (!profileResp.ok) throw new Error("Failed to fetch coach profile")
+        if (!ratingsResp.ok) throw new Error("Failed to fetch coach ratings")
+
+        const profileJson = await profileResp.json()
+        const ratingsJson = await ratingsResp.json()
+
+        const profileData = profileJson?.data || {}
+        const ratingsData = Array.isArray(ratingsJson?.data) ? ratingsJson.data : []
+
+        // process and set states
+        const processedRatings = processRatings(ratingsData)
+        setCoachData({
+          name: profileData.name || user.name || "",
+          age: profileData.age || 0,
+          license: profileData.license || "",
+          ratings: processedRatings,
+          about: profileData.about || "",
+          photoUrl: profileData.photoUrl || "/placeholder.svg",
+          sessionsCount: profileData.sessionsCount || 0
+        })
+
+        setRatings(processedRatings)
+
+        // save to cache for next load
+        saveToCache(id, { profile: profileData, ratings: ratingsData })
+      } catch (err) {
+        if ((err as any)?.name === "AbortError") {
+          // aborted, ignore
+          return
+        }
+        console.error("Error loading coach data:", err)
         toast({
           title: "Error",
-          description: error instanceof Error ? error.message : "Failed to load coach data",
+          description: err instanceof Error ? err.message : "Failed to load coach data",
           variant: "destructive"
         })
       } finally {
@@ -126,37 +184,12 @@ export default function CoachProfilePage() {
       }
     }
 
-    if (user?.username && user?.academyId) {
-      loadCoachData()
-    } else {
-      console.warn('User not ready:', user)
-      setIsLoading(false)
+    fetchAll()
+
+    return () => {
+      controller.abort()
     }
   }, [user?.username, user?.academyId])
-
-  useEffect(() => {
-    const loadRatings = async () => {
-      try {
-        if (!userId) {
-          console.warn('Cannot load ratings - no user ID')
-          return
-        }
-
-        const response = await fetch(`/api/db/coach-ratings?coachId=${userId}`)
-        const { success, data } = await response.json()
-        console.log('Ratings API Response:', { success, data })
-
-        if (success) {
-          console.log('Setting ratings:', data)
-          setRatings(processRatings(data))
-        }
-      } catch (error) {
-        console.error('Error loading ratings:', error)
-      }
-    }
-
-    loadRatings()
-  }, [userId])
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
@@ -168,10 +201,32 @@ export default function CoachProfilePage() {
     if (file) {
       const reader = new FileReader()
       reader.onloadend = () => {
-        setCoachData((prev) => ({ ...prev, photoUrl: reader.result as string }))
+        setTempPhotoUrl(reader.result as string)
       }
       reader.readAsDataURL(file)
     }
+  }
+
+  const handleCancelEdit = () => {
+    setIsEditing(false)
+    setTempPhotoUrl("")
+    setEditFormData({
+      name: coachData.name,
+      age: coachData.age,
+      license: coachData.license,
+      about: coachData.about
+    })
+  }
+
+  const startEditing = () => {
+    setIsEditing(true)
+    setTempPhotoUrl(coachData.photoUrl)
+    setEditFormData({
+      name: coachData.name,
+      age: coachData.age,
+      license: coachData.license,
+      about: coachData.about
+    })
   }
 
   const handleSave = async () => {
@@ -224,6 +279,53 @@ export default function CoachProfilePage() {
       name: user?.name
     }
   })
+
+  // Update the photo display section (replace the existing photo element):
+  const photoDisplaySection = (
+    <div className="relative w-32 h-32">
+      {isEditing ? (
+        <label className="cursor-pointer w-full h-full flex items-center justify-center border-2 border-dashed border-gray-300 rounded-full overflow-hidden">
+          {tempPhotoUrl ? (
+            <Image
+              src={tempPhotoUrl}
+              alt="Preview"
+              width={128}
+              height={128}
+              className="rounded-full object-cover"
+            />
+          ) : (
+            <div className="text-center">
+              <FileUp className="mx-auto h-6 w-6 text-gray-400" />
+              <span className="mt-1 text-xs font-medium">Upload Photo</span>
+            </div>
+          )}
+          <input type="file" className="hidden" accept="image/*" onChange={handlePhotoChange} />
+        </label>
+      ) : (
+        <Image
+          src={coachData.photoUrl || "/placeholder.svg"}
+          alt={coachData.name}
+          width={128}
+          height={128}
+          className="rounded-full object-cover"
+        />
+      )}
+    </div>
+  )
+
+  // Update the buttons section:
+  const actionButtons = (
+    <div className="flex justify-end gap-4">
+      {isEditing ? (
+        <>
+          <Button variant="outline" onClick={handleCancelEdit}>Cancel</Button>
+          <Button onClick={handleSave}>Save Changes</Button>
+        </>
+      ) : (
+        <Button onClick={startEditing}>Edit Profile</Button>
+      )}
+    </div>
+  )
 
   return (
     <div className="flex h-screen overflow-hidden">
@@ -280,25 +382,7 @@ export default function CoachProfilePage() {
                     </>
                   )}
                 </div>
-                <div className="relative w-32 h-32">
-                  {isEditing ? (
-                    <label className="cursor-pointer w-full h-full flex items-center justify-center border-2 border-dashed border-gray-300 rounded-full overflow-hidden">
-                      <div className="text-center">
-                        <FileUp className="mx-auto h-6 w-6 text-gray-400" />
-                        <span className="mt-1 text-xs font-medium">Upload Photo</span>
-                      </div>
-                      <input type="file" className="hidden" accept="image/*" onChange={handlePhotoChange} />
-                    </label>
-                  ) : (
-                    <Image
-                      src={coachData.photoUrl || "/placeholder.svg"}
-                      alt={coachData.name}
-                      width={128}
-                      height={128}
-                      className="rounded-full object-cover"
-                    />
-                  )}
-                </div>
+                {photoDisplaySection}
               </div>
             </CustomTooltip>
           </div>
@@ -342,6 +426,7 @@ export default function CoachProfilePage() {
                             width={32}
                             height={32}
                             className="rounded-full mr-2"
+                            loading="lazy"
                           />
                         ) : (
                           <div className="w-8 h-8 bg-gray-600 rounded-full mr-2" />
@@ -384,13 +469,7 @@ export default function CoachProfilePage() {
           </CardContent>
         </Card>
 
-        <div className="flex justify-end">
-          {isEditing ? (
-            <Button onClick={handleSave}>Save Changes</Button>
-          ) : (
-            <Button onClick={() => setIsEditing(true)}>Edit Profile</Button>
-          )}
-        </div>
+        {actionButtons}
       </div>
     </div>
   )

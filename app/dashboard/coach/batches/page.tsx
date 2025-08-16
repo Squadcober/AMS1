@@ -68,27 +68,40 @@ export default function BatchesPage() {
   const [newBatchName, setNewBatchName] = useState("")
   const [selectedPlayers, setSelectedPlayers] = useState<string[]>([])
   const [players, setPlayers] = useState<any[]>([])
-  const [batchCoaches, setBatchCoaches] = useState<{ [batchId: string]: any[] }>({})
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [editingBatch, setEditingBatch] = useState<any>(null)
   const [batchNameError, setBatchNameError] = useState("")
   const [allPlayersSelected, setAllPlayersSelected] = useState(false)
 
   useEffect(() => {
-    const fetchBatches = async () => {
-      if (!user?.academyId) return;
+    const fetchBatchesForPlayer = async () => {
+      if (!user?.academyId || !user?.id) return;
 
       try {
         setIsLoading(true);
-        const response = await fetch(`/api/db/ams-batches?academyId=${user.academyId}`);
-        if (!response.ok) throw new Error("Failed to fetch batches");
 
-        const result = await response.json();
-        if (result.success) {
-          setLocalBatches(result.data);
-        }
+        // Step 1: Fetch the user's player id
+        const playerRes = await fetch(`/api/db/ams-player-data?academyId=${user.academyId}&userId=${user.id}`);
+        if (!playerRes.ok) throw new Error("Failed to fetch player data");
+        const playerJson = await playerRes.json();
+        const playerObj = Array.isArray(playerJson.data) ? playerJson.data[0] : playerJson.data;
+        const playerId = playerObj?.playerId || playerObj?.id || playerObj?._id;
+        if (!playerId) throw new Error("Player ID not found for user");
+
+        // Step 2: Fetch all batches for the academy
+        const batchesRes = await fetch(`/api/db/ams-batches?academyId=${user.academyId}`);
+        if (!batchesRes.ok) throw new Error("Failed to fetch batches");
+        const batchesJson = await batchesRes.json();
+        const allBatches = Array.isArray(batchesJson.data) ? batchesJson.data : [];
+
+        // Step 3: Filter batches to only those containing the player's playerId
+        const filteredBatches = allBatches.filter((batch: any) =>
+          Array.isArray(batch.players) && batch.players.includes(playerId)
+        );
+
+        setLocalBatches(filteredBatches);
       } catch (error) {
-        console.error("Error fetching batches:", error);
+        console.error("Error fetching batches for player:", error);
         toast({
           title: "Error",
           description: "Failed to load batches",
@@ -99,8 +112,8 @@ export default function BatchesPage() {
       }
     };
 
-    fetchBatches();
-  }, [user?.academyId]);
+    fetchBatchesForPlayer();
+  }, [user?.academyId, user?.id]);
 
   useEffect(() => {
     const fetchBatchPlayers = async (batchId: string) => {
@@ -124,78 +137,6 @@ export default function BatchesPage() {
       fetchBatchPlayers(selectedBatch._id);
     }
   }, [selectedBatch]);
-
-  useEffect(() => {
-    const fetchBatchCoaches = async (batchId: string) => {
-      try {
-        const batch = localBatches.find(b => b._id === batchId);
-        if (!batch?.coachIds?.length) {
-          console.log("No coach IDs found for batch:", batchId);
-          setBatchCoaches(prev => ({ ...prev, [batchId]: [] }));
-          return;
-        }
-
-        console.log("Fetching coaches for batch:", batchId, "Coach IDs:", batch.coachIds);
-
-        // Fetch coach details for each coachId
-        const coachPromises = batch.coachIds.map(async (coachId: string) => {
-          try {
-            // First try to get user details if ID starts with user_
-            if (coachId.startsWith('user_')) {
-              const userResponse = await fetch(`/api/db/ams-users/${coachId}`);
-              const userData = await userResponse.json();
-              
-              if (userData.success) {
-                // Also fetch coach profile data
-                const coachResponse = await fetch(`/api/db/coach-profile/${coachId}`);
-                const coachData = await coachResponse.json();
-                
-                return {
-                  id: coachId,
-                  name: userData.data?.name || userData.data?.username || "Unknown Coach",
-                  email: userData.data?.email,
-                  photoUrl: userData.data?.photoUrl,
-                  ...coachData.data // Merge coach profile data
-                };
-              }
-            }
-
-            // Fallback to coaches collection
-            const response = await fetch(`/api/db/ams-coaches/${coachId}`);
-            if (!response.ok) {
-              console.log(`Failed to fetch coach with ID: ${coachId}`);
-              return null;
-            }
-
-            const result = await response.json();
-            return result.success ? result.data : null;
-
-          } catch (error) {
-            console.error(`Error fetching coach ${coachId}:`, error);
-            return null;
-          }
-        });
-
-        const coachResults = await Promise.all(coachPromises);
-        const validCoaches = coachResults.filter(Boolean);
-
-        console.log("Found coaches:", validCoaches);
-
-        setBatchCoaches(prev => ({
-          ...prev,
-          [batchId]: validCoaches
-        }));
-
-      } catch (error) {
-        console.error("Error fetching batch coaches:", error);
-        setBatchCoaches(prev => ({ ...prev, [batchId]: [] }));
-      }
-    };
-
-    if (selectedBatch?._id) {
-      fetchBatchCoaches(selectedBatch._id);
-    }
-  }, [selectedBatch, localBatches]);
 
   useEffect(() => {
     const fetchPlayers = async () => {
@@ -347,7 +288,7 @@ export default function BatchesPage() {
         const batches = batchesResult.data;
         setLocalBatches(batches);
         
-        // Fetch players and coaches for each batch
+        // Fetch players for each batch
         await Promise.all(batches.map(async (batch: any) => {
           // Fetch players
           const playersResponse = await fetch(`/api/db/ams-batches/${batch._id}/players`);
@@ -356,38 +297,6 @@ export default function BatchesPage() {
             setBatchPlayers(prev => ({
               ...prev,
               [batch._id]: playersResult.data
-            }));
-          }
-
-          // Fetch coaches
-          if (batch.coachIds?.length) {
-            const coachPromises = batch.coachIds.map(async (coachId: string) => {
-              if (coachId.startsWith('user_')) {
-                const userResponse = await fetch(`/api/db/ams-users/${coachId}`);
-                const userData = await userResponse.json();
-                
-                if (userData.success) {
-                  const coachResponse = await fetch(`/api/db/coach-profile/${coachId}`);
-                  const coachData = await coachResponse.json();
-                  
-                  return {
-                    id: coachId,
-                    name: userData.data?.name || userData.data?.username || "Unknown Coach",
-                    email: userData.data?.email,
-                    photoUrl: userData.data?.photoUrl,
-                    ...coachData.data
-                  };
-                }
-              }
-              return null;
-            });
-
-            const coachResults = await Promise.all(coachPromises);
-            const validCoaches = coachResults.filter(Boolean);
-
-            setBatchCoaches(prev => ({
-              ...prev,
-              [batch._id]: validCoaches
             }));
           }
         }));
@@ -694,38 +603,12 @@ export default function BatchesPage() {
                       <TableHeader>
                         <TableRow>
                           <TableHead>Name</TableHead>
-                          <TableHead>Email</TableHead>
-                          <TableHead>Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {batchCoaches[selectedBatch._id]?.map((coach: any) => (
-                          <TableRow key={coach.id}>
-                            <TableCell>
-                              <div className="flex items-center gap-2">
-                                <Avatar className="h-8 w-8">
-                                  <AvatarImage src={coach.photoUrl} />
-                                  <AvatarFallback>{coach.name?.[0]}</AvatarFallback>
-                                </Avatar>
-                                {coach.name}
-                              </div>
-                            </TableCell>
-                            <TableCell>{coach.email}</TableCell>
-                            <TableCell>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                // TODO: Implement coach details modal if needed
-                                onClick={() => {
-                                  toast({
-                                    title: "Info",
-                                    description: "Coach details view not implemented.",
-                                  });
-                                }}
-                              >
-                                View Details
-                              </Button>
-                            </TableCell>
+                        {selectedBatch.coachNames?.map((coachName: string, index: number) => (
+                          <TableRow key={index}>
+                            <TableCell>{coachName}</TableCell>
                           </TableRow>
                         ))}
                       </TableBody>

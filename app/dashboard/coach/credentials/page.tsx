@@ -25,6 +25,10 @@ interface Credential {
 
 const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB in bytes
 
+const LoadingSpinner = () => (
+  <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+);
+
 export default function Credentials() {
   const { user } = useAuth()
   const { toast } = useToast()
@@ -37,11 +41,11 @@ export default function Credentials() {
   })
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [page, setPage] = useState(1)
-  const [loading, setLoading] = useState(false)
   const [hasMore, setHasMore] = useState(true)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [previewDoc, setPreviewDoc] = useState<{url: string, type: string} | null>(null);
+  const [isAddingCredential, setIsAddingCredential] = useState(false); // Add this state near other state declarations
   const ITEMS_PER_PAGE = 10
 
   useEffect(() => {
@@ -134,6 +138,8 @@ export default function Credentials() {
   }
 
   const handleAddCredential = async () => {
+    if (isAddingCredential) return; // Prevent multiple submissions
+    
     if (!user?.username || !user?.academyId) {
       console.error('Missing user data:', { username: user?.username, academyId: user?.academyId });
       toast({
@@ -145,6 +151,7 @@ export default function Credentials() {
     }
 
     try {
+      setIsAddingCredential(true); // Set loading state
       // Get user ID from ams-users collection
       const userResponse = await fetch(`/api/db/ams-users?username=${encodeURIComponent(user.username)}`);
       const userData = await userResponse.json();
@@ -207,6 +214,8 @@ export default function Credentials() {
         description: error instanceof Error ? error.message : "Failed to add credential",
         variant: "destructive"
       });
+    } finally {
+      setIsAddingCredential(false); // Reset loading state
     }
   };
 
@@ -304,14 +313,13 @@ export default function Credentials() {
       <Sidebar />
       <div className="flex-1 overflow-y-auto">
         <div className="p-8 space-y-6">
-          {/* Make header sticky with background */}
+          {/* Header section */}
           <div className="flex justify-between items-center sticky top-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-20 py-4">
             <h1 className="text-3xl font-bold">My Credentials</h1>
             <Dialog>
               <DialogTrigger asChild>
-                <Button>Add Credential</Button>
+                <Button disabled={isLoading}>Add Credential</Button>
               </DialogTrigger>
-              {/* Make dialog content scrollable */}
               <DialogContent className="max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle>Add New Credential</DialogTitle>
@@ -351,7 +359,20 @@ export default function Credentials() {
                       onChange={handleFileChange}
                     />
                   </div>
-                  <Button onClick={handleAddCredential}>Add Credential</Button>
+                  <Button 
+                    onClick={handleAddCredential} 
+                    disabled={isAddingCredential}
+                    className="w-full"
+                  >
+                    {isAddingCredential ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <LoadingSpinner />
+                        Adding...
+                      </span>
+                    ) : (
+                      "Add Credential"
+                    )}
+                  </Button>
                 </div>
               </DialogContent>
             </Dialog>
@@ -365,78 +386,89 @@ export default function Credentials() {
           )}
 
           {/* Loading state */}
-          {isLoading && credentials.length === 0 && (
-            <div className="text-center p-4">
-              Loading credentials...
+          {isLoading && credentials.length === 0 ? (
+            <div className="flex flex-col items-center justify-center p-8 space-y-4">
+              <LoadingSpinner />
+              <p className="text-muted-foreground">Loading credentials...</p>
             </div>
-          )}
-
-          {/* Make credentials grid scrollable */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-6">
-            {credentials.map((credential) => (
-              <Card key={credential._id}>
-                <CardHeader>
-                  <CardTitle className="flex justify-between items-start">
-                    <span>{credential.title}</span>
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => handleDeleteCredential(credential._id)}
-                    >
-                      Delete
-                    </Button>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    <div>
-                      <Badge>{credential.issuer}</Badge>
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                      Issued: {new Date(credential.date).toLocaleDateString()}
-                    </p>
-                    {credential.document && (
-                      <div className="mt-4 flex gap-2">
-                        <Button 
-                          variant="outline" 
+          ) : (
+            <>
+              {/* Make credentials grid scrollable */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-6">
+                {credentials.map((credential) => (
+                  <Card key={credential._id}>
+                    <CardHeader>
+                      <CardTitle className="flex justify-between items-start">
+                        <span>{credential.title}</span>
+                        <Button
+                          variant="destructive"
                           size="sm"
-                          onClick={() => handlePreview(credential.document!)}
-                          className="flex items-center gap-2"
+                          onClick={() => handleDeleteCredential(credential._id)}
                         >
-                          <Eye className="h-4 w-4" />
-                          Preview
+                          Delete
                         </Button>
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => handleDownload(
-                            credential.document!, 
-                            `${credential.title}-${credential.issuer}.${getFileExtension(credential.document!)}`
-                          )}
-                          className="flex items-center gap-2"
-                        >
-                          <Download className="h-4 w-4" />
-                          Download
-                        </Button>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2">
+                        <div>
+                          <Badge>{credential.issuer}</Badge>
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          Issued: {new Date(credential.date).toLocaleDateString()}
+                        </p>
+                        {credential.document && (
+                          <div className="mt-4 flex gap-2">
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => handlePreview(credential.document!)}
+                              className="flex items-center gap-2"
+                            >
+                              <Eye className="h-4 w-4" />
+                              Preview
+                            </Button>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => handleDownload(
+                                credential.document!, 
+                                `${credential.title}-${credential.issuer}.${getFileExtension(credential.document!)}`
+                              )}
+                              className="flex items-center gap-2"
+                            >
+                              <Download className="h-4 w-4" />
+                              Download
+                            </Button>
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
 
-          {/* Add load more button */}
-          {hasMore && (
-            <div className="flex justify-center pb-6">
-              <Button
-                onClick={loadMore}
-                disabled={isLoading}
-                variant="outline"
-              >
-                {isLoading ? "Loading..." : "Load More"}
-              </Button>
-            </div>
+              {/* Load more button - only show spinner in button when loading more */}
+              {hasMore && (
+                <div className="flex justify-center pb-6">
+                  <Button
+                    onClick={loadMore}
+                    disabled={isLoading}
+                    variant="outline"
+                    className="min-w-[120px]"
+                  >
+                    {isLoading && credentials.length > 0 ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <LoadingSpinner />
+                        Loading more...
+                      </span>
+                    ) : (
+                      "Load More"
+                    )}
+                  </Button>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>

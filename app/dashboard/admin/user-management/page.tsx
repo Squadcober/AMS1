@@ -157,17 +157,40 @@ export default function UserManagementPage() {
       if (!userToUpdate) return;
 
       const newStatus = userToUpdate.status === 'active' ? 'inactive' : 'active';
-      
-      const response = await fetch(`/api/db/ams-users/${userId}`, {
+
+      // Only update ams-player-info for players
+      if (userToUpdate.role === 'player') {
+        // Ensure required fields exist before calling player endpoint
+        if (!userToUpdate.username || !userToUpdate.academyId) {
+          throw new Error('Missing username or academyId for player update');
+        }
+
+        const resPlayer = await fetch('/api/db/ams-player-info', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            username: userToUpdate.username,
+            academyId: userToUpdate.academyId,
+            status: newStatus
+          })
+        });
+
+        const dataPlayer = await resPlayer.json();
+        if (!resPlayer.ok || !dataPlayer.success) {
+          throw new Error(dataPlayer.error || 'Failed to update player status');
+        }
+      }
+
+      // Always update ams-users status
+      const resUser = await fetch(`/api/db/ams-users/${userId}`, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus }),
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to update user status');
+      const dataUser = await resUser.json();
+      if (!resUser.ok || !dataUser.success) {
+        throw new Error(dataUser.error || 'Failed to update user status');
       }
 
       // Update local state immediately
@@ -177,15 +200,23 @@ export default function UserManagementPage() {
         )
       );
 
-      toast({
-        title: "Status Updated",
-        description: `User status changed to ${newStatus}`,
-      });
+      // Toast message differs for players vs non-players
+      if (userToUpdate.role === 'player') {
+        toast({
+          title: "Status Updated",
+          description: `Player status changed to ${newStatus} in ams-player-data and ams-users`,
+        });
+      } else {
+        toast({
+          title: "Status Updated",
+          description: `User status changed to ${newStatus} in ams-users`,
+        });
+      }
 
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to update user status",
+        description: (error as any)?.message || "Failed to update player/user status",
         variant: "destructive",
       });
     }

@@ -136,13 +136,25 @@ const POSITION_TYPES = [
 ] as const;
 
 const AVAILABLE_POSITIONS: AvailablePosition[] = [
+  { value: "any", label: "Any Position" },
   { value: "goalkeeper", label: "Goalkeeper" },
+  // Defenders
+  { value: "leftback", label: "Left Back" },
+  { value: "rightback", label: "Right Back" },
+  { value: "centreback", label: "Centre Back" },
   { value: "defender", label: "Defender" },
+  // Midfielders
+  { value: "defensivemid", label: "Defensive Midfielder" },
+  { value: "centralmid", label: "Central Midfielder" },
+  { value: "attackingmid", label: "Attacking Midfielder" },
+  { value: "leftmid", label: "Left Midfielder" },
+  { value: "rightmid", label: "Right Midfielder" },
   { value: "midfielder", label: "Midfielder" },
-  { value: "forward", label: "Forward" },
+  // Forwards/Wingers
+  { value: "leftwinger", label: "Left Winger" },
+  { value: "rightwinger", label: "Right Winger" },
   { value: "striker", label: "Striker" },
-  { value: "winger", label: "Winger" },
-  { value: "any", label: "Any Position" }
+  { value: "forward", label: "Forward" }
 ];
 
 export default function TeamBuilder() {
@@ -1739,15 +1751,22 @@ export default function TeamBuilder() {
     }
   }, [user?.academyId]);
 
-  // Update handlePositionChange function to directly update the database
+  // Update handlePositionChange function to properly handle the position value
   const handlePositionChange = async (playerId: string, newPosition: string) => {
     try {
-      // First update the database
+      // Find the position object from AVAILABLE_POSITIONS
+      const positionObj = AVAILABLE_POSITIONS.find(pos => pos.value === newPosition);
+      const positionLabel = positionObj ? positionObj.label : "Any Position";
+      
+      // Use the label for display but store the value
+      const normalizedPosition = newPosition === "any" ? undefined : newPosition;
+
       const response = await fetch(`/api/db/ams-player-data/${playerId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          position: newPosition,
+          position: normalizedPosition,
+          positionLabel: positionLabel, // Optional: store both value and label
         })
       });
 
@@ -1761,10 +1780,10 @@ export default function TeamBuilder() {
         throw new Error(result.error || 'Failed to update position');
       }
 
-      // Directly update the player's position in the players array
+      // Update local state with the normalized position
       setPlayers(players.map(player => 
         player.id.toString() === playerId 
-          ? { ...player, position: newPosition }
+          ? { ...player, position: normalizedPosition }
           : player
       ));
 
@@ -2010,13 +2029,16 @@ export default function TeamBuilder() {
                                   <span className="font-medium">{player.name}</span>
                                   <div className="flex items-center gap-2">
                                     <select
-                                      value={player.position || ""}
+                                      value={getPositionValue(player.position)}
                                       onChange={(e) => handlePositionChange(player.id.toString(), e.target.value)}
                                       className="text-xs bg-background border rounded px-1 py-0.5"
                                       onClick={(e) => e.stopPropagation()}
                                     >
                                       {AVAILABLE_POSITIONS.map((pos) => (
-                                        <option key={pos.value} value={pos.value}>
+                                        <option 
+                                          key={pos.value} 
+                                          value={pos.value}
+                                        >
                                           {pos.label}
                                         </option>
                                       ))}
@@ -2184,17 +2206,26 @@ export default function TeamBuilder() {
           {/* Make other sections scrollable */}
           <div className="space-y-4 overflow-x-auto">
             <div className="space-y-4">
-              <label htmlFor="batch" className="text-white">Select Batch</label>
+              <div className="flex justify-between items-center">
+                <label htmlFor="batch" className="text-white">Select Batch</label>
+                {selectedBatch && (
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => setSelectedBatch(null)}
+                  >
+                    Clear Selection
+                  </Button>
+                )}
+              </div>
               <select
                 id="batch"
                 value={selectedBatch || ""}
                 onChange={(e) => setSelectedBatch(e.target.value)}
                 className="w-full p-2 border rounded-md bg-gray-800 text-white"
               >
-                <option value="" disabled>
-                  Select a batch
-                </option>
-                {filteredBatches.map((batch) => ( // Use filteredBatches instead of batches
+                <option value="">Select a batch</option>
+                {filteredBatches.map((batch) => (
                   <option key={batch.id} value={batch.id}>
                     {batch.name}
                   </option>
@@ -2463,6 +2494,22 @@ function getPositionStyle(positionId: string, selectedGamePlan: GamePlan | null)
     left: position?.left || defaultCoordinates.left,
     transform: "translate(-50%, -50%)",
   };
+}
+
+// Helper function to map player.position to the corresponding value in AVAILABLE_POSITIONS
+function getPositionValue(position: string | undefined): string {
+  if (!position) return "any";
+  // Try to find a matching value in AVAILABLE_POSITIONS
+  const found = AVAILABLE_POSITIONS.find(
+    (pos) => pos.value.toLowerCase() === position.toLowerCase()
+  );
+  if (found) return found.value;
+  // Try to match by label as fallback
+  const foundByLabel = AVAILABLE_POSITIONS.find(
+    (pos) => pos.label.toLowerCase() === position.toLowerCase()
+  );
+  if (foundByLabel) return foundByLabel.value;
+  return "any";
 }
 
 const getDefaultPositionStyle = (positionId: string): { top: string; left: string } => {

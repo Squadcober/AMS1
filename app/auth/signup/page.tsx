@@ -39,7 +39,7 @@ export default function SignUpPage() {
         role,
         academyId,
         createdAt: new Date(),
-        status: role === 'admin' ? 'active' : 'inactive'
+        status: role === 'admin' ? 'active' : 'inactive' // always active for admin
       }
 
       let response;

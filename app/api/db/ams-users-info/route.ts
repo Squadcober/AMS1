@@ -42,29 +42,42 @@ export async function POST(request: NextRequest) {
     }
 
     const db = await getDatabase();
-    const result = await db.collection('ams-users-info').updateOne(
-      { userId, academyId },
-      { 
-        $set: {
-          ...rest,
-          updatedAt: new Date().toISOString()
-        },
-        $setOnInsert: {
-          createdAt: new Date().toISOString()
-        }
+
+    // Only include certificates/specializations in $setOnInsert if not present in $set
+    const setOnInsert: any = {
+      createdAt: new Date().toISOString()
+    };
+    if (rest.certificates === undefined) setOnInsert.certificates = [];
+    if (rest.specializations === undefined) setOnInsert.specializations = [];
+
+    const updatePayload = {
+      $set: {
+        userId,
+        academyId,
+        ...rest,
+        updatedAt: new Date().toISOString()
       },
-      { upsert: true }
+      $setOnInsert: setOnInsert
+    };
+
+    const opts: any = { upsert: true, returnDocument: 'after' };
+    const result = await db.collection('ams-users-info').findOneAndUpdate(
+      { userId, academyId },
+      updatePayload,
+      opts
     );
+
+    const updatedDoc = result.value;
 
     return NextResponse.json({
       success: true,
-      data: result
+      data: updatedDoc || {}
     });
   } catch (error) {
-    console.error('Error updating user info:', error);
+    console.error('Error updating user info (POST /api/db/ams-users-info):', error);
     return NextResponse.json({
       success: false,
-      error: 'Failed to update user info'
+      error: error instanceof Error ? error.message : 'Failed to update user info'
     }, { status: 500 });
   }
 }

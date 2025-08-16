@@ -30,41 +30,78 @@ export default function playerBatches() {
   const [batchCoachDetails, setBatchCoachDetails] = useState<{ [coachId: string]: any }>({});
   const [allBatchCoachDetails, setAllBatchCoachDetails] = useState<{ [batchId: string]: { [coachId: string]: any } }>({});
   const [coachProfileCache, setCoachProfileCache] = useState<{ [coachId: string]: any }>({});
+  const [coachCache, setCoachCache] = useState<{ [key: string]: any }>({});
+  const [playerCache, setPlayerCache] = useState<{ [key: string]: any }>({});
+  const [isFetchingCoaches, setIsFetchingCoaches] = useState<{ [key: string]: boolean }>({});
+  const [isFetchingPlayers, setIsFetchingPlayers] = useState<{ [key: string]: boolean }>({});
+  const [pendingFetches, setPendingFetches] = useState<{ [key: string]: AbortController }>({});
+
+  // Add this helper function to manage player data cache
+  const fetchMissingPlayerData = async (playerIds: string[]) => {
+    // Filter out IDs that are already in the cache
+    const missingIds = playerIds.filter(id => !playerCache[id]);
+    
+    if (missingIds.length === 0) return;
+
+    try {
+      const response = await fetch(`/api/db/ams-player-data/batch?ids=${missingIds.join(',')}`);
+      if (!response.ok) return;
+      
+      const data = await response.json();
+      const newPlayerCache: { [key: string]: any } = {};
+      
+      data.data.forEach((player: any) => {
+        const playerId = player.id || player._id;
+        if (playerId) {
+          newPlayerCache[playerId] = {
+            name: player.name || "Unknown Player",
+            photoUrl: player.photoUrl || "/placeholder.svg",
+            position: player.position || "No position"
+          };
+        }
+      });
+      
+      setPlayerCache(prev => ({ ...prev, ...newPlayerCache }));
+      setPlayers(prev => [...prev, ...data.data]);
+    } catch (error) {
+      console.error('Error fetching missing player data:', error);
+    }
+  };
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         if (!user?.academyId) return;
 
-        const playerResponse = await fetch(`/api/db/ams-player-data?academyId=${user.academyId}&userId=${user.id}&username=${user.username}&email=${user.email}`);
+        // First get the player data to get the correct player ID
+        const playerResponse = await fetch(`/api/db/ams-player-data?academyId=${user.academyId}&userId=${user.id}`);
         const playerData = await playerResponse.json();
         
-        const currentPlayer = playerData.data?.[0];
-        if (!currentPlayer) {
-          console.error('Current player not found for user:', {
-            id: user.id,
-            username: user.username,
-            email: user.email
-          });
+        const playerObj = playerData.data?.[0];
+        if (!playerObj) {
+          console.error('Player not found');
           return;
         }
 
-        setCurrentPlayer(currentPlayer);
+        // Get the player ID in the format "player_xxxxxx"
+        const playerId = playerObj.playerId || playerObj.id;
+        if (!playerId) {
+          console.error('No valid player ID found');
+          return;
+        }
 
-        // Use the player id string (starting with player_) for batch matching
-        const playerId = currentPlayer.id;
+        setCurrentPlayer(playerObj);
 
-        // Fetch all batches for this academy
+        // Then fetch batches and filter by player ID
         const batchesResponse = await fetch(`/api/db/ams-batches?academyId=${user.academyId}`);
         if (!batchesResponse.ok) throw new Error('Failed to fetch batches');
         const batchesData = await batchesResponse.json();
 
-        // Only include batches where the player's id is present in the batch.players array
-        const playerBatches = batchesData.data.filter((batch: any) =>
-          Array.isArray(batch.players) &&
-          batch.players.some((pid: any) =>
-            typeof pid === "string" && pid === playerId
-          )
+        // Filter batches to only those containing the player ID
+        const allBatches = Array.isArray(batchesData.data) ? batchesData.data : [];
+        const playerBatches = allBatches.filter((batch: any) => 
+          Array.isArray(batch.players) && 
+          batch.players.includes(playerId)
         );
 
         setBatches(playerBatches);
@@ -95,15 +132,16 @@ export default function playerBatches() {
 
         setCoachData(coachDataMap);
 
-        const allPlayerIds = [...new Set(playerBatches.flatMap((batch: any) => batch.players || []))];
-        if (allPlayerIds.length) {
-          const playersResponse = await fetch(`/api/db/ams-player-data/batch?ids=${allPlayerIds.join(',')}`);
-          if (playersResponse.ok) {
-            const playersData = await playersResponse.json();
-            setPlayers(playersData.data);
-            setAssignedPlayers(playersData.data.map((p: any) => p.id));
+        // After setting batches, collect all unique player IDs
+        const allPlayerIds = new Set<string>();
+        playerBatches.forEach((batch: any) => {
+          if (Array.isArray(batch.players)) {
+            batch.players.forEach((id: string) => allPlayerIds.add(id));
           }
-        }
+        });
+
+        // Fetch only missing player data
+        await fetchMissingPlayerData(Array.from(allPlayerIds));
 
       } catch (error) {
         console.error("Error loading data:", error);
@@ -111,7 +149,33 @@ export default function playerBatches() {
     };
 
     fetchData();
-  }, [user?.academyId, user?.id, user?.username, user?.email]);
+  }, [user?.academyId, user?.id]);
+
+  // Update the fetchBatchPlayers effect to use cache
+  useEffect(() => {
+    const fetchBatchPlayers = async () => {
+      if (!selectedBatch?.players || !Array.isArray(selectedBatch.players)) {
+        setBatchPlayers([]);
+        return;
+      }
+
+      // Filter player IDs that aren't in cache
+      const playerIds = selectedBatch.players.filter((id: string) => 
+        typeof id === "string" && id.startsWith("player_")
+      );
+
+      // First, set any players we already have in cache
+      const cachedPlayers = playerIds
+        .map((id: string) => playerCache[id])
+        .filter(Boolean);
+      
+      setBatchPlayers(cachedPlayers);
+
+      // Then fetch any missing players
+      await fetchMissingPlayerData(playerIds);
+    };
+    fetchBatchPlayers();
+  }, [selectedBatch]);
 
   useEffect(() => {
     const fetchplayerInfo = async (playerIds: string[]) => {
@@ -150,160 +214,35 @@ export default function playerBatches() {
     }
   }, [coachData]);
 
-  // Fetch batch players when a batch is selected
-  useEffect(() => {
-    const fetchBatchPlayers = async () => {
-      if (!selectedBatch || !selectedBatch.players || !Array.isArray(selectedBatch.players)) {
-        setBatchPlayers([]);
-        return;
-      }
-      // Only fetch if there are player ids starting with player_
-      const playerIds = selectedBatch.players.filter((id: string) => typeof id === "string" && id.startsWith("player_"));
-      if (playerIds.length === 0) {
-        setBatchPlayers([]);
-        return;
-      }
-      try {
-        const response = await fetch(`/api/db/ams-player-data/batch?ids=${playerIds.join(",")}`);
-        if (response.ok) {
-          const data = await response.json();
-          setBatchPlayers(data.data || []);
-        } else {
-          setBatchPlayers([]);
-        }
-      } catch {
-        setBatchPlayers([]);
-      }
-    };
-    fetchBatchPlayers();
-  }, [selectedBatch]);
-
-  useEffect(() => {
-    const fetchBatchCoachDetails = async () => {
-      if (!selectedBatch) {
-        setBatchCoachDetails({});
-        return;
-      }
-      let coachIds: string[] = [];
-      if (Array.isArray(selectedBatch.coachIds) && selectedBatch.coachIds.length > 0) {
-        coachIds = selectedBatch.coachIds;
-      } else if (selectedBatch.coachId) {
-        coachIds = [selectedBatch.coachId];
-      }
-      if (coachIds.length === 0) {
-        setBatchCoachDetails({});
-        return;
-      }
-      const details: { [coachId: string]: any } = {};
-      await Promise.all(
-        coachIds.map(async (coachId: string) => {
-          // Try to fetch from ams-users and coach-profile for richer info
-          try {
-            const [userRes, profileRes] = await Promise.all([
-              fetch(`/api/db/ams-users/${coachId}`),
-              fetch(`/api/db/coach-profile/${coachId}`)
-            ]);
-            const userData = await userRes.json();
-            const profileData = await profileRes.json();
-            let averageRating = "N/A";
-            const ratings = profileData.data?.ratings || [];
-            if (ratings.length > 0) {
-              averageRating = (
-                ratings.reduce((sum: number, r: any) => sum + (r.rating || 0), 0) / ratings.length
-              ).toFixed(1);
-            }
-            details[coachId] = {
-              id: coachId,
-              name: userData.data?.name || userData.data?.username || "Unknown Coach",
-              photoUrl: userData.data?.photoUrl || profileData.data?.photoUrl || "/placeholder.svg",
-              email: userData.data?.email || "Not available",
-              averageRating,
-            };
-          } catch {
-            details[coachId] = {
-              id: coachId,
-              name: "Unknown Coach",
-              photoUrl: "/placeholder.svg",
-              email: "Not available",
-              averageRating: "N/A"
-            };
-          }
-        })
-      );
-      setBatchCoachDetails(details);
-    };
-    fetchBatchCoachDetails();
-  }, [selectedBatch]);
-
-  useEffect(() => {
-    const fetchAllBatchCoachDetails = async () => {
-      const batchesToFetch = batches;
-      const details: { [batchId: string]: { [coachId: string]: any } } = {};
-
-      await Promise.all(
-        batchesToFetch.map(async (batch: any) => {
-          let coachIds: string[] = [];
-          if (Array.isArray(batch.coachIds) && batch.coachIds.length > 0) {
-            coachIds = batch.coachIds;
-          } else if (batch.coachId) {
-            coachIds = [batch.coachId];
-          }
-          if (coachIds.length === 0) {
-            details[batch.id] = {};
-            return;
-          }
-          const batchDetails: { [coachId: string]: any } = {};
-          await Promise.all(
-            coachIds.map(async (coachId: string) => {
-              try {
-                const [userRes, profileRes] = await Promise.all([
-                  fetch(`/api/db/ams-users/${coachId}`),
-                  fetch(`/api/db/coach-profile/${coachId}`)
-                ]);
-                const userData = await userRes.json();
-                const profileData = await profileRes.json();
-                let averageRating = "N/A";
-                const ratings = profileData.data?.ratings || [];
-                if (ratings.length > 0) {
-                  averageRating = (
-                    ratings.reduce((sum: number, r: any) => sum + (r.rating || 0), 0) / ratings.length
-                  ).toFixed(1);
-                }
-                batchDetails[coachId] = {
-                  id: coachId,
-                  name: userData.data?.name || userData.data?.username || "Unknown Coach",
-                  photoUrl: userData.data?.photoUrl || profileData.data?.photoUrl || "/placeholder.svg",
-                  email: userData.data?.email || "Not available",
-                  averageRating,
-                };
-              } catch {
-                batchDetails[coachId] = {
-                  id: coachId,
-                  name: "Unknown Coach",
-                  photoUrl: "/placeholder.svg",
-                  email: "Not available",
-                  averageRating: "N/A"
-                };
-              }
-            })
-          );
-          details[batch.id] = batchDetails;
-        })
-      );
-      setAllBatchCoachDetails(details);
-    };
-    if (batches.length > 0) {
-      fetchAllBatchCoachDetails();
+  const fetchCoachDetails = async (coachId: string, priority: boolean = false) => {
+    // Cancel any existing non-priority fetch for this coach
+    if (pendingFetches[coachId]) {
+      pendingFetches[coachId].abort();
+      delete pendingFetches[coachId];
     }
-  }, [batches]);
 
-  const fetchCoachDetails = async (coachId: string) => {
+    // If data is already in cache and this is not a priority fetch, return cached data
+    if (coachProfileCache[coachId] && !priority) {
+      return coachProfileCache[coachId];
+    }
+
+    const controller = new AbortController();
+    if (!priority) {
+      setPendingFetches(prev => ({ ...prev, [coachId]: controller }));
+    }
+
     try {
-      // Fetch all coach, user, and credentials data
+      // Fetch all coach data in parallel with abort signal
       const [coachResponse, userResponse, credentialsResponse] = await Promise.all([
-        fetch(`/api/db/ams-coaches?id=${coachId}`),
-        fetch(`/api/db/ams-users?userId=${coachId}`),
-        fetch(`/api/db/ams-credentials?userId=${coachId}&academyId=${user?.academyId}`)
+        fetch(`/api/db/ams-coaches?id=${coachId}`, {
+          signal: controller.signal
+        }),
+        fetch(`/api/db/ams-users?userId=${coachId}`, {
+          signal: controller.signal
+        }),
+        fetch(`/api/db/ams-credentials?userId=${coachId}&academyId=${user?.academyId}`, {
+          signal: controller.signal
+        })
       ]);
 
       const [coachData, userData, credentialsData] = await Promise.all([
@@ -340,14 +279,27 @@ export default function playerBatches() {
         about: userData.data?.about || coachData.data?.about || "",
         achievements: coachData.data?.achievements || [],
         ratings: coachData.data?.ratings || [],
-        // Add any other fields you want to show in the profile dialog
       };
 
       setCoachProfileCache(prev => ({ ...prev, [coachId]: combinedData }));
 
+      // Remove from pending fetches
+      if (!priority) {
+        setPendingFetches(prev => {
+          const newPending = { ...prev };
+          delete newPending[coachId];
+          return newPending;
+        });
+      }
+
       return combinedData;
+
     } catch (error) {
-      console.error('Error fetching coach details:', error);
+      if (typeof error === "object" && error !== null && "name" in error && (error as any).name === 'AbortError') {
+        console.log('Fetch aborted:', coachId);
+      } else {
+        console.error('Error fetching coach details:', error);
+      }
       return defaultCoachData(coachId);
     }
   };
@@ -362,14 +314,16 @@ export default function playerBatches() {
 
   const handleCoachClick = async (coachId: string, e: React.MouseEvent) => {
     e.stopPropagation();
+    setShowCoachProfile(true);
+    
+    // If we have cached data, show it immediately while fetching fresh data
     if (coachProfileCache[coachId]) {
       setSelectedCoach(coachProfileCache[coachId]);
-      setShowCoachProfile(true);
-      return;
     }
-    const coachDetails = await fetchCoachDetails(coachId);
+    
+    // Always fetch fresh data on click with priority
+    const coachDetails = await fetchCoachDetails(coachId, true);
     setSelectedCoach(coachDetails);
-    setShowCoachProfile(true);
   };
 
   const getCoachData = async (batch: any) => {
@@ -464,38 +418,18 @@ export default function playerBatches() {
   };
 
   const getPlayerData = (playerId: string) => {
-    // Try to match by id in batchPlayers first
-    const player = batchPlayers.find(
-      p => p.id && p.id.toString() === playerId.toString()
-    );
-    if (player) {
-      return {
-        name: player.name || "Unknown Player",
-        photoUrl: player.photoUrl || "/placeholder.svg",
-        position: player.position || "No position"
-      };
-    }
-    // fallback to global players list
-    const fallback = players.find(
-      p =>
-        (p._id && p._id.toString() === playerId.toString()) ||
-        (p.id && p.id.toString() === playerId.toString())
-    );
-    return {
-      name: fallback?.name || "Unknown Player",
-      photoUrl: fallback?.photoUrl || "/placeholder.svg",
-      position: fallback?.position || "No position"
+    return playerCache[playerId] || {
+      name: "Unknown Player",
+      photoUrl: "/placeholder.svg",
+      position: "No position"
     };
   };
 
   const getPlayersSummary = (playerIds: any[]) => {
     const stringPlayerIds = playerIds.map(id => id?.toString());
-    // Try to match by _id first, fallback to id if not found
-    const matchingPlayers = players.filter(
-      player =>
-        (player._id && stringPlayerIds.includes(player._id.toString())) ||
-        (player.id && stringPlayerIds.includes(player.id.toString()))
-    );
+    const matchingPlayers = stringPlayerIds
+      .map((id: string) => playerCache[id])
+      .filter(Boolean);
 
     const totalInBatch = stringPlayerIds.length;
     const matchingCount = matchingPlayers.length;
@@ -664,6 +598,61 @@ export default function playerBatches() {
     return 0;
   };
 
+  // Helper to filter batches assigned to the current player and render them
+  const renderBatches = () => {
+    if (!currentPlayer) return null;
+
+    // Get the player ID in the format "player_xxxxx"
+    const playerId = currentPlayer.playerId || currentPlayer.id;
+    if (!playerId) return null;
+
+    // First filter batches
+    const playerAssignedBatches = batches.filter(batch => 
+      Array.isArray(batch.players) && 
+      batch.players.includes(playerId)
+    );
+
+    // Then map over filtered batches to render them
+    return playerAssignedBatches.map((batch: any) => (
+      <TableRow 
+        key={batch._id} 
+        onClick={() => setSelectedBatch(batch)}
+        className="hover:bg-accent"
+      >
+        <TableCell>{batch.name}</TableCell>
+        <TableCell>
+          {batch.coachIds && Array.isArray(batch.coachIds) && batch.coachIds.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {batch.coachIds.map((coachId: string, idx: number) => (
+                <div
+                  key={coachId}
+                  className="flex items-center gap-1"
+                >
+                  <Avatar className="h-6 w-6">
+                    <AvatarImage src={getCoachPhotoUrl(batch, idx)} alt={batch.coachNames?.[idx] || "Unknown"} />
+                    <AvatarFallback>{(batch.coachNames?.[idx] || "U")[0]}</AvatarFallback>
+                  </Avatar>
+                  <span className="text-xs underline text-white hover:text-gray-300">
+                    {batch.coachNames?.[idx] || "Unknown Coach"}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </TableCell>
+        <TableCell>
+          <span title={players
+              .filter(p => batch.players.includes(p.id))
+              .map(p => p.name)
+              .join(", ")}
+          >
+            {getPlayersSummary(batch.players)}
+          </span>
+        </TableCell>
+      </TableRow>
+    ));
+  };
+
   return (
     <div className="flex h-screen">
       <Sidebar />
@@ -681,55 +670,7 @@ export default function playerBatches() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {batches.map((batch) => (
-              <TableRow 
-                key={batch.id} 
-                onClick={() => setSelectedBatch(batch)}
-                className="hover:bg-accent"
-              >
-                <TableCell>{batch.name}</TableCell>
-                <TableCell>
-                  {batch.coachIds && Array.isArray(batch.coachIds) && batch.coachIds.length > 0 ? (
-                    <div className="flex flex-wrap gap-2">
-                      {batch.coachIds.map((coachId: string, idx: number) => (
-                        <div
-                          key={coachId}
-                          className="flex items-center gap-1"
-                        >
-                          <Avatar className="h-6 w-6">
-                            <AvatarImage src={getCoachPhotoUrl(batch, idx)} alt={getCoachDisplayName(batch, idx)} />
-                            <AvatarFallback>{getCoachDisplayName(batch, idx)?.[0]}</AvatarFallback>
-                          </Avatar>
-                          <span className="text-xs underline text-white hover:text-gray-300">
-                            {getCoachDisplayName(batch, idx)}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    batch.coachId && (
-                      <div className="flex items-center gap-1">
-                        <Avatar className="h-6 w-6">
-                          <AvatarImage src={getCoachPhotoUrl(batch)} alt={getCoachDisplayName(batch)} />
-                          <AvatarFallback>{getCoachDisplayName(batch)?.[0]}</AvatarFallback>
-                        </Avatar>
-                        <span className="text-xs underline text-white hover:text-gray-300">
-                          {getCoachDisplayName(batch)}
-                        </span>
-                      </div>
-                    )
-                  )}
-                </TableCell>
-                <TableCell>
-                  <span title={players
-                      .filter(p => batch.players.includes(p._id?.toString()))
-                      .map(p => p.name)
-                      .join(", ")}>
-                    {getPlayersSummary(batch.players)}
-                  </span>
-                </TableCell>
-              </TableRow>
-            ))}
+            {renderBatches()}
           </TableBody>
         </Table>
 
@@ -925,41 +866,41 @@ export default function playerBatches() {
 
                 <TabsContent value="credentials" className="space-y-4">
                   {selectedCoach?.credentials && selectedCoach.credentials.length > 0 ? (
-                    selectedCoach.credentials.map((credential: any, index: number) => (
+                    selectedCoach.credentials.map((cred: any, index: number) => (
                       <Card key={index}>
                         <CardHeader>
-                          <CardTitle>{credential.name}</CardTitle>
+                          <CardTitle>{cred.name}</CardTitle>
                         </CardHeader>
                         <CardContent>
                           <div className="space-y-2">
                             <p className="text-sm text-gray-500">
-                              <span className="font-medium">Type:</span> {credential.type}
+                              <span className="font-medium">Type:</span> {cred.type}
                             </p>
                             <p className="text-sm text-gray-500">
-                              <span className="font-medium">Issued Date:</span> {credential.issueDate}
+                              <span className="font-medium">Issued Date:</span> {cred.issueDate}
                             </p>
                             <p className="text-sm text-gray-500">
-                              <span className="font-medium">Expiry Date:</span> {credential.expiryDate}
+                              <span className="font-medium">Expiry Date:</span> {cred.expiryDate}
                             </p>
                             <p className="text-sm text-gray-500">
-                              <span className="font-medium">Issuing Authority:</span> {credential.issuingAuthority}
+                              <span className="font-medium">Issuing Authority:</span> {cred.issuingAuthority}
                             </p>
                             <p className="text-sm text-gray-500">
-                              <span className="font-medium">Credential ID:</span> {credential.credentialId}
+                              <span className="font-medium">Credential ID:</span> {cred.credentialId}
                             </p>
                             <p className="text-sm text-gray-500">
-                              <span className="font-medium">Status:</span> {credential.status}
+                              <span className="font-medium">Status:</span> {cred.status}
                             </p>
-                            {credential.description && (
+                            {cred.description && (
                               <div className="mt-4">
                                 <span className="font-medium text-sm text-gray-500">Description:</span>
-                                <p className="text-sm text-gray-500 mt-1">{credential.description}</p>
+                                <p className="text-sm text-gray-500 mt-1">{cred.description}</p>
                               </div>
                             )}
-                            {credential.document && (
+                            {cred.document && (
                               <div className="mt-2">
                                 <a
-                                  href={credential.document}
+                                  href={cred.document}
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   className="text-blue-600 underline text-sm"

@@ -17,6 +17,10 @@ import { FileText, Trash2 } from "lucide-react"
 const STORAGE_KEY = 'player-injuries-data'
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
+interface InjuryRehabProps {
+  playerData: any;  // Add proper type definition if available
+}
+
 interface Injury {
   id: string
   _id?: string
@@ -38,11 +42,10 @@ interface Injury {
   certificateUrl?: string;
 }
 
-export default function InjuryRehab() {
+export default function InjuryRehab({ playerData }: InjuryRehabProps) {
   const { toast } = useToast()
   const { user } = useAuth()
   const { players, getPlayerByUserId, updatePlayerAttributes } = usePlayers()
-  const [playerData, setPlayerData] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [injuries, setInjuries] = useState<Injury[]>([])
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
@@ -81,7 +84,7 @@ export default function InjuryRehab() {
             );
 
             if (playerMatch) {
-              setPlayerData(playerMatch);
+              // setPlayerData(playerMatch); // Remove this line, as playerData is a prop and cannot be set here
               setIsLoading(false);
             } else {
               console.error("No matching player found for username:", user.username);
@@ -939,4 +942,4 @@ export default function InjuryRehab() {
       </Dialog>
     </div>
   )
-} 
+}

@@ -547,6 +547,7 @@ export default function FinancesPage() {
                     <TableHead>Transaction ID</TableHead>
                     <TableHead>Description</TableHead>
                     <TableHead>Amount</TableHead>
+                    <TableHead>Quantity</TableHead>
                     <TableHead>Type</TableHead>
                     <TableHead>Date</TableHead>
                     <TableHead>Document</TableHead>
@@ -568,6 +569,7 @@ export default function FinancesPage() {
                           convertCurrency(record.amount, "INR", currency) // Convert amount to selected currency
                         )}
                       </TableCell>
+                      <TableCell>{record.quantity ?? 1}</TableCell>
                       <TableCell className="capitalize">{record.type}</TableCell>
                       <TableCell>{new Date(record.date).toLocaleDateString()}</TableCell>
                       <TableCell>
