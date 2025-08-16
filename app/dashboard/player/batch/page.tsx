@@ -14,7 +14,7 @@ import { Star } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { cn } from "@/lib/utils"
 
-export default function StudentBatches() {
+export default function playerBatches() {
   const { user } = useAuth();
   const [batches, setBatches] = useState<any[]>([]);
   const [players, setPlayers] = useState<any[]>([]);
@@ -26,7 +26,7 @@ export default function StudentBatches() {
   const [selectedCoach, setSelectedCoach] = useState<any>(null);
   const [ratings, setRatings] = useState<{[key: string]: number}>({});
   const [showCoachProfile, setShowCoachProfile] = useState(false);
-  const [studentsInfo, setStudentsInfo] = useState<{[key: string]: any}>({});
+  const [playersInfo, setplayersInfo] = useState<{[key: string]: any}>({});
   const [batchCoachDetails, setBatchCoachDetails] = useState<{ [coachId: string]: any }>({});
   const [allBatchCoachDetails, setAllBatchCoachDetails] = useState<{ [batchId: string]: { [coachId: string]: any } }>({});
   const [coachProfileCache, setCoachProfileCache] = useState<{ [coachId: string]: any }>({});
@@ -114,39 +114,39 @@ export default function StudentBatches() {
   }, [user?.academyId, user?.id, user?.username, user?.email]);
 
   useEffect(() => {
-    const fetchStudentInfo = async (studentIds: string[]) => {
+    const fetchplayerInfo = async (playerIds: string[]) => {
       try {
-        const response = await fetch(`/api/db/ams-player-data/batch?ids=${studentIds.join(',')}`);
+        const response = await fetch(`/api/db/ams-player-data/batch?ids=${playerIds.join(',')}`);
         if (!response.ok) return;
         
         const data = await response.json();
-        const studentsMap: {[key: string]: any} = {};
+        const playersMap: {[key: string]: any} = {};
         
-        data.data.forEach((student: any) => {
-          studentsMap[student.id] = {
-            name: student.name || 'Unknown Student',
-            photoUrl: student.photoUrl || '/placeholder.svg',
-            position: student.position || 'Unknown Position'
+        data.data.forEach((player: any) => {
+          playersMap[player.id] = {
+            name: player.name || 'Unknown player',
+            photoUrl: player.photoUrl || '/placeholder.svg',
+            position: player.position || 'Unknown Position'
           };
         });
         
-        setStudentsInfo(studentsMap);
+        setplayersInfo(playersMap);
       } catch (error) {
-        console.error('Error fetching student info:', error);
+        console.error('Error fetching player info:', error);
       }
     };
 
-    const studentIds = new Set<string>();
+    const playerIds = new Set<string>();
     Object.values(coachData).forEach(coach => {
       coach?.ratings?.forEach((rating: any) => {
-        if (rating.studentId) {
-          studentIds.add(rating.studentId);
+        if (rating.playerId) {
+          playerIds.add(rating.playerId);
         }
       });
     });
 
-    if (studentIds.size > 0) {
-      fetchStudentInfo(Array.from(studentIds));
+    if (playerIds.size > 0) {
+      fetchplayerInfo(Array.from(playerIds));
     }
   }, [coachData]);
 
@@ -513,15 +513,15 @@ export default function StudentBatches() {
         return;
       }
 
-      const studentId = currentPlayer?.id || user?.id;
-      if (!studentId) {
-        console.error('Student ID missing');
+      const playerId = currentPlayer?.id || user?.id;
+      if (!playerId) {
+        console.error('player ID missing');
         return;
       }
 
       console.log('Submitting rating:', {
         coachId,
-        studentId,
+        playerId,
         rating,
         academyId: user.academyId
       });
@@ -533,7 +533,7 @@ export default function StudentBatches() {
         },
         body: JSON.stringify({
           coachId,
-          studentId,
+          playerId,
           rating,
           academyId: user.academyId,
           date: new Date().toISOString()
@@ -620,12 +620,12 @@ export default function StudentBatches() {
     );
   };
 
-  const getStudentInfo = (rating: any) => {
-    if (rating.studentInfo) {
-      return rating.studentInfo;
+  const getplayerInfo = (rating: any) => {
+    if (rating.playerInfo) {
+      return rating.playerInfo;
     }
-    return studentsInfo[rating.studentId] || {
-      name: 'Unknown Student',
+    return playersInfo[rating.playerId] || {
+      name: 'Unknown player',
       photoUrl: '/placeholder.svg'
     };
   };
@@ -659,7 +659,7 @@ export default function StudentBatches() {
     return "/placeholder.svg";
   };
 
-  const getStudentCount = (batch: any) => {
+  const getplayerCount = (batch: any) => {
     if (Array.isArray(batch.players)) return batch.players.length;
     return 0;
   };
@@ -895,16 +895,16 @@ export default function StudentBatches() {
                       <CardContent>
                         <div className="space-y-4">
                           {selectedCoach.ratings.slice(-3).map((rating: any, index: number) => {
-                            const studentInfo = getStudentInfo(rating);
+                            const playerInfo = getplayerInfo(rating);
                             return (
                               <div key={index} className="flex items-start space-x-4 p-4 bg-accent rounded-lg">
                                 <Avatar className="h-10 w-10">
-                                  <AvatarImage src={studentInfo.photoUrl} alt={studentInfo.name} />
-                                  <AvatarFallback>{studentInfo.name[0]}</AvatarFallback>
+                                  <AvatarImage src={playerInfo.photoUrl} alt={playerInfo.name} />
+                                  <AvatarFallback>{playerInfo.name[0]}</AvatarFallback>
                                 </Avatar>
                                 <div className="flex-1">
                                   <div className="flex justify-between items-center">
-                                    <p className="font-medium text-sm">{studentInfo.name}</p>
+                                    <p className="font-medium text-sm">{playerInfo.name}</p>
                                     <div className="flex items-center">
                                       <Star className="h-4 w-4 fill-yellow-400 text-yellow-400 mr-1" />
                                       <span className="text-sm font-medium">{rating.rating}/5</span>

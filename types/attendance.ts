@@ -1,7 +1,7 @@
 export interface AttendanceRecord {
   academyId: string;
   date: string;
-  type: 'student' | 'coach';
+  type: 'player' | 'coach';
   records: {
     [id: string]: {
       status: 'present' | 'absent';

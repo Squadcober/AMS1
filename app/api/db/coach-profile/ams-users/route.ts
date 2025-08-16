@@ -8,7 +8,7 @@ interface User {
   password: string;
   email: string;
   name: string;
-  role: 'admin' | 'coach' | 'student';
+  role: 'admin' | 'coach' | 'player';
   academyId: string;
   createdAt: string;
   status: 'active' | 'inactive';

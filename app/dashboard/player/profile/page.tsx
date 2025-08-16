@@ -218,7 +218,7 @@ const calculateAge = (dob: string): number => {
   return age;
 };
 
-export default function StudentProfile() {
+export default function playerProfile() {
   const { players, getPlayerByUserId, updatePlayerAttributes } = usePlayers()
   const { user } = useAuth()
   const router = useRouter()
@@ -277,8 +277,8 @@ export default function StudentProfile() {
         }
 
         // Rest of the profile loading logic
-        if (user.role !== "student" as typeof user.role) {
-          setError('Access denied. Only students can view this page.');
+        if (user.role !== "player" as typeof user.role) {
+          setError('Access denied. Only players can view this page.');
           router.push(`/dashboard/${user.role}/about`);
           return;
         }
@@ -355,14 +355,14 @@ export default function StudentProfile() {
     );
   }
 
-  // Show error with custom message for non-student users
+  // Show error with custom message for non-player users
   if (error) {
     return (
       <div className="flex h-screen items-center justify-center bg-gray-900">
         <div className="text-center">
           <h2 className="text-2xl font-bold text-red-500 mb-2">Access Error</h2>
           <p className="text-white">{error}</p>
-          {user && user.role !== ('student' as typeof user.role) && (
+          {user && user.role !== ('player' as typeof user.role) && (
             <Link href={`/dashboard/${user.role}/about`} className="mt-4 text-blue-400 hover:text-blue-300">
               Go to {user.role} dashboard
             </Link>
@@ -553,7 +553,7 @@ export default function StudentProfile() {
                     <Button 
                       asChild
                     >
-                      <Link href="/dashboard/student/settings">
+                      <Link href="/dashboard/player/settings">
                         Edit Profile
                       </Link>
                     </Button>

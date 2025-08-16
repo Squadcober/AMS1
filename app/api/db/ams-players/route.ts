@@ -8,25 +8,25 @@ const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const studentIds = searchParams.get('studentIds')?.split(',');
+    const playerIds = searchParams.get('playerIds')?.split(',');
 
-    if (!studentIds?.length) {
+    if (!playerIds?.length) {
       return NextResponse.json({ 
         success: false, 
-        error: 'Student IDs are required' 
+        error: 'player IDs are required' 
       }, { status: 400 });
     }
 
-    // Check cache for each student ID
+    // Check cache for each player ID
     const now = Date.now();
-    const uncachedIds = studentIds.filter(id => {
+    const uncachedIds = playerIds.filter(id => {
       const cached = CACHE.get(id);
       return !cached || (now - cached.timestamp > CACHE_DURATION);
     });
 
     if (uncachedIds.length === 0) {
-      // All students are in cache
-      const cachedData = studentIds.map(id => CACHE.get(id)?.data);
+      // All players are in cache
+      const cachedData = playerIds.map(id => CACHE.get(id)?.data);
       return NextResponse.json({
         success: true,
         data: cachedData,
@@ -34,27 +34,27 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Fetch uncached student data
+    // Fetch uncached player data
     const db = await getDatabase();
-    const students = await db.collection('ams-users')
+    const players = await db.collection('ams-users')
       .find({ id: { $in: uncachedIds } })
       .project({ id: 1, name: 1, photoUrl: 1 })
       .toArray();
 
     // Update cache
-    students.forEach(student => {
-      CACHE.set(student.id, {
+    players.forEach(player => {
+      CACHE.set(player.id, {
         data: {
-          id: student.id,
-          name: student.name,
-          photoUrl: student.photoUrl
+          id: player.id,
+          name: player.name,
+          photoUrl: player.photoUrl
         },
         timestamp: now
       });
     });
 
     // Combine cached and new data
-    const allData = studentIds.map(id => CACHE.get(id)?.data);
+    const allData = playerIds.map(id => CACHE.get(id)?.data);
 
     return NextResponse.json({
       success: true,
@@ -62,10 +62,10 @@ export async function GET(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Error fetching students:', error);
+    console.error('Error fetching players:', error);
     return NextResponse.json({
       success: false,
-      error: 'Failed to fetch students'
+      error: 'Failed to fetch players'
     }, { status: 500 });
   }
 }

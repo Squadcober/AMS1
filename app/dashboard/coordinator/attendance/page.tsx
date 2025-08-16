@@ -21,7 +21,7 @@ interface AttendanceRecord {
   status: "present" | "absent" | "late"
   markedBy: string
   academyId: string
-  type: "students" | "coaches"
+  type: "players" | "coaches"
   markedAt?: string
 }
 
@@ -30,7 +30,7 @@ export default function AttendancePage() {
   const { user } = useAuth()
   const [date, setDate] = useState<Date>(new Date())
   const [view, setView] = useState<"daily" | "monthly">("daily")
-  const [userType, setUserType] = useState<"students" | "coaches">("students")
+  const [userType, setUserType] = useState<"players" | "coaches">("players")
   const [users, setUsers] = useState<any[]>([])
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([])
   const [searchQuery, setSearchQuery] = useState("")
@@ -43,22 +43,22 @@ export default function AttendancePage() {
 
         // Fetch users
         let response;
-        if (userType === "students") {
+        if (userType === "players") {
           response = await fetch(`/api/db/ams-player-data?academyId=${user.academyId}`);
-          if (!response.ok) throw new Error('Failed to fetch students');
+          if (!response.ok) throw new Error('Failed to fetch players');
           const result = await response.json();
           
           // Ensure we're using the data property from the response
           if (result.success && Array.isArray(result.data)) {
-            const formattedStudents = result.data.map((student: any) => ({
-              id: student.id || student._id?.toString(),
-              name: student.name || student.username || 'Unknown Student',
-              email: student.email,
-              academyId: student.academyId
+            const formattedplayers = result.data.map((player: any) => ({
+              id: player.id || player._id?.toString(),
+              name: player.name || player.username || 'Unknown player',
+              email: player.email,
+              academyId: player.academyId
             }));
-            setUsers(formattedStudents);
+            setUsers(formattedplayers);
           } else {
-            console.error('Invalid student data format:', result);
+            console.error('Invalid player data format:', result);
             setUsers([]);
           }
         } else {
@@ -206,7 +206,7 @@ export default function AttendancePage() {
 
     // Create CSV content
     const csvContent = [
-      ['Student ID', 'Student Name', 'Attendance (Present/Total)'].join(','),
+      ['player ID', 'player Name', 'Attendance (Present/Total)'].join(','),
       ...exportData.map(row => [
         row.id,
         row.name,
@@ -251,7 +251,7 @@ export default function AttendancePage() {
           <div className="space-y-1">
             <h2 className="text-2xl font-bold tracking-tight">Attendance Management</h2>
             <p className="text-muted-foreground">
-              Mark and monitor attendance for students and coaches
+              Mark and monitor attendance for players and coaches
             </p>
           </div>
           <Button onClick={exportAttendance} variant="outline">
@@ -268,12 +268,12 @@ export default function AttendancePage() {
                 <TabsTrigger value="monthly">Monthly</TabsTrigger>
               </TabsList>
             </Tabs>
-            <Select value={userType} onValueChange={(v) => setUserType(v as "students" | "coaches")}>
+            <Select value={userType} onValueChange={(v) => setUserType(v as "players" | "coaches")}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="students">Students</SelectItem>
+                <SelectItem value="players">players</SelectItem>
                 <SelectItem value="coaches">Coaches</SelectItem>
               </SelectContent>
             </Select>

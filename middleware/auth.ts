@@ -28,7 +28,7 @@ export async function middleware(request: NextRequest) {
       const roleRedirectMap: { [key: string]: string } = {
         admin: '/dashboard/admin/about',
         coach: '/dashboard/coach/profile',
-        student: '/dashboard/student/profile',
+        player: '/dashboard/player/profile',
         coordinator: '/dashboard/coordinator/overview',
         owner: '/dashboard/Owner/academy-management'
       };

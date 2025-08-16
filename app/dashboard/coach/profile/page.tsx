@@ -14,9 +14,9 @@ import { Separator } from "@/components/ui/separator"
 import { toast } from "@/components/ui/use-toast"
 
 interface Rating {
-  studentId: string
-  studentName?: string
-  studentPhoto?: string
+  playerId: string
+  playerName?: string
+  playerPhoto?: string
   rating: number
   date: string
   comment?: string
@@ -40,21 +40,21 @@ export default function CoachProfilePage() {
 
   const processRatings = (ratings: any[]) => {
     return ratings.map(rating => {
-      const studentName = rating.studentInfo?.name || 
-                         rating.studentName || 
-                         'Anonymous Student'
+      const playerName = rating.playerInfo?.name || 
+                         rating.playerName || 
+                         'Anonymous player'
 
-      const studentPhoto = rating.studentInfo?.photoUrl || 
-                         rating.studentPhoto || 
+      const playerPhoto = rating.playerInfo?.photoUrl || 
+                         rating.playerPhoto || 
                          undefined
 
       return {
         ...rating,
-        studentName,
-        studentPhoto,
+        playerName,
+        playerPhoto,
         rating: rating.rating || 0,
         date: rating.date || new Date().toISOString(),
-        studentId: rating.studentId,
+        playerId: rating.playerId,
         academyId: rating.academyId || user?.academyId,
         comment: rating.comment
       }
@@ -231,7 +231,7 @@ export default function CoachProfilePage() {
       <div className="flex-1 p-6 space-y-6 overflow-y-auto">
         <div className="flex justify-between items-start">
           <div>
-            <CustomTooltip content="Your average rating from students">
+            <CustomTooltip content="Your average rating from players">
               <div>
                 <h1 className="text-4xl font-bold">Rating</h1>
                 <div className="text-7xl font-extrabold mt-2">{averageRating}</div>
@@ -335,10 +335,10 @@ export default function CoachProfilePage() {
                   <div key={index} className="bg-gray-700 p-4 rounded-lg">
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center">
-                        {rating.studentPhoto ? (
+                        {rating.playerPhoto ? (
                           <Image
-                            src={rating.studentPhoto}
-                            alt={rating.studentName || 'Student photo'}
+                            src={rating.playerPhoto}
+                            alt={rating.playerName || 'player photo'}
                             width={32}
                             height={32}
                             className="rounded-full mr-2"
@@ -347,7 +347,7 @@ export default function CoachProfilePage() {
                           <div className="w-8 h-8 bg-gray-600 rounded-full mr-2" />
                         )}
                         <span className="text-sm font-medium">
-                          {rating.studentName}
+                          {rating.playerName}
                         </span>
                       </div>
                       <span className="text-lg font-bold">{rating.rating}/5</span>

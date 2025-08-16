@@ -33,7 +33,7 @@ export default function UserManagement() {
     name: "",
     username: "",
     email: "",
-    role: "student",
+    role: "player",
     password: "",
     academyId: ""
   })
@@ -119,7 +119,7 @@ export default function UserManagement() {
           name: "",
           username: "",
           email: "",
-          role: "student",
+          role: "player",
           password: "",
           academyId: ""
         })
@@ -272,7 +272,7 @@ export default function UserManagement() {
                       <SelectValue placeholder="Select role" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="student">Student</SelectItem>
+                      <SelectItem value="player">player</SelectItem>
                       <SelectItem value="coach">Coach</SelectItem>
                       <SelectItem value="coordinator">Coordinator</SelectItem>
                       <SelectItem value="admin">Admin</SelectItem>
@@ -318,7 +318,7 @@ export default function UserManagement() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Roles</SelectItem>
-                    <SelectItem value="student">Student</SelectItem>
+                    <SelectItem value="player">player</SelectItem>
                     <SelectItem value="coach">Coach</SelectItem>
                     <SelectItem value="coordinator">Coordinator</SelectItem>
                     <SelectItem value="admin">Admin</SelectItem>

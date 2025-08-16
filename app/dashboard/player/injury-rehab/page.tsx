@@ -15,7 +15,7 @@ import { Sidebar } from "@/components/Sidebar"
 import { useToast } from "@/components/ui/use-toast"
 import { FileText, Trash2 } from "lucide-react"
 
-const STORAGE_KEY = 'student-injuries-data'
+const STORAGE_KEY = 'player-injuries-data'
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
 interface Injury {

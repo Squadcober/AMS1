@@ -28,7 +28,7 @@ interface AttendanceRecord {
   status: "present" | "absent" | "late"
   markedBy: string
   academyId: string
-  type: "students" | "coaches"
+  type: "players" | "coaches"
   markedAt?: string
 }
 
@@ -36,7 +36,7 @@ export default function AttendancePage() {
   const { toast } = useToast()
   const { user } = useAuth()
   const [date, setDate] = useState<Date>(new Date())
-  const [userType, setUserType] = useState<"students" | "coaches">("students")
+  const [userType, setUserType] = useState<"players" | "coaches">("players")
   const [users, setUsers] = useState<any[]>([])
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([])
   const [searchQuery, setSearchQuery] = useState("")
@@ -66,29 +66,29 @@ export default function AttendancePage() {
         if (!user?.academyId) return;
 
         let response;
-        if (userType === "students") {
+        if (userType === "players") {
           response = await fetch(`/api/db/ams-player-data?academyId=${user.academyId}`);
-          if (!response.ok) throw new Error('Failed to fetch students');
+          if (!response.ok) throw new Error('Failed to fetch players');
           const result = await response.json();
           
           if (result.success && Array.isArray(result.data)) {
-            const formattedStudents = result.data
-              .filter((student: any) => {
-                // Log the student data to debug
-                console.log('Student data:', student);
-                return student.status === 'active' || !student.status;
+            const formattedplayers = result.data
+              .filter((player: any) => {
+                // Log the player data to debug
+                console.log('player data:', player);
+                return player.status === 'active' || !player.status;
               })
-              .map((student: any) => ({
-                id: student.id || student._id,
-                name: student.name || student.username || 'Unknown Student',
-                email: student.email,
-                academyId: student.academyId,
-                status: student.status || 'active' // Default to active if status is not set
+              .map((player: any) => ({
+                id: player.id || player._id,
+                name: player.name || player.username || 'Unknown player',
+                email: player.email,
+                academyId: player.academyId,
+                status: player.status || 'active' // Default to active if status is not set
               }));
-            console.log('Formatted students:', formattedStudents);
-            setUsers(formattedStudents);
+            console.log('Formatted players:', formattedplayers);
+            setUsers(formattedplayers);
           } else {
-            console.error('Invalid student data format:', result);
+            console.error('Invalid player data format:', result);
             setUsers([]);
           }
         } else {
@@ -252,7 +252,7 @@ export default function AttendancePage() {
 
     // Create CSV content
     const csvContent = [
-      ['Student ID', 'Student Name', 'Attendance (Present/Total)'].join(','),
+      ['player ID', 'player Name', 'Attendance (Present/Total)'].join(','),
       ...exportData.map(row => [
         row.id,
         row.name,
@@ -320,7 +320,7 @@ export default function AttendancePage() {
           <div className="space-y-1">
             <h2 className="text-2xl font-bold tracking-tight">Attendance Management</h2>
             <p className="text-muted-foreground">
-              Mark and monitor attendance for students and coaches
+              Mark and monitor attendance for players and coaches
             </p>
           </div>
           <Button onClick={exportAttendance} variant="outline">
@@ -331,12 +331,12 @@ export default function AttendancePage() {
 
         <div className="space-y-4">
           <div className="flex space-x-4">
-            <Select value={userType} onValueChange={(v) => setUserType(v as "students" | "coaches")}>
+            <Select value={userType} onValueChange={(v) => setUserType(v as "players" | "coaches")}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="students">Students</SelectItem>
+                <SelectItem value="players">players</SelectItem>
                 <SelectItem value="coaches">Coaches</SelectItem>
               </SelectContent>
             </Select>

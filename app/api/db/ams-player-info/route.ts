@@ -16,27 +16,27 @@ export async function GET(request: NextRequest) {
     }
 
     const db = await getDatabase();
-    const studentInfo = await db.collection('ams-player-data').findOne({
+    const playerInfo = await db.collection('ams-player-data').findOne({
       username,
       academyId
     });
 
-    if (!studentInfo) {
+    if (!playerInfo) {
       return NextResponse.json({
         success: false,
-        error: 'Student not found'
+        error: 'player not found'
       }, { status: 404 });
     }
 
     return NextResponse.json({
       success: true,
-      data: studentInfo
+      data: playerInfo
     });
   } catch (error) {
-    console.error('Error fetching student info:', error);
+    console.error('Error fetching player info:', error);
     return NextResponse.json({
       success: false,
-      error: 'Failed to fetch student info'
+      error: 'Failed to fetch player info'
     }, { status: 500 });
   }
 }
@@ -78,10 +78,10 @@ export async function POST(request: NextRequest) {
       data: result
     });
   } catch (error) {
-    console.error('Error updating student info:', error);
+    console.error('Error updating player info:', error);
     return NextResponse.json({
       success: false,
-      error: 'Failed to update student info'
+      error: 'Failed to update player info'
     }, { status: 500 });
   }
 }
@@ -94,7 +94,7 @@ export async function PUT(request: NextRequest) {
     if (!_id) {
       return NextResponse.json({ 
         success: false, 
-        error: 'Student ID is required' 
+        error: 'player ID is required' 
       }, { status: 400 });
     }
 
@@ -121,7 +121,7 @@ export async function PUT(request: NextRequest) {
     if (!result) {
       return NextResponse.json({
         success: false,
-        error: 'Student not found'
+        error: 'player not found'
       }, { status: 404 });
     }
 
@@ -130,10 +130,10 @@ export async function PUT(request: NextRequest) {
       data: result.value
     });
   } catch (error) {
-    console.error('Error updating student:', error);
+    console.error('Error updating player:', error);
     return NextResponse.json({
       success: false,
-      error: 'Failed to update student'
+      error: 'Failed to update player'
     }, { status: 500 });
   }
 }

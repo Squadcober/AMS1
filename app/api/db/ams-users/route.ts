@@ -10,7 +10,7 @@ interface User {
   password: string;
   email: string;
   name: string;
-  role: 'owner' | 'admin' | 'coach' | 'student';
+  role: 'owner' | 'admin' | 'coach' | 'player';
   academyId: string;
   createdAt: string;
   status: 'active' | 'inactive';

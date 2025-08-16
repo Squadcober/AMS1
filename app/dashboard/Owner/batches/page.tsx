@@ -100,7 +100,7 @@ export default function BatchesPage() {
           name: u.name || u.username || "Coach",
           academyId: u.academyId
         })))
-        setPlayers(users.filter((u: any) => u.role === 'student' || u.role === 'player').map((u: any) => ({
+        setPlayers(users.filter((u: any) => u.role === 'player' || u.role === 'player').map((u: any) => ({
           id: u.id || u._id,
           name: u.name || u.username || "Player",
           position: u.position || "",

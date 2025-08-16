@@ -43,7 +43,7 @@ import { CoachProvider } from "@/contexts/CoachContext" // Add this import
 // import sessions from "@/app/api/sessions" // REMOVE or RENAME this import to avoid conflict
 
 export interface Session {
-  id: number
+  id: string | number
   _id?: string;
   name: string
   status: "Finished" | "On-going" | "Upcoming"
@@ -308,40 +308,43 @@ const generateRecurringOccurrences = (session: Session): Session[] => {
     if (selectedDays.includes(dayName)) {
       // Create occurrence date string in YYYY-MM-DD format
       const occurrenceDate = currentDate.toISOString().split('T')[0];
-      
+
       // Create session start and end times for this occurrence
       const sessionDateTime = new Date(occurrenceDate);
       const [startHour, startMinute] = session.startTime.split(':').map(Number);
       const [endHour, endMinute] = session.endTime.split(':').map(Number);
-      
+
       const sessionStart = new Date(sessionDateTime);
       sessionStart.setHours(startHour, startMinute, 0);
-      
+
       const sessionEnd = new Date(sessionDateTime);
       sessionEnd.setHours(endHour, endMinute, 0);
 
       // Determine status based on the current time
       let status: Session['status'];
       if (currentDate < today) {
-        status = 'Finished';
+      status = 'Finished';
       } else if (currentDate.getTime() === today.getTime()) {
-        if (now >= sessionEnd) {
-          status = 'Finished';
-        } else if (now >= sessionStart && now <= sessionEnd) {
-          status = 'On-going';
-        } else {
-          status = 'Upcoming';
-        }
+      if (now >= sessionEnd) {
+        status = 'Finished';
+      } else if (now >= sessionStart && now <= sessionEnd) {
+        status = 'On-going';
       } else {
         status = 'Upcoming';
       }
+      } else {
+      status = 'Upcoming';
+      }
 
-      // Create occurrence with truly unique numeric ID
-      const occurrenceId = Number(`${session.id}${Date.now()}${occurrenceCounter++}`);
+      // Create numeric occurrence ID using parent session id and occurrence counter as decimal
+      const parentIdNum = typeof session.id === "number" ? session.id : Number(session.id);
+      const occurrenceNumber = occurrenceCounter + 1; // start counting occurrences at 1
+      const occurrenceId = Number(`${Math.trunc(parentIdNum)}.${occurrenceNumber}`);
+
       occurrences.push({
         ...session,
         id: occurrenceId,
-        parentSessionId: session.id,
+        parentSessionId: parentIdNum,
         date: occurrenceDate,
         isOccurrence: true,
         status,
@@ -349,8 +352,8 @@ const generateRecurringOccurrences = (session: Session): Session[] => {
         playerMetrics: {},
         playerRatings: {}
       });
-    }
-    
+      occurrenceCounter++;
+        }
     // Move to next day
     currentDate.setDate(currentDate.getDate() + 1);
   }
@@ -386,7 +389,7 @@ const cleanupDuplicateSessions = (sessions: Session[]): Session[] => {
       }
     } else if (session.isRecurring && !session.isOccurrence) {
       // Handle parent recurring sessions
-      parentSessions.set(session.id, session);
+      parentSessions.set(Number(session.id), session);
     } else {
       // Handle regular sessions
       const key = `${session.id}-${session.date}`;
@@ -903,6 +906,7 @@ function SessionsContent() {
 
 const handleAddSession = async () => {
   try {
+    // 1️⃣ Basic required field checks
     if (!user?.academyId) {
       toast({
         title: "Error",
@@ -911,7 +915,7 @@ const handleAddSession = async () => {
       });
       return;
     }
-  
+
     if (!newSession.name) {
       toast({
         title: "Error",
@@ -920,34 +924,35 @@ const handleAddSession = async () => {
       });
       return;
     }
-  
-    let sessionDateStr = newSession.date || new Date().toISOString().split('T')[0];
-    let sessionStart: Date;
-    let sessionEnd: Date;
-    let trimmedDates = { start: dateRange.from, end: dateRange.to };
-  
+
+    // 2️⃣ Prepare date limits
     const now = new Date();
     const past60Days = new Date(now);
-    past60Days.setDate(now.getDate() - 60);  // Changed from 14 to 60
-    const past60DaysStr = past60Days.toISOString().split('T')[0]; // Add this line
-  
+    past60Days.setDate(now.getDate() - 60);
+
+    // Ensure date limits are Date objects
+    const minAllowedDate = new Date(dateLimits.minDate);
+    const maxAllowedDate = new Date(dateLimits.maxDate);
+
+    // 3️⃣ Ensure default times are set
+    if (!newSession.startTime) newSession.startTime = "11:00";
+    if (!newSession.endTime) newSession.endTime = "12:00";
+
+    // 4️⃣ Recurring Sessions
     if (isRecurring) {
-      // ... (rest of recurring session validation remains the same)
-    } else {
-      // Always ensure we have a date - either selected or today
-      sessionDateStr = newSession.date || now.toISOString().split('T')[0];
-      
-      // If using default date, notify user
-      if (!newSession.date) {
+      if (!dateRange.from || !dateRange.to || selectedDays.length === 0) {
         toast({
-          title: "Using current date",
-          description: "No date was selected, using today's date.",
-          variant: "default",
+          title: "Error",
+          description: "Please select a date range and at least one day for recurring sessions",
+          variant: "destructive",
         });
+        return;
       }
-  
-      // Single session date validation
-      if (newSession.date < past60DaysStr) {
+
+      const rangeStart = new Date(dateRange.from);
+      const rangeEnd = new Date(dateRange.to);
+
+      if (rangeStart < past60Days) {
         toast({
           title: "Error",
           description: "Cannot create sessions more than 60 days in the past",
@@ -955,108 +960,186 @@ const handleAddSession = async () => {
         });
         return;
       }
-  
-      if (newSession.date < dateLimits.minDate || newSession.date > dateLimits.maxDate) {
+
+      if (rangeStart < minAllowedDate || rangeEnd > maxAllowedDate) {
         toast({
           title: "Error",
-          description: "Sessions can only be created within 60 days before and after the current date",
+          description: "Sessions must be within the allowed date range",
           variant: "destructive",
         });
         return;
       }
+
+      // Apply trimming if needed
+      const finalDateRange = trimDates
+        ? calculateTrimmedDates(dateRange.from, dateRange.to, selectedDays)
+        : { start: dateRange.from, end: dateRange.to };
+
+      // Get coach data
+      let sessionCoachIds: string[] = [];
+      let sessionCoachNames: string[] = [];
+
+      if (newSession.assignedBatch) {
+        const selectedBatch = batches.find(b => b.id === newSession.assignedBatch);
+        if (selectedBatch) {
+          sessionCoachIds = selectedBatch.coachId ? [selectedBatch.coachId] : [];
+          sessionCoachNames = selectedBatch.coachName ? [selectedBatch.coachName] : [];
+        }
+      } else {
+        sessionCoachIds = Array.isArray(newSession.coachId) ? newSession.coachId : [newSession.coachId];
+        sessionCoachNames = newSession.coachNames || [];
+      }
+
+      // Create parent session
+      const parentSession: Session = {
+        id: Date.now(),
+        name: newSession.name,
+        date: finalDateRange.start,
+        startTime: newSession.startTime,
+        endTime: newSession.endTime,
+        status: "Upcoming",
+        assignedPlayers: newSession.assignedPlayers,
+        coachId: sessionCoachIds,
+        coachNames: sessionCoachNames,
+        userId: user?.id || "",
+        academyId: user.academyId,
+        isRecurring: true,
+        recurringEndDate: finalDateRange.end,
+        selectedDays,
+        attendance: {},
+        playerRatings: {},
+        assignedPlayersData: [],
+        totalOccurrences: 0
+      };
+
+      // Generate occurrences using the helper function
+      const occurrences = generateRecurringOccurrences(parentSession).map(occ => ({
+        ...occ,
+        parentSessionId: typeof parentSession.id === "number" ? parentSession.id : Number(parentSession.id)
+      }));
+
+      parentSession.totalOccurrences = occurrences.length;
+
+      // Save parent session and all occurrences
+      setUnsavedSessions(prev => [
+        ...prev,
+        parentSession,
+        ...occurrences
+      ] as Session[]);
+
+      setHasUnsavedChanges(true);
+      resetSessionForm();
+      await fetchSessions(true);
+      return; // ✅ Exit after handling recurring
     }
-  
-    // Use default times if none are set
-    if (!newSession.startTime) newSession.startTime = "11:00";
-    if (!newSession.endTime) newSession.endTime = "12:00";
-  
+
+    // 5️⃣ Single Sessions
+    const sessionDateStr = newSession.date || now.toISOString().split("T")[0];
     const sessionDate = new Date(sessionDateStr);
-    
-    // Check if session date is more than 14 days in the past
-    if (sessionDate < past60Days) {
-      alert("Cannot create sessions more than 60 days in the past")
-      return
+
+    if (!newSession.date) {
+      toast({
+        title: "Using current date",
+        description: "No date was selected, using today's date.",
+        variant: "default",
+      });
     }
-  
-    // Always assign sessionStart and sessionEnd before using them
-    sessionStart = new Date(`${sessionDateStr}T${newSession.startTime}`);
-    sessionEnd = new Date(`${sessionDateStr}T${newSession.endTime}`);
+
+    if (sessionDate < past60Days) {
+      toast({
+        title: "Error",
+        description: "Cannot create sessions more than 60 days in the past",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (sessionDate < minAllowedDate || sessionDate > maxAllowedDate) {
+      toast({
+        title: "Error",
+        description: "Sessions must be within 60 days before or after today",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const sessionStart = new Date(`${sessionDateStr}T${newSession.startTime}`);
+    const sessionEnd = new Date(`${sessionDateStr}T${newSession.endTime}`);
 
     if (sessionEnd <= sessionStart) {
-      alert("End time must be later than start time.")
-      return
+      toast({
+        title: "Error",
+        description: "End time must be later than start time",
+        variant: "destructive",
+      });
+      return;
     }
-  
-    const assignedPlayerIds = newSession.assignedPlayers
-  
-    // Get coach IDs from either batch or direct selection
+
+    // Get coach data
     let sessionCoachIds: string[] = [];
     let sessionCoachNames: string[] = [];
-  
+
     if (newSession.assignedBatch) {
       const selectedBatch = batches.find(b => b.id === newSession.assignedBatch);
       if (selectedBatch) {
         sessionCoachIds = selectedBatch.coachId ? [selectedBatch.coachId] : [];
         sessionCoachNames = selectedBatch.coachName ? [selectedBatch.coachName] : [];
       }
-      console.log('Using batch coach data:', { sessionCoachIds, sessionCoachNames });
     } else {
       sessionCoachIds = Array.isArray(newSession.coachId) ? newSession.coachId : [newSession.coachId];
       sessionCoachNames = newSession.coachNames || [];
-      console.log('Using directly selected coaches:', { sessionCoachIds, sessionCoachNames });
     }
-  
-    if (isRecurring) {
-      // ... (rest of recurring session logic remains the same)
-    } else {
-      const newSessionWithId: Session = {
-        ...newSession,
-        id: Date.now(),
-        status: "Upcoming",
-        assignedPlayers: assignedPlayerIds,
-        coachId: sessionCoachIds,
-        coachNames: sessionCoachNames,
-        userId: user?.id || "",
-        academyId: user?.academyId,
-        attendance: {},
-        playerRatings: {},
-        assignedPlayersData: []
-      }
-  
-      setUnsavedSessions(prev => [...prev, newSessionWithId])
-    }
-  
-    setHasUnsavedChanges(true)
-    setIsDialogOpen(false)
-    // Reset with default times
-    setNewSession({
-      name: "",
-      date: "",
-      startTime: "11:00",  // Reset to default start time
-      endTime: "12:00",    // Reset to default end time
-      assignedBatch: "",
-      assignedPlayers: [],
-      coachId: [],
+
+    const newSessionWithId: Session = {
+      ...newSession,
+      id: Date.now() + Math.floor(Math.random() * 1000000),
+      date: sessionDateStr,
+      status: "Upcoming",
+      assignedPlayers: newSession.assignedPlayers,
+      coachId: sessionCoachIds,
+      coachNames: sessionCoachNames,
       userId: user?.id || "",
-      coachNames: [],
-      assignedPlayersData: [],
-      academyId: user?.academyId || "",
-    })
-    setIsRecurring(false)
-    setSelectedDays([])
-    setDateRange({ from: "", to: "" })
-    setIsDialogOpen(true)
-    
+      academyId: user?.academyId,
+      attendance: {},
+      playerRatings: {},
+      assignedPlayersData: []
+    };
+
+    setUnsavedSessions(prev => [...prev, newSessionWithId]);
+    setHasUnsavedChanges(true);
+    resetSessionForm();
     await fetchSessions(true);
+
   } catch (error) {
-    console.error('Error creating session:', error);
+    console.error("Error creating session:", error);
     toast({
       title: "Error",
       description: "Failed to create session in database",
       variant: "destructive",
     });
   }
-}
+};
+
+// ♻️ Helper to reset form state
+const resetSessionForm = () => {
+  setNewSession({
+    name: "",
+    date: "",
+    startTime: "11:00",
+    endTime: "12:00",
+    assignedBatch: "",
+    assignedPlayers: [],
+    coachId: [],
+    userId: user?.id || "",
+    coachNames: [],
+    assignedPlayersData: [],
+    academyId: user?.academyId || "",
+  });
+  setIsRecurring(false);
+  setSelectedDays([]);
+  setDateRange({ from: "", to: "" });
+  setIsDialogOpen(false);
+};
 
 const handleRemoveSession = () => {
   if (!showCheckboxes) {
@@ -1096,7 +1179,7 @@ const handleConfirmDelete = async () => {
     }
 
     // Remove from local state
-    setSessions(prev => prev.filter(session => !selectedSessions.includes(session.id)));
+    setSessions(prev => prev.filter(session => !selectedSessions.includes(Number(session.id))));
     setSelectedSessions([]);
     setShowCheckboxes(false);
     setShowDeleteAlert(false);
@@ -1337,7 +1420,7 @@ const handleViewDetails = async (sessionId: number | string) => {
     }
 
     setSessions(prev => prev.map(s => 
-      s.id.toString() === sessionId.toString() ? session : s
+      (s.id != null && s.id.toString() === sessionId.toString()) ? session : s
     ));
     setViewDetailsSessionId(Number(sessionId));
     setViewDetailsSessionData(session);
@@ -1599,8 +1682,8 @@ const renderSessionTable = (status: Session["status"] | "All") => {
                       <Input
                         type="checkbox"
                         className="w-4 h-4"
-                        checked={selectedSessions.includes(session.id)}
-                        onChange={() => handleSelectSession(session.id)}
+                        checked={selectedSessions.includes(Number(session.id))}
+                        onChange={() => handleSelectSession(Number(session.id))}
                       />
                     </TableCell>
                   )}
@@ -1645,11 +1728,11 @@ const renderSessionTable = (status: Session["status"] | "All") => {
                     <Button variant="default" onClick={() => {
                       if (session.isRecurring) {
                         if (status === "Finished") {
-                          handleViewFinishedOccurrences(session.id, user);  // Pass user here
+                          handleViewFinishedOccurrences(Number(session.id), user);  // Pass user here
                         } else if (status === "Upcoming") {
-                          handleViewUpcomingOccurrences(session.id);
+                          handleViewUpcomingOccurrences(Number(session.id));
                         } else {
-                          handleViewOccurrences(session.id);
+                          handleViewOccurrences(Number(session.id));
                         }
                       } else {
                         handleViewDetails(session.id);
@@ -1946,7 +2029,7 @@ const OccurrencesDialog = () => {
                         <Button 
                           variant="outline"
                           size="sm"
-                          onClick={() => handleViewDetails(occurrence.id)}
+                          onClick={() => {handleViewDetails(occurrence.id);setIsOccurrencesDialogOpen(false)}}
                         >
                           View Details
                         </Button>
@@ -2010,7 +2093,7 @@ const SessionTable = ({
             {session.assignedPlayers.length} present
           </TableCell>
           <TableCell>
-            <Button variant="default" onClick={() => onViewDetails(session.id)}>
+            <Button variant="default" onClick={() => onViewDetails(Number(session.id))}>
               View Details
             </Button>
           </TableCell>
@@ -2317,9 +2400,9 @@ const handleConfirmExport = async () => {
     }
   };
   
-  const handleMetricsClick = async (playerId: string, playerName: string, sessionId: number) => {
+  const handleMetricsClick = async (playerId: string, playerName: string, sessionId: number | string) => {
     try {
-      const currentMetrics = await getPlayerCurrentMetrics(playerId, sessionId, sessions);
+      const currentMetrics = await getPlayerCurrentMetrics(playerId, sessionId as number, sessions);
       setPlayerMetrics(prev => ({
         ...prev,
         [playerId]: currentMetrics
@@ -2327,7 +2410,7 @@ const handleConfirmExport = async () => {
       setSelectedPlayerForMetrics({
         id: playerId,
         name: playerName,
-        sessionId
+        sessionId: Number(sessionId)
       });
     } catch (error) {
       console.error('Error loading metrics:', error);
@@ -2340,7 +2423,7 @@ const handleConfirmExport = async () => {
   };
 
 // Update the handleSaveMetrics function
-const handleSaveMetrics = async (sessionId: number, playerId: string, metricsToSave: any) => {
+const handleSaveMetrics = async (sessionId: number | string, playerId: string, metricsToSave: any) => {
   try {
     if (!metricsToSave || !sessionId || !playerId || !user?.academyId) {
       throw new Error('Missing required data');
@@ -2359,7 +2442,7 @@ const handleSaveMetrics = async (sessionId: number, playerId: string, metricsToS
 
     // Calculate overall
     const overall = Math.round(
-      Object.values(numericMetrics).reduce((sum, val) => sum + val, 0) / 
+      Object.values(numericMetrics).reduce((sum, val) => sum + val, 0) /
       Object.keys(numericMetrics).length
     );
 
@@ -2385,7 +2468,7 @@ const handleSaveMetrics = async (sessionId: number, playerId: string, metricsToS
 
     // Update the session state locally
     setSessions(prev => prev.map(session => {
-      if (session.id === sessionId) {
+      if (session.id?.toString() === sessionId.toString()) {
         return {
           ...session,
           playerMetrics: {
@@ -2419,7 +2502,7 @@ const handleSaveMetrics = async (sessionId: number, playerId: string, metricsToS
     );
 
     // If we have a view details session open, update it too
-    if (viewDetailsSessionData && viewDetailsSessionData.id === sessionId) {
+    if (viewDetailsSessionData && viewDetailsSessionData.id?.toString() === sessionId.toString()) {
       setViewDetailsSessionData(prev => {
         if (!prev) return null;
         return {
@@ -2833,7 +2916,20 @@ const renderSessionDetails = (session: Session | undefined) => {
                     <div className="flex items-center space-x-2">
                       <Switch
                         checked={isPresent}
-                        onCheckedChange={(checked) =>{setIsOccurrencesDialogOpen(false); handleAttendanceChange(session.id, player.id, checked, sessions)}}
+                        onCheckedChange={async (checked) => {
+                            setIsOccurrencesDialogOpen(false)
+                            await handleAttendanceChange(
+                            session.id,
+                            player.id,
+                            checked,
+                            viewDetailsSessionData,
+                            setViewDetailsSessionData,
+                            user,
+                            sessions,
+                            setSessions,
+                            user?.academyId ?? "" // Pass academyId as explicit parameter, fallback to empty string
+                            );
+                        }}
                         disabled={currentStatus === "Upcoming"}
                       />
                       <span className="text-sm">
@@ -2888,43 +2984,59 @@ const renderSessionDetails = (session: Session | undefined) => {
 };
 
   // Add this new handler for attendance
-  const handleAttendanceChange = async (sessionId: number | string, playerId: string, isPresent: boolean, sessions: Session[]) => {
-    if (!user?.academyId) {
+  // Update handleAttendanceChange to handle occurrence sessions correctly
+  // Update handleAttendanceChange to always use the academyId passed as argument (do not use user?.academyId from closure)
+  const handleAttendanceChange = async (
+    sessionId: number | string,
+    playerId: string,
+    isPresent: boolean,
+    viewDetailsSessionData: Session | null,
+    setViewDetailsSessionData: (session: Session | null) => void,
+    user: { academyId?: string; id?: string } | null,
+    sessions: Session[],
+    setSessions: React.Dispatch<React.SetStateAction<Session[]>>,
+    academyId: string // <-- now required as 9th argument
+  ) => {
+    const effectiveAcademyId = academyId || user?.academyId;
+    if (!effectiveAcademyId) {
       console.error('[ATTENDANCE] No academyId available');
       return;
     }
-  
+
     // Find session in local state
-    const session = sessions.find(s => 
-      s._id?.toString() === sessionId.toString() || 
-      s.id.toString() === sessionId.toString()
+    const session = sessions.find(s =>
+      s._id?.toString() === sessionId.toString() ||
+      s.id?.toString() === sessionId.toString()
     );
-  
+
     if (!session) {
       console.error('[ATTENDANCE] Session not found:', sessionId);
       return;
     }
-  
+
     // Create updated attendance object
     const updatedAttendance = {
       ...session.attendance,
       [playerId]: {
         status: isPresent ? "Present" : "Absent",
         markedAt: new Date().toISOString(),
-        markedBy: user.id
+        markedBy: user?.id || ''
       }
     };
-  
+
     // Update local state immediately for fast UI
-    setSessions(prev => prev.map(s => {
-      if (s._id?.toString() === sessionId.toString() || s.id.toString() === sessionId.toString()) {
-        // Ensure all attendance entries have status as "Present" | "Absent"
+    setSessions((prev: Session[]) => prev.map(s => {
+      if (
+        s._id?.toString() === sessionId.toString() ||
+        s.id?.toString() === sessionId.toString()
+      ) {
         const fixedAttendance: Session['attendance'] = Object.fromEntries(
-          Object.entries(updatedAttendance).map(([playerId, data]) => [
-            playerId,
+          Object.entries(updatedAttendance).map(([pid, data]) => [
+            pid,
             {
               ...data,
-              status: data.status === "Present" ? "Present" : "Absent"
+              status: data.status === "Present" ? "Present" : "Absent",
+              markedBy: data.markedBy ?? (user?.id ?? "")
             }
           ])
         );
@@ -2932,40 +3044,44 @@ const renderSessionDetails = (session: Session | undefined) => {
       }
       return s;
     }));
-  
+
     // Update view details if open
-    if (viewDetailsSessionData?._id?.toString() === sessionId.toString() ||
-        viewDetailsSessionData?.id?.toString() === sessionId.toString()) {
-      setViewDetailsSessionData((prev: Session | null) => prev ? {
-        ...prev,
+    if (
+      viewDetailsSessionData?._id?.toString() === sessionId.toString() ||
+      viewDetailsSessionData?.id?.toString() === sessionId.toString()
+    ) {
+      setViewDetailsSessionData({
+        ...viewDetailsSessionData!,
         attendance: Object.fromEntries(
-          Object.entries(updatedAttendance).map(([playerId, data]) => [
-            playerId,
+          Object.entries(updatedAttendance).map(([pid, data]) => [
+            pid,
             {
               ...data,
-              status: data.status === "Present" ? "Present" : "Absent" as "Present" | "Absent"
-            }
+              status: data.status === "Present" ? "Present" : "Absent"
+            } as { status: "Present" | "Absent"; markedAt: string; markedBy: string; }
           ])
-        ) as Session['attendance']
-      } : prev);
+        ) as { [playerId: string]: { status: "Present" | "Absent"; markedAt: string; markedBy: string; } }
+      });
     }
-  
+
     // Show immediate success toast
-    toast({
-      title: "Updating",
-      description: `Marking as ${isPresent ? "Present" : "Absent"}...`,
-    });
-  
+    if (typeof toast === "function") {
+      toast({
+        title: "Updating",
+        description: `Marking as ${isPresent ? "Present" : "Absent"}...`,
+      });
+    }
+
     // Update backend
     try {
       const updatePayload = {
         attendance: updatedAttendance,
-        academyId: user.academyId,
+        academyId: effectiveAcademyId,
         isOccurrence: session.isOccurrence || false,
         parentSessionId: session.parentSessionId,
         lastUpdated: new Date().toISOString()
       };
-  
+
       const apiId = session._id || session.id;
       const response = await fetch(`/api/db/ams-sessions/${apiId}`, {
         method: 'PATCH',
@@ -2975,14 +3091,14 @@ const renderSessionDetails = (session: Session | undefined) => {
         },
         body: JSON.stringify(updatePayload)
       });
-  
+
       if (!response.ok) throw new Error('Failed to update attendance');
-      
+
       const result = await response.json();
       if (!result.success) throw new Error(result.error || 'Failed to update attendance');
-  
+
       // Fetch latest attendance from backend and log it
-      const fetchAttendanceResp = await fetch(`/api/db/ams-sessions/${sessionId}?academyId=${user.academyId}`, {
+      const fetchAttendanceResp = await fetch(`/api/db/ams-sessions/${sessionId}?academyId=${effectiveAcademyId}`, {
         headers: {
           'Cache-Control': 'no-cache',
           'Pragma': 'no-cache'
@@ -2997,39 +3113,48 @@ const renderSessionDetails = (session: Session | undefined) => {
           );
         }
       }
-  
+
       // Show final success toast
-      toast({
-        title: "Success",
-        description: `Attendance saved as ${isPresent ? "Present" : "Absent"}`,
-        variant: "default",
-      });
-  
+      if (typeof toast === "function") {
+        toast({
+          title: "Success",
+          description: `Attendance saved as ${isPresent ? "Present" : "Absent"}`,
+          variant: "default",
+        });
+      }
+
     } catch (error) {
       // Revert local state on error
       setSessions(prev => prev.map(s => {
-        if (s._id?.toString() === sessionId.toString() || s.id.toString() === sessionId.toString()) {
+        if (
+          s._id?.toString() === sessionId.toString() ||
+          s.id?.toString() === sessionId.toString()
+        ) {
           return { ...s, attendance: session.attendance };
         }
         return s;
       }));
-  
+
       // Update view details if open
-      if (viewDetailsSessionData?._id?.toString() === sessionId.toString() ||
-          viewDetailsSessionData?.id?.toString() === sessionId.toString()) {
-        setViewDetailsSessionData((prev: Session | null) => prev ? {
-          ...prev,
+      if (
+        viewDetailsSessionData?._id?.toString() === sessionId.toString() ||
+        viewDetailsSessionData?.id?.toString() === sessionId.toString()
+      ) {
+        setViewDetailsSessionData({
+          ...viewDetailsSessionData!,
           attendance: session.attendance
-        } : prev);
+        });
       }
-  
+
       // Show error toast
       console.error('Error updating attendance:', error);
-      toast({
-        title: "Error",
-        description: "Failed to save attendance. Changes reverted.",
-        variant: "destructive",
-      });
+      if (typeof toast === "function") {
+        toast({
+          title: "Error",
+          description: "Failed to save attendance. Changes reverted.",
+          variant: "destructive",
+        });
+      }
     }
   };
 
@@ -3998,7 +4123,7 @@ const calculateSessionStatus = (session: Session) => {
 const renderSessionDetails = (
   session: Session | undefined,
   detailsPlayerSearchQuery: string = "",
-  handleMetricsClickParam?: (playerId: string, playerName: string, sessionId: number) => void,
+  handleMetricsClickParam?: (playerId: string, playerName: string, sessionId: number | string) => void,
   viewDetailsSessionData?: Session | null,
   setViewDetailsSessionData?: (session: Session | null) => void,
   user?: { academyId?: string; id?: string } | null,
@@ -4050,26 +4175,33 @@ const renderSessionDetails = (
               <div className="flex items-center space-x-4">
                 <div className="flex items-center space-x-2">
                   <Switch
-                    checked={isPresent}
-                    onCheckedChange={(checked) => {
-                      if (setSessions) {
-                        handleAttendanceChange(
-                          session.id,
-                          player.id,
-                          checked,
-                          viewDetailsSessionData ?? null,
-                          setViewDetailsSessionData || ((s: Session | null) => {}),
-                          user ?? null,
-                          sessions,
-                          setSessions
-                          
-                        );
-                      }
-                    }}
-                    disabled={currentStatus === "Upcoming"}
+                  checked={isPresent}
+                  onCheckedChange={(checked) => {
+                    if (!user?.academyId) {
+                    toast({
+                      title: "Error",
+                      description: "No academy ID available. Please contact administrator.",
+                      variant: "destructive",
+                    });
+                    return;
+                    }
+                    if (setSessions && setViewDetailsSessionData) {
+                    handleAttendanceChange(
+                      Number(session.id),
+                      player.id,
+                      checked,
+                      viewDetailsSessionData ?? null,
+                      setViewDetailsSessionData,
+                      user ?? null,
+                      sessions,
+                      setSessions
+                    );
+                    }
+                  }}
+                  disabled={currentStatus === "Upcoming"}
                   />
                   <span className="text-sm">
-                    {isPresent ? "Present" : "Absent"}
+                  {isPresent ? "Present" : "Absent"}
                   </span>
                 </div>
                 {isPresent && currentStatus === "Finished" && (
@@ -4091,160 +4223,176 @@ const renderSessionDetails = (
 };
 
 // Update handleAttendanceChange to handle occurrence sessions correctly
+// Update handleAttendanceChange to handle occurrence sessions correctly and always use the correct id for PATCH
+// Improved handleAttendanceChange: ensures optimistic UI, but always fetches latest attendance from backend after PATCH to avoid stale state
 const handleAttendanceChange = async (
-  sessionId: number | string, 
-  playerId: string, 
+  sessionId: number | string,
+  playerId: string,
   isPresent: boolean,
   viewDetailsSessionData: Session | null,
   setViewDetailsSessionData: (session: Session | null) => void,
   user: { academyId?: string; id?: string } | null,
   sessions: Session[],
-  setSessions: React.Dispatch<React.SetStateAction<Session[]>>
+  setSessions: React.Dispatch<React.SetStateAction<Session[]>>,
+  academyId?: string
 ) => {
-  if (!user?.academyId) {
-    console.error('[ATTENDANCE] No academyId available');
+  const effectiveAcademyId = academyId || user?.academyId;
+  if (!effectiveAcademyId) {
+    if (typeof toast === "function") {
+      toast({ title: "Error", description: "No academy ID available", variant: "destructive" });
+    }
     return;
   }
 
   // Find session in local state
-  const session = sessions.find(s => 
-    s._id?.toString() === sessionId.toString() || 
-    s.id.toString() === sessionId.toString()
+  const session = sessions.find(
+    s => s._id?.toString() === sessionId.toString() || s.id?.toString() === sessionId.toString()
   );
-
   if (!session) {
-    console.error('[ATTENDANCE] Session not found:', sessionId);
+    if (typeof toast === "function") toast({ title: "Error", description: "Session not found", variant: "destructive" });
     return;
   }
 
-  // Create updated attendance object
-  const updatedAttendance = {
-    ...session.attendance,
-    [playerId]: {
-      status: isPresent ? "Present" : "Absent",
-      markedAt: new Date().toISOString(),
-      markedBy: user.id
-    }
+  // Snapshot original attendance to revert on error
+  const originalAttendance = session.attendance ? { ...session.attendance } : {};
+
+  const timestamp = new Date().toISOString();
+  const newEntry = {
+    status: isPresent ? "Present" : "Absent",
+    markedAt: timestamp,
+    markedBy: user?.id || ''
   };
 
-  // Update local state immediately for fast UI
-  setSessions((prev: Session[]) => prev.map(s => {
-    if (s._id?.toString() === sessionId.toString() || s.id.toString() === sessionId.toString()) {
-      return {
-        ...s,
-        attendance: {
-          ...s.attendance,
-          [playerId]: {
-            status: isPresent ? "Present" as const : "Absent" as const,
-            markedAt: new Date().toISOString(),
-            markedBy: user?.id || ''
+  // Optimistic UI update
+  setSessions(prev =>
+    prev.map(s => {
+      if (s._id?.toString() === sessionId.toString() || s.id?.toString() === sessionId.toString()) {
+        return {
+          ...s,
+          attendance: {
+            ...s.attendance,
+            [playerId]: {
+              ...newEntry,
+              status: (isPresent ? "Present" : "Absent") as "Present" | "Absent"
+            }
           }
-        }
-      };
-    }
-    return s;
-  }));
-
-  // Update view details if open
-  if (viewDetailsSessionData?._id?.toString() === sessionId.toString() ||
-      viewDetailsSessionData?.id?.toString() === sessionId.toString()) {
-    if (viewDetailsSessionData) {
-      setViewDetailsSessionData({
-        ...viewDetailsSessionData,
-        attendance: {
-          ...viewDetailsSessionData.attendance,
-          [playerId]: {
-            status: isPresent ? "Present" : "Absent",
-            markedAt: new Date().toISOString(),
-            markedBy: user?.id || ''
-          }
-        }
-      });
-    }
-  }
-
-  // Show immediate success toast
-  toast({
-    title: "Updating",
-    description: `Marking as ${isPresent ? "Present" : "Absent"}...`,
-  });
-
-  // Update backend
-  try {
-    const updatePayload = {
-      attendance: updatedAttendance,
-      academyId: user.academyId,
-      isOccurrence: session.isOccurrence || false,
-      parentSessionId: session.parentSessionId,
-      lastUpdated: new Date().toISOString()
-    };
-
-    const apiId = session._id || session.id;
-    const response = await fetch(`/api/db/ams-sessions/${apiId}`, {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        'Cache-Control': 'no-cache'
-      },
-      body: JSON.stringify(updatePayload)
-    });
-
-    if (!response.ok) throw new Error('Failed to update attendance');
-    
-    const result = await response.json();
-    if (!result.success) throw new Error(result.error || 'Failed to update attendance');
-
-    // Fetch latest attendance from backend and log it
-    const fetchAttendanceResp = await fetch(`/api/db/ams-sessions/${sessionId}?academyId=${user.academyId}`, {
-      headers: {
-        'Cache-Control': 'no-cache',
-        'Pragma': 'no-cache'
-      }
-    });
-    if (fetchAttendanceResp.ok) {
-      const attendanceResult = await fetchAttendanceResp.json();
-      if (attendanceResult.success && attendanceResult.data) {
-        console.log(
-          `[ATTENDANCE][AFTER UPDATE] Session ID: ${attendanceResult.data.id} | Recurring: ${!!attendanceResult.data.isRecurring} | Occurrence: ${!!attendanceResult.data.isOccurrence}`,
-          attendanceResult.data.attendance
-        );
-      }
-    }
-
-    // Show final success toast
-    toast({
-      title: "Success",
-      description: `Attendance saved as ${isPresent ? "Present" : "Absent"}`,
-      variant: "default",
-    });
-
-  } catch (error) {
-    // Revert local state on error
-    setSessions(prev => prev.map(s => {
-      if (s._id?.toString() === sessionId.toString() || s.id.toString() === sessionId.toString()) {
-        return { ...s, attendance: session.attendance };
+        };
       }
       return s;
-    }));
+    })
+  );
+  if (
+    viewDetailsSessionData &&
+    (viewDetailsSessionData._id?.toString() === sessionId.toString() || viewDetailsSessionData.id?.toString() === sessionId.toString())
+  ) {
+    setViewDetailsSessionData({
+      ...viewDetailsSessionData,
+      attendance: {
+        ...viewDetailsSessionData.attendance,
+        [playerId]: { 
+          ...newEntry, 
+          status: (isPresent ? "Present" : "Absent") as "Present" | "Absent"
+        }
+      }
+    });
+  }
 
-    // Update view details if open
-    if (viewDetailsSessionData?._id?.toString() === sessionId.toString() ||
-        viewDetailsSessionData?.id?.toString() === sessionId.toString()) {
-      if (session) {
-        setViewDetailsSessionData({
-          ...viewDetailsSessionData as Session,
-          attendance: session.attendance
-        });
+  if (typeof toast === "function") {
+    toast({ title: "Updating", description: `Marking as ${isPresent ? "Present" : "Absent"}...` });
+  }
+
+  // Find correct API id
+  let apiId: string | number | undefined = session._id ?? session.id;
+  if (session.isOccurrence && !session._id && session.parentSessionId) {
+    try {
+      const occResp = await fetch(
+        `/api/db/ams-sessions/occurrences?parentId=${encodeURIComponent(String(session.parentSessionId))}&academyId=${encodeURIComponent(effectiveAcademyId)}`,
+        { headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' } }
+      );
+      if (occResp.ok) {
+        const occJson = await occResp.json();
+        const occArray: Session[] = Array.isArray(occJson.data) ? occJson.data : [];
+        const matched = occArray.find(o => {
+          if (!o) return false;
+          const oDate = (o.date || '').split('T')[0];
+          const sDate = (session.date || '').split('T')[0];
+          const timeMatch = (o.startTime || '') === (session.startTime || '') || (o.endTime || '') === (session.endTime || '');
+          return oDate === sDate && timeMatch;
+        }) || occArray.find(o => (o.date || '').split('T')[0] === (session.date || '').split('T')[0]);
+        if (matched) apiId = matched._id ?? matched.id;
+      }
+    } catch {}
+  }
+  if (!apiId) {
+    setSessions(prev => prev.map(s => (s._id?.toString() === sessionId.toString() || s.id?.toString() === sessionId.toString() ? { ...s, attendance: originalAttendance } : s)));
+    if (viewDetailsSessionData) setViewDetailsSessionData({ ...viewDetailsSessionData, attendance: originalAttendance });
+    if (typeof toast === "function") toast({ title: "Error", description: "Unable to determine session id for saving attendance", variant: "destructive" });
+    return;
+  }
+
+  const apiIdStr = encodeURIComponent(String(apiId));
+  const payload = {
+    attendance: {
+      ...session.attendance,
+      [playerId]: newEntry
+    },
+    academyId: effectiveAcademyId,
+    isOccurrence: !!session.isOccurrence,
+    parentSessionId: session.parentSessionId,
+    lastUpdated: new Date().toISOString()
+  };
+
+  try {
+    const patchResp = await fetch(`/api/db/ams-sessions/${apiIdStr}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' },
+      body: JSON.stringify(payload)
+    });
+
+    if (!patchResp.ok) throw new Error('PATCH failed');
+
+    // Always fetch latest session from backend after PATCH to avoid stale state
+    const refetch = await fetch(`/api/db/ams-sessions/${apiIdStr}?academyId=${encodeURIComponent(effectiveAcademyId)}`, { headers: { 'Cache-Control': 'no-cache' } });
+    let savedSession: Session | undefined;
+    if (refetch.ok) {
+      const refJson = await refetch.json();
+      if (refJson.success && refJson.data) savedSession = refJson.data;
+    }
+
+    if (savedSession) {
+      const savedIdKey = savedSession._id ?? savedSession.id ?? apiId;
+      setSessions(prev => prev.map(s => {
+        if (
+          s._id?.toString() === String(savedIdKey) ||
+          s.id?.toString() === String(savedIdKey) ||
+          s._id?.toString() === sessionId.toString() ||
+          s.id?.toString() === sessionId.toString()
+        ) {
+          return { ...s, ...savedSession, attendance: savedSession.attendance };
+        }
+        return s;
+      }));
+      if (
+        viewDetailsSessionData &&
+        (viewDetailsSessionData._id?.toString() === String(savedIdKey) ||
+          viewDetailsSessionData.id?.toString() === String(savedIdKey) ||
+          viewDetailsSessionData._id?.toString() === sessionId.toString() ||
+          viewDetailsSessionData.id?.toString() === sessionId.toString())
+      ) {
+        setViewDetailsSessionData({ ...viewDetailsSessionData, ...savedSession, attendance: savedSession.attendance });
       }
     }
 
-    // Show error toast
-    console.error('Error updating attendance:', error);
-    toast({
-      title: "Error",
-      description: "Failed to save attendance. Changes reverted.",
-      variant: "destructive",
-    });
+    if (typeof toast === "function") {
+      toast({ title: "Success", description: `Attendance saved as ${isPresent ? 'Present' : 'Absent'}`, variant: "default" });
+    }
+  } catch (error) {
+    // Revert optimistic update on error
+    setSessions(prev => prev.map(s => (s._id?.toString() === sessionId.toString() || s.id?.toString() === sessionId.toString() ? { ...s, attendance: originalAttendance } : s)));
+    if (viewDetailsSessionData) setViewDetailsSessionData({ ...viewDetailsSessionData, attendance: originalAttendance });
+    if (typeof toast === "function") {
+      toast({ title: "Error", description: "Failed to save attendance. Changes reverted.", variant: "destructive" });
+    }
   }
 };
 

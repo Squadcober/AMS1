@@ -12,7 +12,7 @@ import { useAuth } from "@/contexts/AuthContext"
 import { toast } from "@/components/ui/use-toast"
 import { FileUp } from "lucide-react" // Add this import
 
-interface StudentInfo {
+interface playerInfo {
   pid: string
   name: string
   dob: string
@@ -71,9 +71,9 @@ const positions = [
   "Forward"
 ]
 
-export default function StudentSettings() {
+export default function playerSettings() {
   const { user } = useAuth()
-  const [studentInfo, setStudentInfo] = useState<StudentInfo>({
+  const [playerInfo, setplayerInfo] = useState<playerInfo>({
     pid: "",
     name: "",
     dob: "",
@@ -165,8 +165,8 @@ export default function StudentSettings() {
     return date.toISOString().split("T")[0];
   }
 
-  // Move loadStudentData outside useEffect so it can be called elsewhere
-  const loadStudentData = async () => {
+  // Move loadplayerData outside useEffect so it can be called elsewhere
+  const loadplayerData = async () => {
     try {
       setIsLoading(true);
 
@@ -211,7 +211,7 @@ export default function StudentSettings() {
       const academyData = academyResult.data;
       const userData = userResult.data;
 
-      setStudentInfo(prev => ({
+      setplayerInfo(prev => ({
         ...prev,
         pid: playerData.id || "",
         photoUrl: playerData.photoUrl || "",  // Set photo URL from player data
@@ -255,7 +255,7 @@ export default function StudentSettings() {
   };
 
   useEffect(() => {
-    loadStudentData();
+    loadplayerData();
   }, [user?.username, user?.academyId, user?.id, user?.email]); // Add user.email to dependencies
 
   const handleEdit = () => {
@@ -273,34 +273,34 @@ export default function StudentSettings() {
       // Structure updates with $set operator like profile page
       const updates = {
         $set: {
-          name: studentInfo.name,
+          name: playerInfo.name,
           email: user.email,
-          photoUrl: studentInfo.photoUrl,
-          position: studentInfo.position,
-          secondaryPosition: studentInfo.secondaryPosition,
-          strongFoot: studentInfo.strongFoot,
-          dob: studentInfo.dob,
-          age: parseInt(studentInfo.age) || 0,
-          gender: studentInfo.gender,
-          height: studentInfo.height,
-          weight: studentInfo.weight,
-          primaryGuardian: studentInfo.primaryGuardian,
-          secondaryGuardian: studentInfo.secondaryGuardian,
-          primaryPhone: studentInfo.primaryPhone,
-          secondaryPhone: studentInfo.secondaryPhone,
-          address: studentInfo.address,
-          bloodGroup: studentInfo.bloodGroup,
-          hasDisability: studentInfo.hasDisability,
-          disabilityType: studentInfo.disabilityType,
-          status: studentInfo.status,
-          enrollmentDate: studentInfo.enrollmentDate,
+          photoUrl: playerInfo.photoUrl,
+          position: playerInfo.position,
+          secondaryPosition: playerInfo.secondaryPosition,
+          strongFoot: playerInfo.strongFoot,
+          dob: playerInfo.dob,
+          age: parseInt(playerInfo.age) || 0,
+          gender: playerInfo.gender,
+          height: playerInfo.height,
+          weight: playerInfo.weight,
+          primaryGuardian: playerInfo.primaryGuardian,
+          secondaryGuardian: playerInfo.secondaryGuardian,
+          primaryPhone: playerInfo.primaryPhone,
+          secondaryPhone: playerInfo.secondaryPhone,
+          address: playerInfo.address,
+          bloodGroup: playerInfo.bloodGroup,
+          hasDisability: playerInfo.hasDisability,
+          disabilityType: playerInfo.disabilityType,
+          status: playerInfo.status,
+          enrollmentDate: playerInfo.enrollmentDate,
           updatedAt: new Date().toISOString(),
           lastUpdated: new Date().toISOString()
         }
       };
 
       // Use same endpoint and method as profile page
-      const response = await fetch(`/api/db/ams-player-data/${encodeURIComponent(studentInfo.pid)}`, {
+      const response = await fetch(`/api/db/ams-player-data/${encodeURIComponent(playerInfo.pid)}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -315,7 +315,7 @@ export default function StudentSettings() {
       const updatedPlayer = await response.json();
       
       // Update local state with response data
-      setStudentInfo(prev => ({
+      setplayerInfo(prev => ({
         ...prev,
         ...updatedPlayer
       }));
@@ -341,7 +341,7 @@ export default function StudentSettings() {
 
   const handleCancel = () => {
     setIsEditing(false);
-    loadStudentData(); // Reload original data
+    loadplayerData(); // Reload original data
   };
 
   const calculateAge = (dob: string): number => {
@@ -360,7 +360,7 @@ export default function StudentSettings() {
   const handleDOBChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newDOB = e.target.value;
     const calculatedAge = calculateAge(newDOB);
-    setStudentInfo(prev => ({
+    setplayerInfo(prev => ({
       ...prev,
       dob: newDOB,
       age: calculatedAge.toString()
@@ -377,7 +377,7 @@ export default function StudentSettings() {
     const value = e.target.value;
     // Only allow digits and limit to 10 characters
     if (/^\d{0,10}$/.test(value)) {
-      setStudentInfo(prev => ({ ...prev, [field]: value }));
+      setplayerInfo(prev => ({ ...prev, [field]: value }));
     }
   };
 
@@ -387,7 +387,7 @@ export default function StudentSettings() {
       const reader = new FileReader();
       reader.onloadend = () => {
         const photoUrl = reader.result as string;
-        setStudentInfo(prev => ({
+        setplayerInfo(prev => ({
           ...prev,
           photoUrl
         }));
@@ -400,7 +400,7 @@ export default function StudentSettings() {
     <div className="flex h-screen overflow-hidden">
       <Sidebar />
       <div className="flex-1 p-8 overflow-y-auto">
-        <h1 className="text-3xl font-bold mb-8">Student Settings</h1>
+        <h1 className="text-3xl font-bold mb-8">player Settings</h1>
 
         <div className="space-y-6">
           {/* Add Photo Card before Personal Information */}
@@ -410,9 +410,9 @@ export default function StudentSettings() {
             </CardHeader>
             <CardContent className="flex items-center gap-6">
               <div className="w-32 h-32 relative rounded-lg overflow-hidden bg-secondary">
-                {studentInfo.photoUrl ? (
+                {playerInfo.photoUrl ? (
                   <img
-                    src={studentInfo.photoUrl}
+                    src={playerInfo.photoUrl}
                     alt="Profile"
                     className="w-full h-full object-cover"
                     onError={(e) => {
@@ -456,7 +456,7 @@ export default function StudentSettings() {
                 </Label>
                 <Input
                   id="pid"
-                  value={studentInfo.pid}
+                  value={playerInfo.pid}
                   readOnly
                   className="bg-muted cursor-not-allowed"
                 />
@@ -469,7 +469,7 @@ export default function StudentSettings() {
                 </Label>
                 <Input
                   id="name"
-                  value={studentInfo.name}
+                  value={playerInfo.name}
                   readOnly
                   className="bg-muted cursor-not-allowed"
                 />
@@ -480,7 +480,7 @@ export default function StudentSettings() {
                 <Input
                   id="dob"
                   type="date"
-                  value={studentInfo.dob}
+                  value={playerInfo.dob}
                   onChange={handleDOBChange}
                   {...inputProps}
                 />
@@ -489,8 +489,8 @@ export default function StudentSettings() {
               <div className="space-y-2">
                 <Label htmlFor="gender">Gender</Label>
                 <Select
-                  value={studentInfo.gender}
-                  onValueChange={(value) => setStudentInfo(prev => ({ ...prev, gender: value }))}
+                  value={playerInfo.gender}
+                  onValueChange={(value) => setplayerInfo(prev => ({ ...prev, gender: value }))}
                   {...inputProps}
                 >
                   <SelectTrigger>
@@ -507,8 +507,8 @@ export default function StudentSettings() {
               <div className="space-y-2">
                 <Label htmlFor="position">Primary Position</Label>
                 <Select
-                  value={studentInfo.position}
-                  onValueChange={(value) => setStudentInfo(prev => ({ ...prev, position: value }))}
+                  value={playerInfo.position}
+                  onValueChange={(value) => setplayerInfo(prev => ({ ...prev, position: value }))}
                   {...inputProps}
                 >
                   <SelectTrigger>
@@ -527,8 +527,8 @@ export default function StudentSettings() {
               <div className="space-y-2">
                 <Label htmlFor="secondaryPosition">Secondary Position</Label>
                 <Select
-                  value={studentInfo.secondaryPosition}
-                  onValueChange={(value) => setStudentInfo(prev => ({ ...prev, secondaryPosition: value }))}
+                  value={playerInfo.secondaryPosition}
+                  onValueChange={(value) => setplayerInfo(prev => ({ ...prev, secondaryPosition: value }))}
                   {...inputProps}
                 >
                   <SelectTrigger>
@@ -547,8 +547,8 @@ export default function StudentSettings() {
               <div className="space-y-2">
                 <Label htmlFor="strongFoot">Strong Foot</Label>
                 <Select
-                  value={studentInfo.strongFoot}
-                  onValueChange={(value) => setStudentInfo(prev => ({ ...prev, strongFoot: value }))}
+                  value={playerInfo.strongFoot}
+                  onValueChange={(value) => setplayerInfo(prev => ({ ...prev, strongFoot: value }))}
                   {...inputProps}
                 >
                   <SelectTrigger>
@@ -565,8 +565,8 @@ export default function StudentSettings() {
               <div className="space-y-2">
                 <Label htmlFor="status">Status</Label>
                 <Select
-                  value={studentInfo.status}
-                  onValueChange={(value) => setStudentInfo(prev => ({ ...prev, status: value }))}
+                  value={playerInfo.status}
+                  onValueChange={(value) => setplayerInfo(prev => ({ ...prev, status: value }))}
                   {...inputProps}
                 >
                   <SelectTrigger>
@@ -585,8 +585,8 @@ export default function StudentSettings() {
                 <Input
                   id="enrollmentDate"
                   type="date"
-                  value={studentInfo.enrollmentDate}
-                  onChange={(e) => setStudentInfo(prev => ({ ...prev, enrollmentDate: e.target.value }))}
+                  value={playerInfo.enrollmentDate}
+                  onChange={(e) => setplayerInfo(prev => ({ ...prev, enrollmentDate: e.target.value }))}
                   {...inputProps}
                 />
               </div>
@@ -596,8 +596,8 @@ export default function StudentSettings() {
                 <Input
                   id="height"
                   type="number"
-                  value={studentInfo.height}
-                  onChange={(e) => setStudentInfo(prev => ({ ...prev, height: e.target.value }))}
+                  value={playerInfo.height}
+                  onChange={(e) => setplayerInfo(prev => ({ ...prev, height: e.target.value }))}
                   {...inputProps}
                 />
               </div>
@@ -607,8 +607,8 @@ export default function StudentSettings() {
                 <Input
                   id="weight"
                   type="number"
-                  value={studentInfo.weight}
-                  onChange={(e) => setStudentInfo(prev => ({ ...prev, weight: e.target.value }))}
+                  value={playerInfo.weight}
+                  onChange={(e) => setplayerInfo(prev => ({ ...prev, weight: e.target.value }))}
                   {...inputProps}
                 />
               </div>
@@ -620,7 +620,7 @@ export default function StudentSettings() {
                 </Label>
                 <Input
                   id="school"
-                  value={studentInfo.school}
+                  value={playerInfo.school}
                   readOnly
                   className="bg-muted cursor-not-allowed"
                 />
@@ -630,7 +630,7 @@ export default function StudentSettings() {
                 <Label htmlFor="age">Age (Auto-calculated)</Label>
                 <Input
                   id="age"
-                  value={studentInfo.age}
+                  value={playerInfo.age}
                   readOnly
                   className="bg-muted cursor-not-allowed"
                 />
@@ -646,21 +646,21 @@ export default function StudentSettings() {
               <div className="flex items-center space-x-2">
                 <Switch
                   id="hasDisability"
-                  checked={studentInfo.hasDisability}
+                  checked={playerInfo.hasDisability}
                   onCheckedChange={(checked) => 
-                    setStudentInfo(prev => ({ ...prev, hasDisability: checked }))
+                    setplayerInfo(prev => ({ ...prev, hasDisability: checked }))
                   }
                 />
                 <Label htmlFor="hasDisability">Has Disability</Label>
               </div>
 
-              {studentInfo.hasDisability && (
+              {playerInfo.hasDisability && (
                 <div className="space-y-2">
                   <Label htmlFor="disabilityType">Disability Type</Label>
                   <Input
                     id="disabilityType"
-                    value={studentInfo.disabilityType}
-                    onChange={(e) => setStudentInfo(prev => ({ ...prev, disabilityType: e.target.value }))}
+                    value={playerInfo.disabilityType}
+                    onChange={(e) => setplayerInfo(prev => ({ ...prev, disabilityType: e.target.value }))}
                     {...inputProps}
                   />
                 </div>
@@ -669,8 +669,8 @@ export default function StudentSettings() {
               <div className="space-y-2">
                 <Label htmlFor="bloodGroup">Blood Group</Label>
                 <Select
-                  value={studentInfo.bloodGroup}
-                  onValueChange={(value) => setStudentInfo(prev => ({ ...prev, bloodGroup: value }))}
+                  value={playerInfo.bloodGroup}
+                  onValueChange={(value) => setplayerInfo(prev => ({ ...prev, bloodGroup: value }))}
                   {...inputProps}
                 >
                   <SelectTrigger>
@@ -700,8 +700,8 @@ export default function StudentSettings() {
                 <Label htmlFor="primaryGuardian">Primary Guardian Name</Label>
                 <Input
                   id="primaryGuardian"
-                  value={studentInfo.primaryGuardian}
-                  onChange={(e) => setStudentInfo(prev => ({ ...prev, primaryGuardian: e.target.value }))}
+                  value={playerInfo.primaryGuardian}
+                  onChange={(e) => setplayerInfo(prev => ({ ...prev, primaryGuardian: e.target.value }))}
                   {...inputProps}
                 />
               </div>
@@ -710,8 +710,8 @@ export default function StudentSettings() {
                 <Label htmlFor="secondaryGuardian">Secondary Guardian Name</Label>
                 <Input
                   id="secondaryGuardian"
-                  value={studentInfo.secondaryGuardian}
-                  onChange={(e) => setStudentInfo(prev => ({ ...prev, secondaryGuardian: e.target.value }))}
+                  value={playerInfo.secondaryGuardian}
+                  onChange={(e) => setplayerInfo(prev => ({ ...prev, secondaryGuardian: e.target.value }))}
                   {...inputProps}
                 />
               </div>
@@ -724,7 +724,7 @@ export default function StudentSettings() {
                 <Input
                   id="email"
                   type="email"
-                  value={studentInfo.email}
+                  value={playerInfo.email}
                   readOnly
                   className="bg-muted cursor-not-allowed"
                 />
@@ -735,7 +735,7 @@ export default function StudentSettings() {
                 <Input
                   id="primaryPhone"
                   type="tel"
-                  value={studentInfo.primaryPhone}
+                  value={playerInfo.primaryPhone}
                   onChange={(e) => handlePhoneChange(e, 'primaryPhone')}
                   maxLength={10}
                   placeholder="Enter 10 digit number"
@@ -748,7 +748,7 @@ export default function StudentSettings() {
                 <Input
                   id="secondaryPhone"
                   type="tel"
-                  value={studentInfo.secondaryPhone}
+                  value={playerInfo.secondaryPhone}
                   onChange={(e) => handlePhoneChange(e, 'secondaryPhone')}
                   maxLength={10}
                   placeholder="Enter 10 digit number"
@@ -760,8 +760,8 @@ export default function StudentSettings() {
                 <Label htmlFor="address">Address</Label>
                 <Input
                   id="address"
-                  value={studentInfo.address}
-                  onChange={(e) => setStudentInfo(prev => ({ ...prev, address: e.target.value }))}
+                  value={playerInfo.address}
+                  onChange={(e) => setplayerInfo(prev => ({ ...prev, address: e.target.value }))}
                   {...inputProps}
                 />
               </div>

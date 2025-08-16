@@ -6,7 +6,7 @@ import { useAuth } from "@/contexts/AuthContext"
 import { UserRole } from "@/types/user"
 // Make sure UserRole is defined as follows in '@/types/user':
 // export enum UserRole {
-//   STUDENT = "STUDENT",
+//   player = "player",
 //   COACH = "COACH",
 //   ADMIN = "ADMIN",
 //   COORDINATOR = "COORDINATOR",
@@ -20,8 +20,8 @@ export default function Dashboard() {
   useEffect(() => {
     if (user) {
       switch (user.role) {
-        case UserRole.STUDENT:
-          router.push("/dashboard/student/profile")
+        case UserRole.player:
+          router.push("/dashboard/player/profile")
           break
         case UserRole.COACH:
           router.push("/dashboard/coach/profile")

@@ -10,7 +10,7 @@ function generateUniqueId(prefix: string): string {
 const createRoleSpecificData = async (db: any, userData: any, userId: string) => {
   try {
     switch (userData.role) {
-      case 'student':
+      case 'player':
         const playerCollection = db.collection('ams-player-data');
         const playerId = generateUniqueId('player');
         const playerData = {
@@ -21,7 +21,7 @@ const createRoleSpecificData = async (db: any, userData: any, userId: string) =>
           name: userData.name,
           email: userData.email,
           academyId: userData.academyId,
-          role: 'student',
+          role: 'player',
           position: "",
           playingStyle: "",
           photoUrl: "",

@@ -24,14 +24,14 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 
 const navItems = {
-  student: [
-    { name: "Profile", href: "/dashboard/student/profile" },
-    { name: "My Sessions", href: "/dashboard/student/training" },
-    { name: "Performance", href: "/dashboard/student/performance" },
-    { name: "Schedule", href: "/dashboard/student/schedule" },
-    { name: "Match Day", href: "/dashboard/student/matchday" },
-    { name: "My Batch", href: "/dashboard/student/batch" },
-    { name: "Settings", href: "/dashboard/student/settings" },
+  player: [
+    { name: "Profile", href: "/dashboard/player/profile" },
+    { name: "My Sessions", href: "/dashboard/player/training" },
+    { name: "Performance", href: "/dashboard/player/performance" },
+    { name: "Schedule", href: "/dashboard/player/schedule" },
+    { name: "Match Day", href: "/dashboard/player/matchday" },
+    { name: "My Batch", href: "/dashboard/player/batch" },
+    { name: "Settings", href: "/dashboard/player/settings" },
     { name: "Logout", href: "/auth" },
   ],
   coach: [

@@ -19,7 +19,7 @@ import { useToast } from "@/components/ui/use-toast"
 import { useRouter } from "next/navigation"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import PerformanceChart from "../../student/performance/components/PerformanceChart"
+import PerformanceChart from "../../player/performance/components/PerformanceChart"
 import { calculateAveragePerformance } from "@/utils/calculations"
 
 ChartJS.register(RadialLinearScale, PointElement, LineElement, Filler, Tooltip, Legend, CategoryScale, LinearScale)
@@ -93,7 +93,7 @@ export default function SearchPage() {
   const { toast } = useToast()
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedUser, setSelectedUser] = useState<any>(null)
-  const [selectedTab, setSelectedTab] = useState<"all" | "students" | "coaches">("all")
+  const [selectedTab, setSelectedTab] = useState<"all" | "players" | "coaches">("all")
   const [filteredPlayers, setFilteredPlayers] = useState<string[]>([])
   const [visibleCount, setVisibleCount] = useState(20)
   const [batches, setBatches] = useState<any[]>([])
@@ -170,7 +170,7 @@ export default function SearchPage() {
           // Fetch photos based on role
           const photoPromises = usersResult.data.map(async (user: any) => {
             try {
-              if (user.role === 'student') {
+              if (user.role === 'player') {
                 const playerResponse = await fetch(`/api/db/ams-player-data?ids=${user.id}`);
                 const playerData = await playerResponse.json();
                 return playerData.success && playerData.data[0]?.photoUrl;
@@ -198,7 +198,7 @@ export default function SearchPage() {
           setUsers(fetchedUsers);
         }
 
-        // Then fetch player data for all students
+        // Then fetch player data for all players
         const playerDataResponse = await fetch(`/api/db/ams-player-data?academyId=${user.academyId}`);
         if (!playerDataResponse.ok) throw new Error('Failed to fetch player data');
         
@@ -519,7 +519,7 @@ export default function SearchPage() {
                             user.email?.toLowerCase().includes(searchTerm.toLowerCase())
         
         const matchesTab = selectedTab === "all" ? true :
-                          selectedTab === "students" ? user.role === "student" :
+                          selectedTab === "players" ? user.role === "player" :
                           selectedTab === "coaches" ? user.role === "coach" : false
         
         // Exclude admin users
@@ -568,7 +568,7 @@ export default function SearchPage() {
   }
 
   const renderUserProfile = (user: any) => {
-    if (user.role === "student") {
+    if (user.role === "player") {
       const playerData = getPlayerData(user.id);
       console.log('Rendering player data:', playerData);
 
@@ -919,7 +919,7 @@ export default function SearchPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Batch Name</TableHead>
-                      <TableHead>Students</TableHead>
+                      <TableHead>players</TableHead>
                       <TableHead>Schedule</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -928,7 +928,7 @@ export default function SearchPage() {
                         coachData.batches.map((batch: any) => (
                           <TableRow key={batch.id}>
                             <TableCell className="font-medium">{batch.name}</TableCell>
-                            <TableCell>{batch.totalPlayers} students</TableCell>
+                            <TableCell>{batch.totalPlayers} players</TableCell>
                             <TableCell>{batch.schedule}</TableCell>
                           </TableRow>
                         ))
@@ -1065,7 +1065,7 @@ export default function SearchPage() {
             <Tabs value={selectedTab} onValueChange={(value: any) => setSelectedTab(value)}>
               <TabsList>
                 <TabsTrigger value="all">All</TabsTrigger>
-                <TabsTrigger value="students">Students</TabsTrigger>
+                <TabsTrigger value="players">players</TabsTrigger>
                 <TabsTrigger value="coaches">Coaches</TabsTrigger>
               </TabsList>
             </Tabs>
@@ -1100,7 +1100,7 @@ export default function SearchPage() {
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline">
-                          {user.role === "student" ? "Student" : "Coach"}
+                          {user.role === "player" ? "player" : "Coach"}
                         </Badge>
                       </TableCell>
                       <TableCell>{user.email}</TableCell>

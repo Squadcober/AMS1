@@ -7,25 +7,25 @@ import { useToast } from "@/components/ui/use-toast"
 
 export default function PerformancePage() {
   const { user } = useAuth()
-  const [students, setStudents] = useState<any[]>([])
+  const [players, setplayers] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const { toast } = useToast()
 
   useEffect(() => {
-    const fetchStudents = async () => {
+    const fetchplayers = async () => {
       try {
         if (!user?.academyId) return;
 
         const response = await fetch(`/api/db/ams-player-data?academyId=${user.academyId}`);
-        if (!response.ok) throw new Error('Failed to fetch students');
+        if (!response.ok) throw new Error('Failed to fetch players');
         
         const data = await response.json();
-        setStudents(data);
+        setplayers(data);
       } catch (error) {
-        console.error('Error fetching students:', error);
+        console.error('Error fetching players:', error);
         toast({
           title: "Error",
-          description: "Failed to load student data",
+          description: "Failed to load player data",
           variant: "destructive",
         });
       } finally {
@@ -33,7 +33,7 @@ export default function PerformancePage() {
       }
     };
 
-    fetchStudents();
+    fetchplayers();
   }, [user?.academyId]);
 
   if (loading) {
@@ -42,7 +42,7 @@ export default function PerformancePage() {
         <Sidebar />
         <div className="flex-1 p-8">
           <div className="flex items-center justify-center h-full">
-            Loading student data...
+            Loading player data...
           </div>
         </div>
       </div>

@@ -74,8 +74,8 @@ export default function PerformanceReports() {
   const { batches } = useBatches()
   const [selectedPerson, setSelectedPerson] = useState<Player | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
-  const [view, setView] = useState<"students" | "coaches">("students")
-  const [selectedStudent, setSelectedStudent] = useState<string>("")
+  const [view, setView] = useState<"players" | "coaches">("players")
+  const [selectedplayer, setSelectedplayer] = useState<string>("")
   interface PerformanceData {
     date: string;
     value: number;
@@ -171,7 +171,7 @@ export default function PerformanceReports() {
   useEffect(() => {
     // Replace with actual API call to fetch performance data
     setPerformanceData(mockPerformanceData)
-  }, [selectedStudent])
+  }, [selectedplayer])
 
   const handlePersonClick = (person: any) => {
     if (person.academyId !== user?.academyId) {

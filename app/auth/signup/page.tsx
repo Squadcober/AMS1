@@ -6,7 +6,7 @@ import { motion } from "framer-motion"
 import Link from "next/link"
 import { useAuth } from "@/contexts/AuthContext"
 import { usePlayers } from "@/contexts/PlayerContext"
-export type UserRole = "student" | "coach" | "admin" | "coordinator";
+export type UserRole = "player" | "coach" | "admin" | "coordinator";
 import { CustomTooltip } from "@/components/custom-tooltip"
 
 export default function SignUpPage() {
@@ -14,7 +14,7 @@ export default function SignUpPage() {
   const [password, setPassword] = useState("")
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
-  const [role, setRole] = useState<UserRole>("student")
+  const [role, setRole] = useState<UserRole>("player")
   const [error, setError] = useState("")
   const [academyId, setAcademyId] = useState("")
   const router = useRouter()
@@ -77,8 +77,8 @@ export default function SignUpPage() {
 
       // After successful signup, redirect based on role
       switch (role) {
-        case "student":
-          router.push("/dashboard/student/profile")
+        case "player":
+          router.push("/dashboard/player/profile")
           break
         case "coach":
           router.push("/dashboard/coach/batches")
@@ -190,7 +190,7 @@ export default function SignUpPage() {
               required
               className="w-full px-3 py-2 bg-[#2a2f3d] border border-[#3a3f4d] rounded-md text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
             >
-              <option value="student">Student</option>
+              <option value="player">player</option>
               <option value="coach">Coach</option>
               <option value="admin">Admin</option>
               <option value="coordinator">Coordinator</option>

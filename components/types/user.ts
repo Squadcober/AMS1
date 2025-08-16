@@ -24,7 +24,7 @@ export interface User {
   email: string
 }
 
-export interface Student extends User {
+export interface player extends User {
   academyId: string
   age: number
   grade: string

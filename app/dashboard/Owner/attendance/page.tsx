@@ -29,7 +29,7 @@ export default function AttendancePage() {
   const [selectedAcademy, setSelectedAcademy] = useState<string>("")
   const [searchTerm, setSearchTerm] = useState<string>("")
   const [loading, setLoading] = useState(true)
-  const [userType, setUserType] = useState<"students" | "coaches">("students")
+  const [userType, setUserType] = useState<"players" | "coaches">("players")
   const [playerIdNameMap, setPlayerIdNameMap] = useState<Record<string, string>>({})
   const [playerData, setPlayerData] = useState<any[]>([])
 
@@ -127,7 +127,7 @@ export default function AttendancePage() {
     const fetchData = async () => {
       try {
         // Fetch users for selected academy and type
-        const usersRes = await fetch(`/api/db/ams-users?academyId=${selectedAcademy}&role=${userType === "students" ? "student" : "coach"}`)
+        const usersRes = await fetch(`/api/db/ams-users?academyId=${selectedAcademy}&role=${userType === "players" ? "player" : "coach"}`)
         const usersData = await usersRes.json()
         setUsers(usersData.success ? usersData.data : [])
 
@@ -262,12 +262,12 @@ export default function AttendancePage() {
                 ))}
               </SelectContent>
             </Select>
-            <Select onValueChange={v => setUserType(v as "students" | "coaches")} value={userType}>
+            <Select onValueChange={v => setUserType(v as "players" | "coaches")} value={userType}>
               <SelectTrigger className="w-40">
                 <SelectValue placeholder="User Type" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="students">Students</SelectItem>
+                <SelectItem value="players">players</SelectItem>
                 <SelectItem value="coaches">Coaches</SelectItem>
               </SelectContent>
             </Select>

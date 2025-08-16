@@ -23,18 +23,18 @@ export async function GET(request: NextRequest) {
     const coach = await db.collection('ams-coaches').findOne({ userId: coachId });
     const ratings = coach?.ratings || [];
 
-    // Also fetch student names for the ratings
-    const studentIds = ratings.map((r: any) => r.studentId);
-    const students = await db.collection('ams-users')
-      .find({ id: { $in: studentIds } })
+    // Also fetch player names for the ratings
+    const playerIds = ratings.map((r: any) => r.playerId);
+    const players = await db.collection('ams-users')
+      .find({ id: { $in: playerIds } })
       .toArray();
 
-    // Merge student names with ratings
+    // Merge player names with ratings
     const ratingsWithNames = ratings.map((rating: any) => {
-      const student = students.find(s => s.id === rating.studentId);
+      const player = players.find(s => s.id === rating.playerId);
       return {
         ...rating,
-        studentName: student?.name || 'Anonymous Student'
+        playerName: player?.name || 'Anonymous player'
       };
     });
 

@@ -10,7 +10,7 @@ import { LineChart, Line, Area, AreaChart, XAxis, YAxis, CartesianGrid, Tooltip,
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState({
-    students: 0,
+    players: 0,
     coaches: 0,
     ongoingSessions: 0,
     monthlyRevenue: 0,
@@ -19,9 +19,9 @@ export default function AdminDashboard() {
   });
 
   useEffect(() => {
-    // Get students and coaches count
+    // Get players and coaches count
     const users = JSON.parse(localStorage.getItem('users') || '[]');
-    const studentCount = users.filter((user: any) => user.role === 'student').length;
+    const playerCount = users.filter((user: any) => user.role === 'player').length;
     const coachCount = users.filter((user: any) => user.role === 'coach').length;
 
     // Get ongoing sessions count
@@ -92,7 +92,7 @@ export default function AdminDashboard() {
     });
 
     setStats({
-      students: studentCount,
+      players: playerCount,
       coaches: coachCount,
       ongoingSessions: ongoingCount,
       monthlyRevenue: februaryBalance - januaryBalance, // Revenue is the difference
@@ -113,11 +113,11 @@ export default function AdminDashboard() {
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Students</CardTitle>
+              <CardTitle className="text-sm font-medium">Total players</CardTitle>
               <User2 className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.students}</div>
+              <div className="text-2xl font-bold">{stats.players}</div>
             </CardContent>
           </Card>
 

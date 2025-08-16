@@ -16,19 +16,19 @@ interface User {
 }
 
 interface Stats {
-  totalStudents: number;
+  totalplayers: number;
   totalCoaches: number;
   totalSessions: number;
-  activeStudents: number;
+  activeplayers: number;
   revenue: number;
   expenses: number;
 }
 
 const defaultStats: Stats = {
-  totalStudents: 0,
+  totalplayers: 0,
   totalCoaches: 0,
   totalSessions: 0,
-  activeStudents: 0,
+  activeplayers: 0,
   revenue: 0,
   expenses: 0
 };
@@ -84,7 +84,7 @@ export default function AdminDetailPage() {
       // Calculate stats with null checks and proper filtering
       const now = new Date();
       const newStats = {
-        totalStudents: users.filter((u: { role: string }) => u.role === 'student').length || 0,
+        totalplayers: users.filter((u: { role: string }) => u.role === 'player').length || 0,
         totalCoaches: users.filter((u: { role: string }) => u.role === 'coach').length || 0,
         totalSessions: sessions.filter((s: { date: string | number | Date; startTime: { split: (arg0: string) => { (): any; new(): any; map: { (arg0: NumberConstructor): [any, any]; new(): any } } }; endTime: { split: (arg0: string) => { (): any; new(): any; map: { (arg0: NumberConstructor): [any, any]; new(): any } } } }) => {
           const sessionDate = new Date(s.date);
@@ -99,7 +99,7 @@ export default function AdminDetailPage() {
 
           return now >= sessionStart && now <= sessionEnd;
         }).length || 0,
-        activeStudents: users.filter((u: { role: string; status: string }) => u.role === 'student' && u.status === 'active').length || 0,
+        activeplayers: users.filter((u: { role: string; status: string }) => u.role === 'player' && u.status === 'active').length || 0,
         revenue: transactions
           .filter((t: { type: string }) => t.type?.toLowerCase() === 'income')
           .reduce((sum: number, t: { amount: any }) => sum + (Number(t.amount) || 0), 0),
@@ -197,11 +197,11 @@ export default function AdminDetailPage() {
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Students</CardTitle>
+              <CardTitle className="text-sm font-medium">Total players</CardTitle>
               <User2 className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.totalStudents}</div>
+              <div className="text-2xl font-bold">{stats.totalplayers}</div>
             </CardContent>
           </Card>
 

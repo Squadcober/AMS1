@@ -5,7 +5,7 @@ export enum UserRole {
   OWNER = "OWNER",
   COACH = "COACH",
   USER = "USER",
-  STUDENT = "STUDENT"
+  player = "player"
 }
 
 export interface User {
@@ -28,7 +28,7 @@ export interface User {
   education: string
 }
 
-export interface Student extends User {
+export interface player extends User {
   academyId: string
   age: number
   grade: string

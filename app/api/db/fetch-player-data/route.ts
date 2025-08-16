@@ -7,10 +7,10 @@ export const fetchCache = 'force-no-store';
 
 export async function GET(request: NextRequest) {
   try {
-    const studentId = request.nextUrl.searchParams.get('studentId');
+    const playerId = request.nextUrl.searchParams.get('playerId');
     const academyId = request.nextUrl.searchParams.get('academyId');
 
-    if (!studentId || !academyId) {
+    if (!playerId || !academyId) {
       return NextResponse.json({ 
         success: false, 
         error: 'Missing required parameters' 
@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
 
     // Fetch player data
     const playerData = await db.collection('ams-player-data').findOne({
-      userId: studentId,
+      userId: playerId,
       academyId,
       isDeleted: { $ne: true },
     });
@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
     if (!playerData && !academyData) {
       return NextResponse.json({
         success: false,
-        error: 'No data found for the given Student ID and Academy ID',
+        error: 'No data found for the given player ID and Academy ID',
       }, { status: 404 });
     }
 
@@ -46,10 +46,10 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error('Error fetching student data:', error);
+    console.error('Error fetching player data:', error);
     return NextResponse.json({
       success: false,
-      error: 'Failed to fetch student data',
+      error: 'Failed to fetch player data',
       details: error instanceof Error ? error.message : 'Unknown error',
     }, { status: 500 });
   }

@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 interface User {
   id: string
   name: string
-  role: "student" | "coach"
+  role: "player" | "coach"
   email: string
   age?: number
   position?: string
@@ -39,9 +39,9 @@ export default function SearchPage() {
   const [userCredentials, setUserCredentials] = useState<any>(null)
   const [userInfoDetails, setUserInfoDetails] = useState<any>(null)
 
-  // Helper to get correct username and role for student/coach
+  // Helper to get correct username and role for player/coach
   function getDisplayUsername(user: any, playerDetails: any, coachUserInfo: any) {
-    if (user.role === "student") {
+    if (user.role === "player") {
       return playerDetails?.username || user.username || user.name || "N/A";
     }
     if (user.role === "coach") {
@@ -84,7 +84,7 @@ export default function SearchPage() {
         const res = await fetch(`/api/db/ams-users?academyId=${selectedAcademy}`)
         const data = await res.json()
         if (data.success && Array.isArray(data.data)) {
-          setUsers(data.data.filter((user: User) => user.role === "student" || user.role === "coach"))
+          setUsers(data.data.filter((user: User) => user.role === "player" || user.role === "coach"))
         } else {
           setUsers([])
         }
@@ -110,7 +110,7 @@ export default function SearchPage() {
       setUserInfoDetails(null)
       return
     }
-    if (selectedUser.role === "student") {
+    if (selectedUser.role === "player") {
       const fetchPlayer = async () => {
         let player = null
         let res = await fetch(`/api/db/ams-player-data?ids=${selectedUser.id}`)
@@ -368,8 +368,8 @@ export default function SearchPage() {
                                   <span>{getDisplayUsername(user, playerDetails, coachUserInfo)}</span>
                                 </div>
                               </div>
-                              {/* Show extra details from ams-player-data for students */}
-                              {user.role === "student" && playerDetails && (
+                              {/* Show extra details from ams-player-data for players */}
+                              {user.role === "player" && playerDetails && (
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                   <div>
                                     <span className="font-bold block">Player ID:</span>
@@ -418,7 +418,7 @@ export default function SearchPage() {
                                 </div>
                               )}
                               {/* Show attributes from last performance history update if available */}
-                              {user.role === "student" && playerDetails && (
+                              {user.role === "player" && playerDetails && (
                                 <div>
                                   <span className="font-bold block mb-2">Latest Attributes:</span>
                                   <div className="flex flex-wrap gap-4">
@@ -446,7 +446,7 @@ export default function SearchPage() {
                                 </div>
                               )}
                               {/* Show total goals, assists, matchpoints, trainingpoints from sessions/performanceHistory */}
-                              {user.role === "student" && playerDetails && (
+                              {user.role === "player" && playerDetails && (
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                   <div>
                                     <span className="font-bold block">Total Goals:</span>
@@ -502,8 +502,8 @@ export default function SearchPage() {
                                   </div>
                                 </div>
                               )}
-                              {/* Show achievements for students */}
-                              {user.role === "student" && playerAchievements && playerAchievements.length > 0 && (
+                              {/* Show achievements for players */}
+                              {user.role === "player" && playerAchievements && playerAchievements.length > 0 && (
                                 <>
                                   <div className="col-span-4 font-bold mt-4">Achievements:</div>
                                   {playerAchievements.map((ach, idx) => (
@@ -518,11 +518,11 @@ export default function SearchPage() {
                                   ))}
                                 </>
                               )}
-                              {/* Show user info and credentials for students */}
-                              {user.role === "student" && (
+                              {/* Show user info and credentials for players */}
+                              {user.role === "player" && (
                                 <></>
                               )}
-                              {user.role === "student" && userCredentials && (
+                              {user.role === "player" && userCredentials && (
                                 <>
                                   <div className="col-span-4 font-bold mt-4">Credentials:</div>
                                   {Object.entries(userCredentials).map(([k, v]) => (

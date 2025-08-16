@@ -29,6 +29,11 @@ interface Session {
   };
 }
 
+const isPlayerAssignedToSession = (session: Session, playerId: string): boolean => {
+  return session.assignedPlayers.includes(playerId) || 
+         Object.keys(session.attendance || {}).includes(playerId);
+};
+
 export default function Training() {
   const { user } = useAuth();
   const [sessions, setSessions] = useState<Session[]>([]);
@@ -51,7 +56,12 @@ export default function Training() {
 
         const result = await response.json();
         if (result.success) {
-          setSessions(result.data);
+          const PLAYER_ID = 'player_dhs96a3m2_1755249651574';
+          // Filter sessions to only include those assigned to the specific player ID
+          const playerSessions = result.data.filter((session: Session) => 
+            session.assignedPlayers.includes(PLAYER_ID)
+          );
+          setSessions(playerSessions);
         } else {
           toast({
             title: "Error",
@@ -75,25 +85,11 @@ export default function Training() {
   }, [user]);
 
   const getAttendanceStatus = (session: Session): string => {
-    if (!user?.username) return "Not marked";
-
-    // Possible IDs to check in the attendance object
-    const possibleIds = [
-      user.username, // Username
-      // user.userId, // User ID (removed because it does not exist)
-      '67ee678c34baa740e23e21c4', // Player document ID
-      'player_qa4d9vdz1_1743677324992' // Player ID
-    ].filter(Boolean); // Remove any undefined values
-
-    // Check if attendance exists for any of the possible IDs
-    for (const id of possibleIds) {
-      if (session.attendance?.[id]) {
-        return session.attendance[id].status;
-      }
+    const PLAYER_ID = 'player_dhs96a3m2_1755249651574';
+    
+    if (session.attendance?.[PLAYER_ID]) {
+      return session.attendance[PLAYER_ID].status;
     }
-
-    console.log('Session:', session._id, 'Player:', user.username, 
-      'Attendance keys:', Object.keys(session.attendance || {}));
     
     return "Not marked";
   };
@@ -204,4 +200,3 @@ export default function Training() {
     </div>
   );
 }
-

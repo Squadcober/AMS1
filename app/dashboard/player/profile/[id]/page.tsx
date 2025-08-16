@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/button"
 
 ChartJS.register(RadialLinearScale, PointElement, LineElement, Filler, Tooltip, Legend)
 
-export default function StudentProfile() {
+export default function playerProfile() {
   const { id } = useParams()
   const { players } = usePlayers()
   const { user } = useAuth()

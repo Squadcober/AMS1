@@ -10,7 +10,7 @@ export async function GET(
     const client = await getClientPromise();
     const db = client.db(process.env.MONGODB_DB);
 
-    // Get coach data and include student info for ratings
+    // Get coach data and include player info for ratings
     const [coachInfo, userData, sessions] = await Promise.all([
       db.collection('ams-coaches').findOne({ userId: params.id }),
       db.collection('ams-users').findOne({ id: params.id }),
@@ -28,24 +28,24 @@ export async function GET(
     }
 
     interface Rating {
-      studentId: string;
+      playerId: string;
       [key: string]: any;
     }
 
-    // If there are ratings, fetch student names
+    // If there are ratings, fetch player names
     let ratings = coachInfo?.ratings || [] as Rating[];
     if (ratings.length > 0) {
-      const studentIds = ratings.map((r: Rating) => r.studentId);
-      const students = await db.collection('ams-users')
-        .find({ id: { $in: studentIds } })
+      const playerIds = ratings.map((r: Rating) => r.playerId);
+      const players = await db.collection('ams-users')
+        .find({ id: { $in: playerIds } })
         .toArray();
 
-      // Map student names to ratings
+      // Map player names to ratings
       ratings = ratings.map((rating: Rating) => {
-        const student = students.find(s => s.id === rating.studentId);
+        const player = players.find(s => s.id === rating.playerId);
         return {
           ...rating,
-          studentName: student?.name || 'Anonymous Student'
+          playerName: player?.name || 'Anonymous player'
         };
       });
     }

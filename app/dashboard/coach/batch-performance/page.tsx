@@ -49,7 +49,7 @@ const PLAYER_BORDER_COLORS = [
 export default function BatchPerformancePage() {
   const { user } = useAuth()
   const [localBatches, setLocalBatches] = useState<any[]>([])
-  const [batchStudents, setBatchStudents] = useState<any[]>([])
+  const [batchplayers, setBatchplayers] = useState<any[]>([])
   const [selectedBatch, setSelectedBatch] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [players, setPlayers] = useState<any[]>([]);

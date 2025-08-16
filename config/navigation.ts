@@ -1,6 +1,6 @@
 export const navItems = {
-  student: [
-    { name: "Profile", href: "/dashboard/student/profile" },
+  player: [
+    { name: "Profile", href: "/dashboard/player/profile" },
     // ...existing navigation items...
   ],
   coach: [

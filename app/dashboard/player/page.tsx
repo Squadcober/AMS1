@@ -50,7 +50,7 @@ const weeklyChanges = [
 
 const suggestedDrills = ["Speed Drills – G1T1", "Passing Drills – G2T1", "Strength Training – G3T2", "Shooting – G3T1"]
 
-export default function StudentDashboard() {
+export default function playerDashboard() {
   const [activeTab, setActiveTab] = useState("profile")
 
   return (

@@ -3,8 +3,8 @@ import { getDatabase } from '@/lib/mongodb';
 import { ObjectId, Filter, Document, UpdateFilter } from 'mongodb';
 
 interface Rating {
-  studentId: string;
-  studentInfo: {
+  playerId: string;
+  playerInfo: {
     id: string;
     name: string;
     photoUrl: string;
@@ -55,43 +55,43 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Get all unique student IDs from ratings
-    const studentIds = [...new Set(coach.ratings.map((r: any) => r.studentId))];
+    // Get all unique player IDs from ratings
+    const playerIds = [...new Set(coach.ratings.map((r: any) => r.playerId))];
 
-    // Fetch student information
-    const students = await db.collection('ams-player-data')
+    // Fetch player information
+    const players = await db.collection('ams-player-data')
       .find({
         $or: [
-          { id: { $in: studentIds } },
-          { userId: { $in: studentIds } },
-          { _id: { $in: studentIds.filter((id): id is string => typeof id === 'string' && ObjectId.isValid(id)).map(id => new ObjectId(id)) } }
+          { id: { $in: playerIds } },
+          { userId: { $in: playerIds } },
+          { _id: { $in: playerIds.filter((id): id is string => typeof id === 'string' && ObjectId.isValid(id)).map(id => new ObjectId(id)) } }
         ]
       })
       .toArray();
 
-    // Create a map of student info
-    const studentMap = new Map(
-      students.map(student => [
-        student.id || student._id.toString(),
+    // Create a map of player info
+    const playerMap = new Map(
+      players.map(player => [
+        player.id || player._id.toString(),
         {
-          name: student.name || student.username || 'Unknown Student',
-          photoUrl: student.photoUrl || '/placeholder.svg'
+          name: player.name || player.username || 'Unknown player',
+          photoUrl: player.photoUrl || '/placeholder.svg'
         }
       ])
     );
 
-    // Combine ratings with student info
-    const ratingsWithStudentInfo = coach.ratings.map((rating: any) => ({
+    // Combine ratings with player info
+    const ratingsWithplayerInfo = coach.ratings.map((rating: any) => ({
       ...rating,
-      student: studentMap.get(rating.studentId) || {
-        name: 'Unknown Student',
+      player: playerMap.get(rating.playerId) || {
+        name: 'Unknown player',
         photoUrl: '/placeholder.svg'
       }
     }));
 
     return NextResponse.json({
       success: true,
-      data: ratingsWithStudentInfo
+      data: ratingsWithplayerInfo
     });
 
   } catch (error) {
@@ -105,9 +105,9 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const { coachId, studentId, rating, academyId, date } = await request.json();
+    const { coachId, playerId, rating, academyId, date } = await request.json();
 
-    if (!coachId || !studentId || !rating || !academyId) {
+    if (!coachId || !playerId || !rating || !academyId) {
       return NextResponse.json({ 
         success: false, 
         error: 'Missing required fields' 
@@ -116,24 +116,24 @@ export async function POST(request: NextRequest) {
 
     const db = await getDatabase();
 
-    // Get student info first
+    // Get player info first
     const queryConditions: Filter<Document>[] = [
-      { id: studentId },
-      { userId: studentId }
+      { id: playerId },
+      { userId: playerId }
     ];
     
-    if (ObjectId.isValid(studentId)) {
-      queryConditions.push({ _id: new ObjectId(studentId) });
+    if (ObjectId.isValid(playerId)) {
+      queryConditions.push({ _id: new ObjectId(playerId) });
     }
 
-    const student = await db.collection('ams-player-data').findOne({
+    const player = await db.collection('ams-player-data').findOne({
       $or: queryConditions
     });
 
-    const studentInfo = {
-      id: student?._id.toString() || studentId,
-      name: student?.name || student?.username || 'Unknown Student',
-      photoUrl: student?.photoUrl || '/placeholder.svg'
+    const playerInfo = {
+      id: player?._id.toString() || playerId,
+      name: player?.name || player?.username || 'Unknown player',
+      photoUrl: player?.photoUrl || '/placeholder.svg'
     };
 
     // Build query conditions
@@ -150,8 +150,8 @@ export async function POST(request: NextRequest) {
     const updateDoc: UpdateFilter<CoachDocument> = {
           $push: {
             ratings: {
-              studentId,
-              studentInfo,
+              playerId,
+              playerInfo,
               rating,
               date,
               academyId

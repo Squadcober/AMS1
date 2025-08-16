@@ -8,10 +8,10 @@ import { CustomTooltip } from "@/components/custom-tooltip"
 
 export default function AccessEntities() {
   const [entities, setEntities] = useState([
-    { id: 1, name: "John Doe", role: "Student", access: true },
+    { id: 1, name: "John Doe", role: "player", access: true },
     { id: 2, name: "Jane Smith", role: "Coach", access: true },
     { id: 3, name: "Mike Johnson", role: "Admin", access: true },
-    { id: 4, name: "Sarah Brown", role: "Student", access: false },
+    { id: 4, name: "Sarah Brown", role: "player", access: false },
   ])
 
   const toggleAccess = (id: number) => {

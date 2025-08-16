@@ -4,7 +4,7 @@ import { ObjectId, Document, UpdateFilter } from 'mongodb';
 
 // Define rating interface
 interface Rating {
-  studentId: string;
+  playerId: string;
   rating: number;
   date: string;
 }
@@ -25,9 +25,9 @@ interface CoachDocument extends Document {
 
 export async function POST(request: NextRequest) {
   try {
-    const { coachId, studentId, rating, date } = await request.json();
+    const { coachId, playerId, rating, date } = await request.json();
 
-    if (!coachId || !studentId || !rating) {
+    if (!coachId || !playerId || !rating) {
       return NextResponse.json({ 
         success: false, 
         error: 'Missing required fields' 
@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
     const updateDoc: UpdateFilter<CoachDocument> = {
       $push: {
         ratings: {
-          studentId,
+          playerId,
           rating,
           date
         } as any // Use 'any' to satisfy the MongoDB driver type
