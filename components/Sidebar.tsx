@@ -56,7 +56,6 @@ const navItems = {
     { name: "Search", href: "/dashboard/admin/search" },
     { name: "Batches", href: "/dashboard/admin/batches" },
     { name: "Finances", href: "/dashboard/admin/finances" },
-    { name: "Consult", href: "/dashboard/admin/consult" },
     { name: "Export Data", href: "/dashboard/admin/export-data" },
     { name: "User Management", href: "/dashboard/admin/user-management" },
     { name: "Settings", href: "/dashboard/admin/settings" },

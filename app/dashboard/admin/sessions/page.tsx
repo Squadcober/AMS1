@@ -50,6 +50,7 @@ export interface Session {
   date: string
   startTime: string
   endTime: string
+  duration?: string // <-- Added duration property
   assignedBatch?: string
   assignedPlayers: string[] // Change this to just array of IDs
   coachId: string | string[]
@@ -457,6 +458,8 @@ const updateSessionStatus = (sessions: Session[]): Session[] => {
 
       const sessionEnd = new Date(occurrenceDateTime);
       sessionEnd.setHours(endHour, endMinute, 0);
+      
+      
 
       let status: Session['status'];
       if (occurrenceDateTime < today) {
@@ -731,6 +734,7 @@ function SessionsContent() {
     date: new Date().toISOString().split('T')[0], // Set default date to today
     startTime: "11:00",
     endTime: "12:00",
+    duration: "1h",
     assignedBatch: "",
     assignedPlayers: [] as string[], // Change to string array
     coachId: [],
@@ -937,6 +941,7 @@ const handleAddSession = async () => {
     // 3️⃣ Ensure default times are set
     if (!newSession.startTime) newSession.startTime = "11:00";
     if (!newSession.endTime) newSession.endTime = "12:00";
+    calculateDuration(newSession.startTime, newSession.endTime)
 
     // 4️⃣ Recurring Sessions
     if (isRecurring) {
@@ -997,6 +1002,7 @@ const handleAddSession = async () => {
         date: finalDateRange.start,
         startTime: newSession.startTime,
         endTime: newSession.endTime,
+        duration: newSession.duration,
         status: "Upcoming",
         assignedPlayers: newSession.assignedPlayers,
         coachId: sessionCoachIds,
@@ -1065,6 +1071,7 @@ const handleAddSession = async () => {
 
     const sessionStart = new Date(`${sessionDateStr}T${newSession.startTime}`);
     const sessionEnd = new Date(`${sessionDateStr}T${newSession.endTime}`);
+    const duration = sessionEnd.getTime() - sessionStart.getTime();
 
     if (sessionEnd <= sessionStart) {
       toast({
@@ -1127,6 +1134,7 @@ const resetSessionForm = () => {
     date: "",
     startTime: "11:00",
     endTime: "12:00",
+    duration: "1h",
     assignedBatch: "",
     assignedPlayers: [],
     coachId: [],
@@ -1784,6 +1792,7 @@ const splitRecurringSession = (session: Session) => {
   const isSessionToday = selectedDays.includes(todayName);
   const sessionStartTime = new Date(`${today.toISOString().split('T')[0]}T${session.startTime}`);
   const sessionEndTime = new Date(`${today.toISOString().split('T')[0]}T${session.endTime}`);
+  const duration = calculateDuration(session.startTime, session.endTime);
   const now = new Date();
   const isOngoing = isSessionToday && now >= sessionStartTime && now <= sessionEndTime;
   
@@ -3528,6 +3537,7 @@ const handleSaveChanges = async () => {
                       date: new Date().toISOString().split('T')[0],
                       startTime: "11:00",
                       endTime: "12:00",
+                      duration: "1h",
                       assignedBatch: "",
                       assignedPlayers: [],
                       coachId: [],
@@ -3673,6 +3683,16 @@ const handleSaveChanges = async () => {
                     />
                   </div>
                   <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="duration" className="text-right">
+                      Duration
+                    </Label>
+                    <div className="col-span-3 flex items-center">
+                      <span className="bg-black text-white border border-gray-600 rounded px-3 py-2">
+                        {calculateDuration(newSession.startTime, newSession.endTime)}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-4 items-center gap-4">
                     <Label className="text-right">Assign To</Label>
                     <div className="col-span-3 space-y-4">
                       <Input
@@ -3789,6 +3809,7 @@ const handleSaveChanges = async () => {
                                     date: new Date().toISOString().split('T')[0],
                                     startTime: "11:00",
                                     endTime: "12:00",
+                                    duration: "1h",
                                     assignedBatch: "",
                                     assignedPlayers: [],
                                     coachId: [],
