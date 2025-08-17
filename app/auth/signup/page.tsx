@@ -72,25 +72,28 @@ export default function SignUpPage() {
       }
 
       if (role !== 'admin') {
-        alert('Your account has been created. Please wait for admin approval to activate your account.');
+        router.push("/auth/admin_permission");
       }
 
       // After successful signup, redirect based on role
       switch (role) {
         case "player":
-          router.push("/dashboard/player/profile")
+          router.push("/auth/admin_permission")
           break
         case "coach":
-          router.push("/dashboard/coach/batches")
+          router.push("/auth/admin_permission")
+          break
+        case "coach":
+          router.push("/auth/admin_permission")
           break
         case "admin":
           router.push("/dashboard/admin/about")
           break
         case "coordinator":
-          router.push("/dashboard/coordinator/overview")
+          router.push("/auth/admin_permission")
           break
         default:
-          router.push("/dashboard")
+          router.push("/auth/admin_permission")
       }
       
     } catch (error) {

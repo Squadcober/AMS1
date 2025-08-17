@@ -40,8 +40,14 @@ const getInitialRoute = (role: string) => {
 };
 
 const isPublicRoute = (path: string) => {
-  return ['/auth', '/auth/signup', '/auth/login'].includes(path);
+  return [
+    '/auth', 
+    '/auth/signup', 
+    '/auth/login',
+    '/auth/admin_permission'   // ✅ add this
+  ].includes(path);
 };
+
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
