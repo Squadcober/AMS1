@@ -71,42 +71,52 @@ export default function playerBatches() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        if (!user?.academyId) return;
+        if (!user?.academyId || !user?.id) return;
 
-        // First get the player data to get the correct player ID
-        const playerResponse = await fetch(`/api/db/ams-player-data?academyId=${user.academyId}&userId=${user.id}`);
+        // First get the player data to get the correct player ID from ams-player-data collection
+        // Filter by both academyId and userId to get the specific player for this user
+        const playerResponse = await fetch(`/api/db/ams-player-data?academyId=${user.academyId}`);
         const playerData = await playerResponse.json();
         
-        const playerObj = playerData.data?.[0];
+        // Find the specific player that matches the current user's ID
+        const playerObj = playerData.data?.find((player: any) => player.userId === user.id);
         if (!playerObj) {
-          console.error('Player not found');
+          console.error('Player not found in ams-player-data for user ID:', user.id);
           return;
         }
 
-        // Get the player ID in the format "player_xxxxxx"
-        const playerId = playerObj.playerId || playerObj.id;
-        if (!playerId) {
-          console.error('No valid player ID found');
+        // Get the player ID - use the 'id' field which starts with "player_"
+        const playerId = playerObj.id; // This is the field that starts with "player_"
+        if (!playerId || !playerId.startsWith('player_')) {
+          console.error('No valid player ID found in ams-player-data or ID does not start with "player_"');
           return;
         }
 
+        console.log('Current user ID:', user.id);
+        console.log('Found matching player ID:', playerId);
         setCurrentPlayer(playerObj);
 
-        // Then fetch batches and filter by player ID
+        // Fetch ALL batches from ams-batches collection
         const batchesResponse = await fetch(`/api/db/ams-batches?academyId=${user.academyId}`);
         if (!batchesResponse.ok) throw new Error('Failed to fetch batches');
         const batchesData = await batchesResponse.json();
 
-        // Filter batches to only those containing the player ID
+        // CRITICAL FILTER: Only show batches that contain the current player's ID in the players array
         const allBatches = Array.isArray(batchesData.data) ? batchesData.data : [];
-        const playerBatches = allBatches.filter((batch: any) => 
-          Array.isArray(batch.players) && 
-          batch.players.includes(playerId)
-        );
+        console.log('All batches found:', allBatches.length);
+        
+        const playerBatches = allBatches.filter((batch: any) => {
+          const hasPlayer = Array.isArray(batch.players) && batch.players.includes(playerId);
+          if (hasPlayer) {
+            console.log(`Batch "${batch.name}" contains player ${playerId}`);
+          }
+          return hasPlayer;
+        });
 
-        setBatches(playerBatches);
+        console.log('Filtered batches for player:', playerBatches.length);
+        setBatches(playerBatches); // Only set batches that contain this specific player
 
-        // Fetch coach data for these batches (for batch list rendering)
+        // Fetch coach data for the filtered batches only
         const coachIds = new Set<string>();
         playerBatches.forEach((batch: { coachId?: string; coachIds?: string[]; userId?: string }) => {
           if (batch.coachId) coachIds.add(batch.coachId);
@@ -132,7 +142,7 @@ export default function playerBatches() {
 
         setCoachData(coachDataMap);
 
-        // After setting batches, collect all unique player IDs
+        // Collect all unique player IDs from the filtered batches only
         const allPlayerIds = new Set<string>();
         playerBatches.forEach((batch: any) => {
           if (Array.isArray(batch.players)) {
@@ -140,7 +150,7 @@ export default function playerBatches() {
           }
         });
 
-        // Fetch only missing player data
+        // Fetch missing player data for players in these batches
         await fetchMissingPlayerData(Array.from(allPlayerIds));
 
       } catch (error) {
@@ -598,28 +608,36 @@ export default function playerBatches() {
     return 0;
   };
 
-  // Helper to filter batches assigned to the current player and render them
+  // Render function that shows ONLY batches assigned to the current player
   const renderBatches = () => {
-    if (!currentPlayer) return null;
+    if (!currentPlayer) {
+      return (
+        <TableRow>
+          <TableCell colSpan={3} className="text-center text-gray-500">
+            Loading player information...
+          </TableCell>
+        </TableRow>
+      );
+    }
 
-    // Get the player ID in the format "player_xxxxx"
-    const playerId = currentPlayer.playerId || currentPlayer.id;
-    if (!playerId) return null;
+    if (batches.length === 0) {
+      return (
+        <TableRow>
+          <TableCell colSpan={3} className="text-center text-gray-500">
+            No batches found for this player
+          </TableCell>
+        </TableRow>
+      );
+    }
 
-    // First filter batches
-    const playerAssignedBatches = batches.filter(batch => 
-      Array.isArray(batch.players) && 
-      batch.players.includes(playerId)
-    );
-
-    // Then map over filtered batches to render them
-    return playerAssignedBatches.map((batch: any) => (
+    // Render all batches (they are already filtered in the useEffect)
+    return batches.map((batch: any) => (
       <TableRow 
-        key={batch._id} 
+        key={batch._id || batch.id} 
         onClick={() => setSelectedBatch(batch)}
-        className="hover:bg-accent"
+        className="hover:bg-accent cursor-pointer"
       >
-        <TableCell>{batch.name}</TableCell>
+        <TableCell className="font-medium">{batch.name}</TableCell>
         <TableCell>
           {batch.coachIds && Array.isArray(batch.coachIds) && batch.coachIds.length > 0 ? (
             <div className="flex flex-wrap gap-2">
@@ -627,26 +645,48 @@ export default function playerBatches() {
                 <div
                   key={coachId}
                   className="flex items-center gap-1"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleCoachClick(coachId, e);
+                  }}
                 >
                   <Avatar className="h-6 w-6">
                     <AvatarImage src={getCoachPhotoUrl(batch, idx)} alt={batch.coachNames?.[idx] || "Unknown"} />
                     <AvatarFallback>{(batch.coachNames?.[idx] || "U")[0]}</AvatarFallback>
                   </Avatar>
-                  <span className="text-xs underline text-white hover:text-gray-300">
+                  <span className="text-xs underline text-white hover:text-gray-300 cursor-pointer">
                     {batch.coachNames?.[idx] || "Unknown Coach"}
                   </span>
                 </div>
               ))}
             </div>
-          ) : null}
+          ) : batch.coachId ? (
+            <div 
+              className="flex items-center gap-1"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleCoachClick(batch.coachId, e);
+              }}
+            >
+              <Avatar className="h-6 w-6">
+                <AvatarImage src={getCoachPhotoUrl(batch)} alt={batch.coachName || "Unknown"} />
+                <AvatarFallback>{(batch.coachName || "U")[0]}</AvatarFallback>
+              </Avatar>
+              <span className="text-xs underline text-white hover:text-gray-300 cursor-pointer">
+                {batch.coachName || "Unknown Coach"}
+              </span>
+            </div>
+          ) : (
+            <span className="text-xs text-gray-500">No coach assigned</span>
+          )}
         </TableCell>
         <TableCell>
           <span title={players
-              .filter(p => batch.players.includes(p.id))
+              .filter(p => batch.players && batch.players.includes(p.id))
               .map(p => p.name)
               .join(", ")}
           >
-            {getPlayersSummary(batch.players)}
+            {getPlayersSummary(batch.players || [])}
           </span>
         </TableCell>
       </TableRow>
@@ -658,10 +698,15 @@ export default function playerBatches() {
       <Sidebar />
       <div className="flex-1 p-8 overflow-y-auto">
         <div className="flex justify-between items-center mb-4">
-          <h1 className="text-3xl font-bold text-white">Batches</h1>
+          <h1 className="text-3xl font-bold text-white">My Batches</h1>
+          {currentPlayer && (
+            <div className="text-sm text-gray-400">
+              Player: {currentPlayer.name} ({currentPlayer.id})
+            </div>
+          )}
         </div>
 
-        <Table className="mt-6 cursor-pointer">
+        <Table className="mt-6">
           <TableHeader>
             <TableRow>
               <TableHead>Batch Name</TableHead>
@@ -745,7 +790,7 @@ export default function playerBatches() {
                   <Separator className="my-4" />
 
                   <div className="grid grid-cols-2 gap-4">
-                    {selectedBatch.players.map((playerId: string) => {
+                    {selectedBatch.players && selectedBatch.players.map((playerId: string) => {
                       const playerData = getPlayerData(playerId);
                       return (
                         <div 
