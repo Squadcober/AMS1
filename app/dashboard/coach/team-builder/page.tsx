@@ -901,155 +901,231 @@ export default function TeamBuilder() {
   }
 
   const PlayerSelectionModal = () => {
-    const [showAllPositions, setShowAllPositions] = useState(false)
+  const [showAllPositions, setShowAllPositions] = useState(false)
+  
+  const positionPlayers = useMemo(() => {
+    if (!selectedPosition) return [];
     
-    const positionPlayers = useMemo(() => {
-      if (!selectedPosition) return [];
+    return availablePlayers.filter((player) => {
+      if (showAllPositions) return true;
       
-      return availablePlayers.filter((player) => {
-        if (showAllPositions) return true;
-        
-        const playerPosition = player.position?.toLowerCase() || "";
-        const positionName = selectedPosition.name.toLowerCase();
-        
-        switch (positionName) {
-          case "goalkeeper":
-            return ["goalkeeper", "gk"].includes(playerPosition);
-          case "left back":
-          case "center back 1":
-          case "center back 2":
-          case "right back":
-            return ["defender", "back", "lb", "rb", "cb"].includes(playerPosition);
-          case "left midfielder":
-          case "center midfielder 1":
-          case "center midfielder 2":
-          case "right midfielder":
-            return ["midfielder", "mid", "lm", "rm", "cm"].includes(playerPosition);
-          case "striker 1":
-          case "striker 2":
-            return ["forward", "striker", "attacker", "st"].includes(playerPosition);
-          default:
-            if (selectedPosition.type) {
-              return (player.position || '').toLowerCase().includes(selectedPosition.type.toLowerCase());
-            }
-            return false;
-        }
-      });
-    }, [selectedPosition, availablePlayers, showAllPositions]);
+      const playerPosition = player.position?.toLowerCase() || "";
+      const positionName = selectedPosition.name.toLowerCase();
+      
+      switch (positionName) {
+        case "goalkeeper":
+          return ["goalkeeper", "gk"].includes(playerPosition);
+        case "left back":
+        case "center back 1":
+        case "center back 2":
+        case "right back":
+          return ["defender", "back", "lb", "rb", "cb"].includes(playerPosition);
+        case "left midfielder":
+        case "center midfielder 1":
+        case "center midfielder 2":
+        case "right midfielder":
+          return ["midfielder", "mid", "lm", "rm", "cm"].includes(playerPosition);
+        case "striker 1":
+        case "striker 2":
+          return ["forward", "striker", "attacker", "st"].includes(playerPosition);
+        default:
+          if (selectedPosition.type) {
+            return (player.position || '').toLowerCase().includes(selectedPosition.type.toLowerCase());
+          }
+          return false;
+      }
+    });
+  }, [selectedPosition, availablePlayers, showAllPositions]);
 
-    const remainingPlayers = useMemo(() => {
-      return availablePlayers.filter(player => !positionPlayers.includes(player));
-    }, [availablePlayers, positionPlayers]);
+  const remainingPlayers = useMemo(() => {
+    return availablePlayers.filter(player => !positionPlayers.includes(player));
+  }, [availablePlayers, positionPlayers]);
 
-    return (
-      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader className="space-y-4">
-            <DialogTitle>Select Player for {selectedPosition?.name}</DialogTitle>
-            {showAllPositions && (
-              <div className="text-sm text-muted-foreground">
-                Showing players from all positions
-              </div>
-            )}
-          </DialogHeader>
-
-          {positionPlayers.length === 0 ? (
-            <div className="text-center py-8">
-              <h3 className="text-lg font-semibold mb-2">No Players Available</h3>
-              <p className="text-muted-foreground mb-4">
-                There are no players available for the {selectedPosition?.name} position
-              </p>
-              {!showAllPositions && (
-                <Button 
-                  onClick={() => setShowAllPositions(true)}
-                  className="w-full"
-                >
-                  View Players from Other Positions ({remainingPlayers.length})
-                </Button>
-              )}
+  return (
+    <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+      <DialogContent className="max-w-md">
+        <DialogHeader className="space-y-4">
+          <DialogTitle>Select Player for {selectedPosition?.name}</DialogTitle>
+          {selectedBatch && (
+            <div className="text-sm text-blue-400">
+              Showing players from: {filteredBatches.find(b => b.id === selectedBatch)?.name}
             </div>
-          ) : (
-            <ScrollArea className="h-[400px] pr-4">
-              <div className="space-y-2">
-                {(showAllPositions ? availablePlayers : positionPlayers).map((player) => (
-                  <div
-                    key={player.id}
-                    onClick={() => handlePlayerSelect(player.id.toString())}
-                    className="flex items-center justify-between p-3 hover:bg-accent rounded-lg cursor-pointer group"
-                  >
-                    <div className="flex items-center gap-3">
-                      <Avatar className="h-10 w-10">
-                        <AvatarImage src={player.photoUrl} alt={player.name} />
-                        <AvatarFallback className="text-lg bg-gray-900 w-full h-full flex items-center justify-center rounded-full">
-                          {player.name?.charAt(0)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <p className="font-medium group-hover:text-primary">{player.name}</p>
-                        <p className="text-sm text-muted-foreground">{player.position}</p>
-                      </div>
-                    </div>
-                    {showAllPositions && (
-                      <span className="text-xs px-2 py-1 rounded-full bg-secondary">
-                        {player.position}
-                      </span>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </ScrollArea>
           )}
-          
-          {positionPlayers.length > 0 && !showAllPositions && remainingPlayers.length > 0 && (
-            <div className="mt-4 pt-4 border-t">
+          {showAllPositions && (
+            <div className="text-sm text-muted-foreground">
+              Showing players from all positions
+            </div>
+          )}
+        </DialogHeader>
+
+        {positionPlayers.length === 0 ? (
+          <div className="text-center py-8">
+            <h3 className="text-lg font-semibold mb-2">No Players Available</h3>
+            <p className="text-muted-foreground mb-4">
+              {selectedBatch 
+                ? `There are no players available for the ${selectedPosition?.name} position in the selected batch`
+                : `There are no players available for the ${selectedPosition?.name} position`
+              }
+            </p>
+            {!showAllPositions && (
               <Button 
-                variant="outline" 
                 onClick={() => setShowAllPositions(true)}
                 className="w-full"
               >
-                Show {remainingPlayers.length} More Players from Other Positions
+                View Players from Other Positions ({remainingPlayers.length})
               </Button>
+            )}
+          </div>
+        ) : (
+          <ScrollArea className="h-[400px] pr-4">
+            <div className="space-y-2">
+              {(showAllPositions ? availablePlayers : positionPlayers).map((player) => (
+                <div
+                  key={player.id}
+                  onClick={() => handlePlayerSelect(player.id.toString())}
+                  className="flex items-center justify-between p-3 hover:bg-accent rounded-lg cursor-pointer group"
+                >
+                  <div className="flex items-center gap-3">
+                    <Avatar className="h-10 w-10">
+                      <AvatarImage src={player.photoUrl} alt={player.name} />
+                      <AvatarFallback className="text-lg bg-gray-900 w-full h-full flex items-center justify-center rounded-full">
+                        {player.name?.charAt(0)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <p className="font-medium group-hover:text-primary">{player.name}</p>
+                      <p className="text-sm text-muted-foreground">{player.position}</p>
+                    </div>
+                  </div>
+                  {showAllPositions && (
+                    <span className="text-xs px-2 py-1 rounded-full bg-secondary">
+                      {player.position}
+                    </span>
+                  )}
+                </div>
+              ))}
             </div>
-          )}
+          </ScrollArea>
+        )}
+        
+        {positionPlayers.length > 0 && !showAllPositions && remainingPlayers.length > 0 && (
+          <div className="mt-4 pt-4 border-t">
+            <Button 
+              variant="outline" 
+              onClick={() => setShowAllPositions(true)}
+              className="w-full"
+            >
+              Show {remainingPlayers.length} More Players from Other Positions
+            </Button>
+          </div>
+        )}
 
-          {showAllPositions && (
-            <div className="mt-4 pt-4 border-t">
-              <Button 
-                variant="outline" 
-                onClick={() => setShowAllPositions(false)}
-                className="w-full"
-              >
-                Show Only {selectedPosition?.name} Players
-              </Button>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-    );
-  };
+        {showAllPositions && (
+          <div className="mt-4 pt-4 border-t">
+            <Button 
+              variant="outline" 
+              onClick={() => setShowAllPositions(false)}
+              className="w-full"
+            >
+              Show Only {selectedPosition?.name} Players
+            </Button>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+const filteredBatches = useMemo(() => {
+  console.log("=== FILTER BATCHES DEBUG ===");
+  console.log("All batches from context:", batches);
+  console.log("Batches length:", batches?.length);
+  console.log("Batches type:", typeof batches);
+  console.log("Is batches an array?", Array.isArray(batches));
+  
+  if (!batches || !Array.isArray(batches)) {
+    console.log("❌ Batches is not an array or is null/undefined");
+    return [];
+  }
+
+  console.log("User for filtering:", { 
+    id: user?.id, 
+    academyId: user?.academyId 
+  });
+  
+  if (!user?.academyId) {
+    console.log("❌ No academy ID available for filtering");
+    return [];
+  }
+  
+  const filtered = batches.filter(batch => {
+    console.log("Filtering batch:", {
+      batchId: batch.id, // Using id as per your interface
+      batchName: batch.name,
+      batchCoachId: batch.coachId,
+      batchCoachName: batch.coachName,
+      batchAcademyId: batch.academyId,
+      userAcademyId: user.academyId,
+      userCoachId: user.id,
+      sameAcademy: batch.academyId === user.academyId,
+      sameCoach: batch.coachId === user.id
+    });
+    
+    // Filter by academy ID first
+    const isSameAcademy = batch.academyId === user.academyId;
+    
+    // You can choose to filter by coach as well if needed:
+    // const isSameCoach = batch.coachId === user.id;
+    // return isSameAcademy && isSameCoach;
+    
+    // For now, just filter by academy
+    return isSameAcademy;
+  });
+  
+  console.log("✅ Filtered batches result:", filtered);
+  console.log("Filtered batches length:", filtered.length);
+  return filtered;
+}, [batches, user?.academyId, user?.id]);
 
   // Update the availablePlayers memo to exclude both assigned and substitute players
   const availablePlayers = useMemo(() => {
-    if (!selectedGamePlan || !user?.academyId || !selectedGamePlan.positions) return [];
-    
-    // Get IDs of players assigned to positions
-    const assignedPlayerIds = Object.values(selectedGamePlan.positions || {})
-      .filter((pos): pos is { playerId: string; top: string; left: string } => pos !== null)
-      .map(pos => pos.playerId);
-    
-    // Get IDs of substitute players
-    const substitutePlayerIds = (selectedGamePlan.substitutes || [])
-      .map(sub => sub.playerId);
+  if (!selectedGamePlan || !user?.academyId || !selectedGamePlan.positions) return [];
+  
+  // Get IDs of players assigned to positions
+  const assignedPlayerIds = Object.values(selectedGamePlan.positions || {})
+    .filter((pos): pos is { playerId: string; top: string; left: string } => pos !== null)
+    .map(pos => pos.playerId);
+  
+  // Get IDs of substitute players
+  const substitutePlayerIds = (selectedGamePlan.substitutes || [])
+    .map(sub => sub.playerId);
 
-    // Combine both arrays to get all used player IDs
-    const usedPlayerIds = [...assignedPlayerIds, ...substitutePlayerIds];
+  // Combine both arrays to get all used player IDs
+  const usedPlayerIds = [...assignedPlayerIds, ...substitutePlayerIds];
 
-    // Filter players by academy and exclude both assigned and substitute players
-    return players.filter((player) => 
-      player.academyId === user.academyId && 
-      !usedPlayerIds.includes(player.id.toString())
-    );
-  }, [players, selectedGamePlan, user?.academyId]);
+  // Filter players by academy and exclude both assigned and substitute players
+  let filteredPlayers = players.filter((player) => 
+    player.academyId === user.academyId && 
+    !usedPlayerIds.includes(player.id.toString())
+  );
+
+  // If a batch is selected, further filter by batch
+  if (selectedBatch) {
+    // Find the selected batch object
+    const batch = filteredBatches.find(b => b.id === selectedBatch);
+    
+    if (batch && batch.players && Array.isArray(batch.players)) {
+      // Filter players to only include those in the selected batch
+      const batchPlayerIds = batch.players.map(p => p.toString());
+      filteredPlayers = filteredPlayers.filter(player => 
+        batchPlayerIds.includes(player.id.toString())
+      );
+    }
+  }
+
+  return filteredPlayers;
+}, [players, selectedGamePlan, user?.academyId, selectedBatch, filteredBatches]);
+
 
   // Update groupedPlayers memo to work with filtered players
   const groupedPlayers = useMemo(() => {
@@ -1623,16 +1699,7 @@ export default function TeamBuilder() {
   );
 
   // Update selected batch section to filter batches
-  const filteredBatches = useMemo(() => {
-    if (!user?.academyId || !user?.id) return [];
-    
-    return batches.filter(batch => {
-      const isUserBatch = batch.coachId === user.id;
-      const isSameAcademy = batch.academyId === user.academyId;
-      
-      return isUserBatch && isSameAcademy;
-    });
-  }, [batches, user?.academyId, user?.id]);
+  
 
   const ExportDialog = () => (
     <Dialog open={showExportDialog} onOpenChange={setShowExportDialog}>
@@ -1750,7 +1817,91 @@ export default function TeamBuilder() {
       fetchPlayers();
     }
   }, [user?.academyId]);
+  // Add this useEffect to fetch batches when component mounts
+useEffect(() => {
+  const fetchBatches = async () => {
+    try {
+      if (!user?.academyId || !user?.id) {
+        console.log("User or academy ID not available yet");
+        return;
+      }
 
+      const response = await fetch(`/api/db/ams-batches?academyId=${user.academyId}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch batches');
+      }
+
+      const result = await response.json();
+      if (result.success) {
+        setBatches(result.data);
+        console.log("Batches fetched:", result.data);
+      }
+    } catch (error) {
+      console.error('Error fetching batches:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load batches",
+        variant: "destructive",
+      });
+    }
+  };
+
+  fetchBatches();
+}, [user?.academyId, user?.id, setBatches, toast]);
+
+
+// Updated batch selection section with better debugging
+<div className="space-y-4 overflow-x-auto">
+  <div className="space-y-4">
+    <div className="flex justify-between items-center">
+      <label htmlFor="batch" className="text-white">
+        Select Batch ({filteredBatches.length} available)
+      </label>
+      {selectedBatch && (
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          onClick={() => setSelectedBatch(null)}
+        >
+          Clear Selection
+        </Button>
+      )}
+    </div>
+    <select
+      id="batch"
+      value={selectedBatch || ""}
+      onChange={(e) => {
+        console.log("Batch selected:", e.target.value);
+        setSelectedBatch(e.target.value);
+      }}
+      className="w-full p-2 border rounded-md bg-gray-800 text-white"
+    >
+      <option value="">
+        {filteredBatches.length === 0 
+          ? "No batches available" 
+          : `Select a batch (${filteredBatches.length} available)`
+        }
+      </option>
+      {filteredBatches.map((batch) => (
+        <option key={batch.id} value={batch.id}>
+          {batch.name} {batch.coachId && `(Coach: ${batch.coachId})`}
+        </option>
+      ))}
+    </select>
+    
+    {/* Debug information - remove this in production */}
+    {process.env.NODE_ENV === 'development' && (
+      <div className="text-xs text-gray-400 p-2 bg-gray-900 rounded">
+        <p>Debug Info:</p>
+        <p>Total batches: {batches.length}</p>
+        <p>Filtered batches: {filteredBatches.length}</p>
+        <p>User Academy ID: {user?.academyId}</p>
+        <p>User ID: {user?.id}</p>
+      </div>
+    )}
+  </div>
+  {selectedBatch && <ComparePlayers batchId={selectedBatch} />}
+</div>
   // Update handlePositionChange function to properly handle the position value
   const handlePositionChange = async (playerId: string, newPosition: string) => {
     try {
@@ -1996,62 +2147,83 @@ export default function TeamBuilder() {
               {/* Players list card */}
               <Card className="order-2 lg:order-1 min-w-0">
                 <CardHeader>
-                  <CardTitle>Players by Position</CardTitle>
+                  <CardTitle className="flex items-center justify-between">
+                    <span>Players by Position</span>
+                    {selectedBatch && (
+                      <span className="text-sm text-blue-400 font-normal">
+                        Batch: {filteredBatches.find(b => b.id === selectedBatch)?.name}
+                      </span>
+                    )}
+                  </CardTitle>
+                  {selectedBatch && availablePlayers.length === 0 && (
+                    <p className="text-sm text-muted-foreground">
+                      No players available in the selected batch that aren't already assigned.
+                    </p>
+                  )}
                 </CardHeader>
                 <CardContent className="overflow-x-auto">
                   <div className="space-y-4">
-                    {positionGroups.map(([position, positionPlayers]) => (
-                      <div key={position}>
-                        <h3 className="text-sm font-semibold text-muted-foreground mb-2">{position}</h3>
-                        <div className="space-y-2">
-                          {positionPlayers.map((player) => (
-                            <div
-                              key={player.id}
-                              className="bg-secondary p-2 rounded-md text-xs flex items-center justify-between"
-                            >
-                              <div className="flex items-center gap-2 flex-1">
-                                <div
-                                  className="cursor-move"
-                                  draggable
-                                  onDragStart={(e) => handlePlayerDragStart(e, player.id.toString())}
-                                >
-                                  <Avatar className="h-8 w-8">
-                                    <AvatarImage 
-                                      src={player.photoUrl} 
-                                      alt={player.name}
-                                    />
-                                    <AvatarFallback>
-                                      {player.name?.charAt(0)}
-                                    </AvatarFallback>
-                                  </Avatar>
-                                </div>
-                                <div className="flex flex-col">
-                                  <span className="font-medium">{player.name}</span>
-                                  <div className="flex items-center gap-2">
-                                    <select
-                                      value={getPositionValue(player.position)}
-                                      onChange={(e) => handlePositionChange(player.id.toString(), e.target.value)}
-                                      className="text-xs bg-background border rounded px-1 py-0.5"
-                                      onClick={(e) => e.stopPropagation()}
-                                    >
-                                      {AVAILABLE_POSITIONS.map((pos) => (
-                                        <option 
-                                          key={pos.value} 
-                                          value={pos.value}
-                                        >
-                                          {pos.label}
-                                        </option>
-                                      ))}
-                                    </select>
+                    {positionGroups.length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        {selectedBatch
+                          ? "No available players in the selected batch"
+                          : "No available players"
+                        }
+                      </div>
+                    ) : (
+                      positionGroups.map(([position, positionPlayers]) => (
+                        <div key={position}>
+                          <h3 className="text-sm font-semibold text-muted-foreground mb-2">{position}</h3>
+                          <div className="space-y-2">
+                            {positionPlayers.map((player) => (
+                              <div
+                                key={player.id}
+                                className="bg-secondary p-2 rounded-md text-xs flex items-center justify-between"
+                              >
+                                <div className="flex items-center gap-2 flex-1">
+                                  <div
+                                    className="cursor-move"
+                                    draggable
+                                    onDragStart={(e) => handlePlayerDragStart(e, player.id.toString())}
+                                  >
+                                    <Avatar className="h-8 w-8">
+                                      <AvatarImage
+                                        src={player.photoUrl}
+                                        alt={player.name}
+                                      />
+                                      <AvatarFallback>
+                                        {player.name?.charAt(0)}
+                                      </AvatarFallback>
+                                    </Avatar>
+                                  </div>
+                                  <div className="flex flex-col">
+                                    <span className="font-medium">{player.name}</span>
+                                    <div className="flex items-center gap-2">
+                                      <select
+                                        value={getPositionValue(player.position)}
+                                        onChange={(e) => handlePositionChange(player.id.toString(), e.target.value)}
+                                        className="text-xs bg-background border rounded px-1 py-0.5"
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
+                                        {AVAILABLE_POSITIONS.map((pos) => (
+                                          <option
+                                            key={pos.value}
+                                            value={pos.value}
+                                          >
+                                            {pos.label}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </div>
                                   </div>
                                 </div>
                               </div>
-                            </div>
-                          ))}
+                            ))}
+                          </div>
+                          <Separator className="my-4" />
                         </div>
-                        <Separator className="my-4" />
-                      </div>
-                    ))}
+                      ))
+                    )}
                   </div>
                 </CardContent>
               </Card>

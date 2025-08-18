@@ -210,9 +210,9 @@ export default function BatchPerformancePage() {
     const lastMonth = new Date();
     lastMonth.setMonth(today.getMonth() - 1);
 
-    // Create array of dates for the past month
+    // Create array of dates for the past month (every 3 days for better readability)
     const dates: string[] = [];
-    for (let d = new Date(lastMonth); d <= today; d.setDate(d.getDate() + 1)) {
+    for (let d = new Date(lastMonth); d <= today; d.setDate(d.getDate() + 3)) {
       dates.push(d.toISOString().split('T')[0]);
     }
 
@@ -225,22 +225,40 @@ export default function BatchPerformancePage() {
         const player = batchPlayers.find(p => p.id.toString() === playerId);
         console.log('Processing player for graph:', player?.name);
 
-        // Get initial value
-        let lastValue = player?.attributes?.[selectedAttribute] || 0;
+        // Sort performance history by date to process chronologically
+        const sortedHistory = player?.performanceHistory?.sort((a: any, b: any) => 
+          new Date(a.date).getTime() - new Date(b.date).getTime()
+        ) || [];
 
-        // Map values to dates
+        // Get initial value - either from earliest performance history or current attributes
+        let lastKnownValue = getLatestAttributeValue(player, selectedAttribute);
+        
+        // If we have performance history, start with the earliest value if it exists
+        if (sortedHistory.length > 0) {
+          const earliestEntry = sortedHistory.find((e: any) => 
+            e.attributes?.[selectedAttribute] !== undefined
+          );
+          if (earliestEntry) {
+            lastKnownValue = earliestEntry.attributes[selectedAttribute];
+          }
+        }
+
+        // Map values to dates, carrying forward the last known value
         const data = dates.map(date => {
-          // Find performance entry for this date
-          const entry = player?.performanceHistory?.find((e: any) => {
+          // Find all entries up to this date that have the selected attribute
+          const entriesUpToDate = sortedHistory.filter((e: any) => {
             const entryDate = new Date(e.date).toISOString().split('T')[0];
-            return entryDate === date && e.attributes?.[selectedAttribute] !== undefined;
+            return entryDate <= date && e.attributes?.[selectedAttribute] !== undefined;
           });
 
-          if (entry?.attributes?.[selectedAttribute] !== undefined) {
-            lastValue = entry.attributes[selectedAttribute];
+          // If we have entries up to this date, use the most recent one
+          if (entriesUpToDate.length > 0) {
+            const mostRecentEntry = entriesUpToDate[entriesUpToDate.length - 1];
+            lastKnownValue = mostRecentEntry.attributes[selectedAttribute];
           }
 
-          return lastValue;
+          // Return the last known value (carries forward if no new data)
+          return lastKnownValue;
         });
 
         return {
@@ -337,10 +355,6 @@ export default function BatchPerformancePage() {
           maxRotation: 45,
           autoSkip: true,
           maxTicksLimit: 10, // Show max 10 date labels
-          callback: function(value: any, index: number, values: any[]) {
-            // Show date in MMM DD format
-            return value;
-          }
         }
       },
       y: {
@@ -365,11 +379,7 @@ export default function BatchPerformancePage() {
         callbacks: {
           title: function(context: any[]) {
             // Format the date in the tooltip
-            return new Date(context[0].label).toLocaleDateString('en-US', {
-              year: 'numeric',
-              month: 'short',
-              day: 'numeric'
-            });
+            return context[0].label;
           },
           label: function(context: any) {
             const label = context.dataset.label || '';
@@ -433,17 +443,27 @@ export default function BatchPerformancePage() {
     });
   }, [batchPlayers, searchTerm]);
 
+  // FIXED: Color coding function for attribute comparison table
   const getColorForAttribute = (attribute: string, value: number) => {
+    // Get all values for this attribute from selected players (including 0)
     const values = selectedPlayers.map(playerId => {
-      const player = players.find(p => p.id.toString() === playerId)
-      return player ? player.attributes[attribute as keyof typeof player.attributes] : 0
-    })
-    const max = Math.max(...values)
-    const min = Math.min(...values)
-    if (value === max) return "text-green-500"
-    if (value === min) return "text-red-500"
-    return ""
-  }
+      const player = batchPlayers.find(p => p._id.toString() === playerId || p.id.toString() === playerId);
+      return getLatestAttributeValue(player, attribute);
+    });
+
+    if (values.length === 0) return "";
+
+    const max = Math.max(...values);
+    const min = Math.min(...values);
+    
+    // If all values are the same, no color coding
+    if (max === min) return "";
+    
+    // Green for highest, red for lowest (including 0 as a valid minimum)
+    if (value === max) return "text-green-500 font-bold";
+    if (value === min) return "text-red-500 font-bold";
+    return "";
+  };
 
   const renderAttributeComparison = () => (
     <Table>
@@ -452,8 +472,8 @@ export default function BatchPerformancePage() {
           <TableHead>Attribute</TableHead>
           {selectedPlayers.map((playerId) => (
             <TableHead key={playerId}>
-              {batchPlayers.find((p) => p._id.toString() === playerId)?.name || 
-               batchPlayers.find((p) => p._id.toString() === playerId)?.username}
+              {batchPlayers.find((p) => p._id.toString() === playerId || p.id.toString() === playerId)?.name || 
+               batchPlayers.find((p) => p._id.toString() === playerId || p.id.toString() === playerId)?.username}
             </TableHead>
           ))}
         </TableRow>
@@ -461,9 +481,11 @@ export default function BatchPerformancePage() {
       <TableBody>
         {["shooting", "pace", "positioning", "passing", "ballControl", "crossing"].map((attr) => (
           <TableRow key={attr}>
-            <TableCell>{attr.charAt(0).toUpperCase() + attr.slice(1)}</TableCell>
+            <TableCell className="font-medium">
+              {attr.charAt(0).toUpperCase() + attr.slice(1)}
+            </TableCell>
             {selectedPlayers.map((playerId) => {
-              const player = batchPlayers.find((p) => p._id.toString() === playerId);
+              const player = batchPlayers.find((p) => p._id.toString() === playerId || p.id.toString() === playerId);
               const value = getLatestAttributeValue(player, attr);
               return (
                 <TableCell key={playerId} className={getColorForAttribute(attr, value)}>
@@ -627,10 +649,15 @@ export default function BatchPerformancePage() {
                   <Radar data={radarData} options={radarOptions} />
                 </div>
               </div>
+              
               <div className="mt-6">
                 <Card>
                   <CardHeader>
                     <CardTitle>Attribute Comparison</CardTitle>
+                    <p className="text-sm text-muted-foreground">
+                      <span className="text-green-500 font-bold">Green</span> = Highest value, 
+                      <span className="text-red-500 font-bold"> Red</span> = Lowest value
+                    </p>
                   </CardHeader>
                   <CardContent>
                     {renderAttributeComparison()}
@@ -641,15 +668,19 @@ export default function BatchPerformancePage() {
               <div className="mt-6">
                 <Card>
                   <CardHeader>
-                    <CardTitle>Performance Graph</CardTitle>
+                    <CardTitle>Performance Over Time - {selectedAttribute.charAt(0).toUpperCase() + selectedAttribute.slice(1)}</CardTitle>
+                    <p className="text-sm text-muted-foreground">
+                      Track how player attributes change over the last month
+                    </p>
                   </CardHeader>
                   <CardContent>
-                    <div className="flex space-x-4 mb-4">
+                    <div className="flex flex-wrap gap-2 mb-4">
                       {["shooting", "pace", "positioning", "passing", "ballControl", "crossing"].map((attr) => (
                         <Button
                           key={attr}
                           variant={selectedAttribute === attr ? "default" : "outline"}
                           onClick={() => setSelectedAttribute(attr)}
+                          size="sm"
                         >
                           {attr.charAt(0).toUpperCase() + attr.slice(1)}
                         </Button>

@@ -74,34 +74,42 @@ export default function BatchesPage() {
   const [allPlayersSelected, setAllPlayersSelected] = useState(false)
 
   useEffect(() => {
-    const fetchBatchesForPlayer = async () => {
+    const fetchBatchesForCoach = async () => {
       if (!user?.academyId || !user?.id) return;
 
       try {
         setIsLoading(true);
 
-        // Step 1: Fetch the user's player id
-        const playerRes = await fetch(`/api/db/ams-player-data?academyId=${user.academyId}&userId=${user.id}`);
-        if (!playerRes.ok) throw new Error("Failed to fetch player data");
-        const playerJson = await playerRes.json();
-        const playerObj = Array.isArray(playerJson.data) ? playerJson.data[0] : playerJson.data;
-        const playerId = playerObj?.playerId || playerObj?.id || playerObj?._id;
-        if (!playerId) throw new Error("Player ID not found for user");
-
-        // Step 2: Fetch all batches for the academy
+        // Fetch all batches for the academy
         const batchesRes = await fetch(`/api/db/ams-batches?academyId=${user.academyId}`);
         if (!batchesRes.ok) throw new Error("Failed to fetch batches");
         const batchesJson = await batchesRes.json();
         const allBatches = Array.isArray(batchesJson.data) ? batchesJson.data : [];
 
-        // Step 3: Filter batches to only those containing the player's playerId
-        const filteredBatches = allBatches.filter((batch: any) =>
-          Array.isArray(batch.players) && batch.players.includes(playerId)
-        );
+        // Filter batches to only those where the current user is assigned as a coach
+        const filteredBatches = allBatches.filter((batch: any) => {
+          // Check if user ID is in coachIds array
+          if (Array.isArray(batch.coachIds) && batch.coachIds.includes(user.id)) {
+            return true;
+          }
+          
+          // Also check legacy coachId field for backward compatibility
+          if (batch.coachId === user.id) {
+            return true;
+          }
+          
+          // Check if user created the batch
+          if (batch.createdBy === user.id) {
+            return true;
+          }
+          
+          return false;
+        });
 
+        console.log("Filtered batches for coach:", filteredBatches);
         setLocalBatches(filteredBatches);
       } catch (error) {
-        console.error("Error fetching batches for player:", error);
+        console.error("Error fetching batches for coach:", error);
         toast({
           title: "Error",
           description: "Failed to load batches",
@@ -112,7 +120,7 @@ export default function BatchesPage() {
       }
     };
 
-    fetchBatchesForPlayer();
+    fetchBatchesForCoach();
   }, [user?.academyId, user?.id]);
 
   useEffect(() => {
@@ -165,7 +173,16 @@ export default function BatchesPage() {
 
   // Add helper function to check if coach owns the batch
   const isCoachOwner = (batch: any) => {
-    return batch.createdBy === user?.id || batch.coachId === user?.id;
+    // Check if user created the batch
+    if (batch.createdBy === user?.id) return true;
+    
+    // Check if user is in coachIds array
+    if (Array.isArray(batch.coachIds) && batch.coachIds.includes(user?.id)) return true;
+    
+    // Check legacy coachId field
+    if (batch.coachId === user?.id) return true;
+    
+    return false;
   };
 
   const handleDeleteBatch = async (batchId: string) => {
@@ -173,7 +190,7 @@ export default function BatchesPage() {
     if (!batch || !isCoachOwner(batch)) {
       toast({
         title: "Permission Denied",
-        description: "You can only delete batches that you created",
+        description: "You can only delete batches that you created or are assigned to",
         variant: "destructive",
       });
       return;
@@ -280,16 +297,37 @@ export default function BatchesPage() {
 
   const refetchAllBatchData = async () => {
     try {
-      // Fetch all batches
+      // Fetch all batches for the academy
       const batchesResponse = await fetch(`/api/db/ams-batches?academyId=${user?.academyId}`);
       const batchesResult = await batchesResponse.json();
       
       if (batchesResult.success) {
-        const batches = batchesResult.data;
-        setLocalBatches(batches);
+        const allBatches = batchesResult.data;
+        
+        // Filter batches for the current coach
+        const filteredBatches = allBatches.filter((batch: any) => {
+          // Check if user ID is in coachIds array
+          if (Array.isArray(batch.coachIds) && batch.coachIds.includes(user?.id)) {
+            return true;
+          }
+          
+          // Also check legacy coachId field for backward compatibility
+          if (batch.coachId === user?.id) {
+            return true;
+          }
+          
+          // Check if user created the batch
+          if (batch.createdBy === user?.id) {
+            return true;
+          }
+          
+          return false;
+        });
+        
+        setLocalBatches(filteredBatches);
         
         // Fetch players for each batch
-        await Promise.all(batches.map(async (batch: any) => {
+        await Promise.all(filteredBatches.map(async (batch: any) => {
           // Fetch players
           const playersResponse = await fetch(`/api/db/ams-batches/${batch._id}/players`);
           const playersResult = await playersResponse.json();
@@ -448,7 +486,7 @@ export default function BatchesPage() {
     if (!isCoachOwner(batch)) {
       toast({
         title: "Permission Denied",
-        description: "You can only edit batches that you created",
+        description: "You can only edit batches that you created or are assigned to",
         variant: "destructive",
       });
       return;
@@ -519,148 +557,163 @@ export default function BatchesPage() {
       <Sidebar />
       <div className="flex-1 p-8 pt-6">
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold">Batches</h1>
+          <h1 className="text-3xl font-bold">My Batches</h1>
           <Button onClick={() => setIsCreateDialogOpen(true)}>
             Create New Batch
           </Button>
         </div>
 
-        <div className="grid md:grid-cols-2 gap-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Your Batches</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ScrollArea className="h-[600px] pr-4">
-                <div className="space-y-4">
-                  {localBatches.map(batch => (
-                    <div
-                      key={batch._id}
-                      onClick={() => setSelectedBatch(batch)}
-                      className={cn(
-                        "p-4 border rounded-lg hover:bg-accent cursor-pointer",
-                        selectedBatch?._id === batch._id ? "bg-accent" : ""
-                      )}
-                    >
-                      <div className="flex justify-between items-center">
-                        <h3 className="text-lg font-semibold">{batch.name}</h3>
-                        {isCoachOwner(batch) && (
-                          <div className="flex gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleStartEdit(batch);
-                              }}
-                            >
-                              Edit
-                            </Button>
-                            <Button
-                              variant="destructive"
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDeleteBatch(batch._id);
-                              }}
-                            >
-                              Delete
-                            </Button>
-                          </div>
+        {localBatches.length === 0 && !isLoading ? (
+          <div className="text-center py-12">
+            <h2 className="text-xl font-semibold mb-2">No Batches Found</h2>
+            <p className="text-muted-foreground mb-4">
+              You don't have any batches assigned to you yet.
+            </p>
+            <Button onClick={() => setIsCreateDialogOpen(true)}>
+              Create Your First Batch
+            </Button>
+          </div>
+        ) : (
+          <div className="grid md:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Your Assigned Batches</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ScrollArea className="h-[600px] pr-4">
+                  <div className="space-y-4">
+                    {localBatches.map(batch => (
+                      <div
+                        key={batch._id}
+                        onClick={() => setSelectedBatch(batch)}
+                        className={cn(
+                          "p-4 border rounded-lg hover:bg-accent cursor-pointer",
+                          selectedBatch?._id === batch._id ? "bg-accent" : ""
                         )}
-                      </div>
-                      <p className="text-sm text-muted-foreground mt-2">
-                        Coach: {batch.coachName}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </ScrollArea>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>
-                {selectedBatch ? `${selectedBatch.name} Details` : "Select a Batch"}
-              </CardTitle>
-              {selectedBatch && isCoachOwner(selectedBatch) && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleStartEdit(selectedBatch)}
-                >
-                  Edit Batch
-                </Button>
-              )}
-            </CardHeader>
-            <CardContent>
-              {selectedBatch ? (
-                <div className="space-y-6">
-                  <div>
-                    <h3 className="text-lg font-semibold mb-4">Coaches</h3>
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Name</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {selectedBatch.coachNames?.map((coachName: string, index: number) => (
-                          <TableRow key={index}>
-                            <TableCell>{coachName}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                  <Separator className="my-4" />
-                  <div>
-                    <h3 className="text-lg font-semibold mb-4">Players</h3>
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Name</TableHead>
-                          <TableHead>Position</TableHead>
-                          <TableHead>Actions</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {batchPlayers[selectedBatch.id]?.map((player: any) => (
-                          <TableRow key={player.id}>
-                            <TableCell>
-                              <div className="flex items-center gap-2">
-                                <Avatar className="h-8 w-8">
-                                  <AvatarImage src={player.photoUrl} />
-                                  <AvatarFallback>{player.name[0]}</AvatarFallback>
-                                </Avatar>
-                                {player.name}
-                              </div>
-                            </TableCell>
-                            <TableCell>{player.position}</TableCell>
-                            <TableCell>
+                      >
+                        <div className="flex justify-between items-center">
+                          <h3 className="text-lg font-semibold">{batch.name}</h3>
+                          {isCoachOwner(batch) && (
+                            <div className="flex gap-2">
                               <Button
-                                variant="ghost"
+                                variant="outline"
                                 size="sm"
-                                onClick={() => handleViewPlayerDetails(player.id)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleStartEdit(batch);
+                                }}
                               >
-                                View Details
+                                Edit
                               </Button>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteBatch(batch._id);
+                                }}
+                              >
+                                Delete
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                        <p className="text-sm text-muted-foreground mt-2">
+                          Coach: {batch.coachName}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Players: {batch.players?.length || 0}
+                        </p>
+                      </div>
+                    ))}
                   </div>
-                </div>
-              ) : (
-                <div className="text-center py-8">
-                  <p className="text-muted-foreground">Select a batch to view details</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+                </ScrollArea>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle>
+                  {selectedBatch ? `${selectedBatch.name} Details` : "Select a Batch"}
+                </CardTitle>
+                {selectedBatch && isCoachOwner(selectedBatch) && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleStartEdit(selectedBatch)}
+                  >
+                    Edit Batch
+                  </Button>
+                )}
+              </CardHeader>
+              <CardContent>
+                {selectedBatch ? (
+                  <div className="space-y-6">
+                    <div>
+                      <h3 className="text-lg font-semibold mb-4">Coaches</h3>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Name</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {selectedBatch.coachNames?.map((coachName: string, index: number) => (
+                            <TableRow key={index}>
+                              <TableCell>{coachName}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                    <Separator className="my-4" />
+                    <div>
+                      <h3 className="text-lg font-semibold mb-4">Players</h3>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Name</TableHead>
+                            <TableHead>Position</TableHead>
+                            <TableHead>Actions</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {batchPlayers[selectedBatch._id]?.map((player: any) => (
+                            <TableRow key={player.id}>
+                              <TableCell>
+                                <div className="flex items-center gap-2">
+                                  <Avatar className="h-8 w-8">
+                                    <AvatarImage src={player.photoUrl} />
+                                    <AvatarFallback>{player.name[0]}</AvatarFallback>
+                                  </Avatar>
+                                  {player.name}
+                                </div>
+                              </TableCell>
+                              <TableCell>{player.position}</TableCell>
+                              <TableCell>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleViewPlayerDetails(player.id)}
+                                >
+                                  View Details
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <p className="text-muted-foreground">Select a batch to view details</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
         <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
           <DialogContent>
