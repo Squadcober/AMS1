@@ -10,25 +10,17 @@ import { Switch } from "@/components/ui/switch"
 import Sidebar from "@/components/Sidebar"
 import { useAuth } from "@/contexts/AuthContext"
 import { toast } from "@/components/ui/use-toast"
-import { FileUp } from "lucide-react" // Add this import
-
-// Helper function to get base URL for API calls
-const getBaseUrl = () => {
-  if (typeof window !== 'undefined') {
-    return window.location.origin
-  }
-  return process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
-}
+import { FileUp } from "lucide-react"
 
 interface playerInfo {
   pid: string
   name: string
   dob: string
-  position: string // added
+  position: string
   secondaryPosition: string
   strongFoot: string
   enrollmentDate: string
-  createdAt?: string // Add this field
+  createdAt?: string
   height: string
   weight: string
   hasDisability: boolean
@@ -85,11 +77,11 @@ export default function playerSettings() {
     pid: "",
     name: "",
     dob: "",
-    position: "", // replaced primaryPosition
+    position: "",
     secondaryPosition: "",
     strongFoot: "",
     enrollmentDate: "",
-    createdAt: "", // Initialize createdAt
+    createdAt: "",
     height: "",
     weight: "",
     hasDisability: false,
@@ -109,7 +101,7 @@ export default function playerSettings() {
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [canSave, setCanSave] = useState(false)
-  const [isEditing, setIsEditing] = useState(false) // Add isEditing state
+  const [isEditing, setIsEditing] = useState(false)
 
   useEffect(() => {
     setCanSave(
@@ -120,51 +112,6 @@ export default function playerSettings() {
     )
   }, [user?.id, user?.academyId, isLoading, isSaving])
 
-  const fetchUserIdentifiers = async () => {
-    try {
-      if (!user?.id || !user?.academyId) {
-        console.warn("User data missing:", { id: user?.id, academyId: user?.academyId })
-        throw new Error("User ID or Academy ID is missing")
-      }
-
-      const playerResponse = await fetch(
-        `${getBaseUrl()}/api/db/ams-player-data?academyId=${encodeURIComponent(user.academyId)}&userId=${encodeURIComponent(user.id)}`
-      )
-      const playerData = await playerResponse.json()
-      console.log("Player API Response:", playerData)
-
-      if (playerData.success && playerData.data?.[0]) {
-        console.log("Found player data:", playerData.data[0])
-        return {
-          playerId: playerData.data[0].id,
-          userId: user.id,
-          source: "player"
-        }
-      }
-
-      const userResponse = await fetch(`${getBaseUrl()}/api/db/ams-users?userId=${user.id}`)
-      const userData = await userResponse.json()
-      console.log("User API Response:", userData)
-
-      if (userData.success && userData.data) {
-        return {
-          playerId: userData.data._id,
-          userId: user.id,
-          source: "user"
-        }
-      }
-
-      return {
-        playerId: user.id,
-        userId: user.id,
-        source: "auth"
-      }
-    } catch (error) {
-      console.error("Error in fetchUserIdentifiers:", error)
-      throw error
-    }
-  }
-
   // Helper function to format date as YYYY-MM-DD
   function formatDate(dateString: string): string {
     if (!dateString) return "";
@@ -173,91 +120,115 @@ export default function playerSettings() {
     return date.toISOString().split("T")[0];
   }
 
-  // Move loadplayerData outside useEffect so it can be called elsewhere
+  const calculateAge = (dob: string): number => {
+    if (!dob) return 0;
+    const birthDate = new Date(dob);
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    return age;
+  };
+
   const loadplayerData = async () => {
     try {
       setIsLoading(true);
 
-      if (!user?.username || !user?.academyId || !user?.email || !user?.id) {
-        throw new Error("User data is incomplete");
+      if (!user?.username) {
+        console.error("Missing username:", user?.username);
+        throw new Error("Username is required");
       }
 
-      // Fetch player data using the main player data endpoint with academyId and userId
+      console.log('Loading data for username:', user.username);
+
+      // Fetch player data using the exact same endpoint as profile page
       const playerResponse = await fetch(
-        `${getBaseUrl()}/api/db/ams-player-data?academyId=${encodeURIComponent(user.academyId)}&userId=${encodeURIComponent(user.id)}`,
-        { credentials: 'include' }
+        `/api/db/ams-player-data/user/${encodeURIComponent(user.username)}`,
+        { 
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        }
       );
 
+      console.log('Player response status:', playerResponse.status);
+
       if (!playerResponse.ok) {
-        throw new Error('Failed to fetch player data');
+        const errorText = await playerResponse.text();
+        console.error('Player fetch failed:', {
+          status: playerResponse.status,
+          statusText: playerResponse.statusText,
+          error: errorText
+        });
+        throw new Error(`Failed to fetch player data: ${playerResponse.status}`);
       }
 
-      const playerResult = await playerResponse.json();
-      console.log('Received player data result:', playerResult);
+      const playerData = await playerResponse.json();
+      console.log('Received player data:', playerData);
 
-      if (!playerResult.success || !playerResult.data?.[0]) {
-        throw new Error('Player data not found');
+      if (!playerData) {
+        throw new Error('No player data returned');
       }
 
-      const playerData = playerResult.data[0];
-      console.log('Player data:', playerData);
+      // Fetch academy data if academyId exists
+      let academyName = "Academy not found";
+      if (user.academyId) {
+        try {
+          const academyResponse = await fetch(
+            `/api/db/ams-academy/${encodeURIComponent(user.academyId)}`,
+            { 
+              credentials: 'include',
+              headers: {
+                'Content-Type': 'application/json',
+              }
+            }
+          );
 
-      // Rest of parallel fetches
-      const [academyResponse, userResponse] = await Promise.all([
-        fetch(
-          `${getBaseUrl()}/api/db/ams-academy/${encodeURIComponent(user.academyId)}`,
-          { credentials: 'include' }
-        ),
-        fetch(
-          `${getBaseUrl()}/api/db/ams-users/${encodeURIComponent(user.id)}`,
-          { credentials: 'include' }
-        )
-      ]);
-
-      if (!academyResponse.ok || !userResponse.ok) {
-        throw new Error('Failed to fetch required data');
+          if (academyResponse.ok) {
+            const academyResult = await academyResponse.json();
+            academyName = academyResult.data?.name || academyName;
+          }
+        } catch (academyError) {
+          console.warn('Failed to fetch academy data:', academyError);
+        }
       }
 
-      const [academyResult, userResult] = await Promise.all([
-        academyResponse.json(),
-        userResponse.json()
-      ]);
+      // Calculate age from DOB
+      const calculatedAge = calculateAge(playerData.dob || "");
 
-      const academyData = academyResult.data;
-      const userData = userResult.data;
-
+      // Set player info with proper data mapping
       setplayerInfo(prev => ({
         ...prev,
-        pid: playerData.id || "",
-        photoUrl: playerData.photoUrl || "",  // Set photo URL from player data
+        pid: playerData._id || playerData.id || "",
+        photoUrl: playerData.photoUrl || "",
         name: playerData.name || "",
-        email: user.email,
-        // Use enrollment date from user data
-        enrollmentDate: userData?.createdAt 
-          ? new Date(userData.createdAt).toISOString().split('T')[0]
-          : '',
-        // Properly format DOB from player data
-        dob: formatDate(playerData?.dob || ""),
-        age: playerData?.age?.toString() || "",
-        position: playerData?.position || "",
-        secondaryPosition: playerData?.secondaryPosition || "",
-        strongFoot: playerData?.strongFoot || "",
-        height: playerData?.height || "",
-        weight: playerData?.weight || "",
-        hasDisability: playerData?.hasDisability || false,
-        disabilityType: playerData?.disabilityType || "",
-        status: playerData?.status || "Active",
-        school: academyData.name || "Academy not found", // Set academy name from academy data
-        gender: playerData?.gender || "",
-        bloodGroup: playerData?.bloodGroup || "",
-        primaryGuardian: playerData?.primaryGuardian || "",
-        secondaryGuardian: playerData?.secondaryGuardian || "",
-        primaryPhone: playerData?.primaryPhone || "",
-        secondaryPhone: playerData?.secondaryPhone || "",
-        address: playerData?.address || "",
+        email: user.email || "",
+        enrollmentDate: playerData.enrollmentDate 
+          ? formatDate(playerData.enrollmentDate)
+          : (playerData.createdAt ? formatDate(playerData.createdAt) : ''),
+        dob: formatDate(playerData.dob || ""),
+        age: calculatedAge.toString(),
+        position: playerData.position || "",
+        secondaryPosition: playerData.secondaryPosition || "",
+        strongFoot: playerData.strongFoot || "",
+        height: playerData.height?.toString() || "",
+        weight: playerData.weight?.toString() || "",
+        hasDisability: Boolean(playerData.hasDisability),
+        disabilityType: playerData.disabilityType || "",
+        status: playerData.status || "Active",
+        school: academyName,
+        gender: playerData.gender || "",
+        bloodGroup: playerData.bloodGroup || "",
+        primaryGuardian: playerData.primaryGuardian || "",
+        secondaryGuardian: playerData.secondaryGuardian || "",
+        primaryPhone: playerData.primaryPhone || "",
+        secondaryPhone: playerData.secondaryPhone || "",
+        address: playerData.address || "",
       }));
 
-      setIsLoading(false);
     } catch (error) {
       console.error("Error loading data:", error);
       toast({
@@ -265,13 +236,16 @@ export default function playerSettings() {
         description: error instanceof Error ? error.message : "Failed to load data",
         variant: "destructive"
       });
+    } finally {
       setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    loadplayerData();
-  }, [user?.username, user?.academyId, user?.id, user?.email]); // Add user.email to dependencies
+    if (user?.username) {
+      loadplayerData();
+    }
+  }, [user?.username]);
 
   const handleEdit = () => {
     setIsEditing(true);
@@ -280,59 +254,66 @@ export default function playerSettings() {
   const handleSave = async () => {
     try {
       if (!user?.username) {
-        throw new Error("Missing user information");
+        throw new Error("Missing username");
       }
 
       setIsSaving(true);
 
-      // Structure updates with $set operator like profile page
+      // Calculate age from DOB
+      const calculatedAge = calculateAge(playerInfo.dob);
+
+      // Prepare updates for PATCH request (your API expects $set structure)
       const updates = {
-        $set: {
-          name: playerInfo.name,
-          email: user.email,
-          photoUrl: playerInfo.photoUrl,
-          position: playerInfo.position,
-          secondaryPosition: playerInfo.secondaryPosition,
-          strongFoot: playerInfo.strongFoot,
-          dob: playerInfo.dob,
-          age: parseInt(playerInfo.age) || 0,
-          gender: playerInfo.gender,
-          height: playerInfo.height,
-          weight: playerInfo.weight,
-          primaryGuardian: playerInfo.primaryGuardian,
-          secondaryGuardian: playerInfo.secondaryGuardian,
-          primaryPhone: playerInfo.primaryPhone,
-          secondaryPhone: playerInfo.secondaryPhone,
-          address: playerInfo.address,
-          bloodGroup: playerInfo.bloodGroup,
-          hasDisability: playerInfo.hasDisability,
-          disabilityType: playerInfo.disabilityType,
-          status: playerInfo.status,
-          enrollmentDate: playerInfo.enrollmentDate,
-          updatedAt: new Date().toISOString(),
-          lastUpdated: new Date().toISOString()
-        }
+        name: playerInfo.name,
+        email: user.email,
+        photoUrl: playerInfo.photoUrl,
+        position: playerInfo.position,
+        secondaryPosition: playerInfo.secondaryPosition,
+        strongFoot: playerInfo.strongFoot,
+        dob: playerInfo.dob,
+        age: calculatedAge,
+        gender: playerInfo.gender,
+        height: playerInfo.height,
+        weight: playerInfo.weight,
+        primaryGuardian: playerInfo.primaryGuardian,
+        secondaryGuardian: playerInfo.secondaryGuardian,
+        primaryPhone: playerInfo.primaryPhone,
+        secondaryPhone: playerInfo.secondaryPhone,
+        address: playerInfo.address,
+        bloodGroup: playerInfo.bloodGroup,
+        hasDisability: playerInfo.hasDisability,
+        disabilityType: playerInfo.disabilityType,
+        status: playerInfo.status,
+        enrollmentDate: playerInfo.enrollmentDate,
+        updatedAt: new Date().toISOString(),
+        lastUpdated: new Date().toISOString()
       };
 
-      // Use same endpoint and method as profile page
-      const response = await fetch(`${getBaseUrl()}/api/db/ams-player-data/${encodeURIComponent(playerInfo.pid)}`, {
+      console.log('Sending updates:', updates);
+
+      // Use PATCH method to match your API route
+      const response = await fetch(`/api/db/ams-player-data/user/${encodeURIComponent(user.username)}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify(updates)
       });
 
+      console.log('Save response status:', response.status);
+
       if (!response.ok) {
         const errorData = await response.json();
+        console.error('Save failed:', errorData);
         throw new Error(errorData.error || 'Failed to update profile');
       }
 
-      const updatedPlayer = await response.json();
-      
-      // Update local state with response data
+      const result = await response.json();
+      console.log('Save result:', result);
+
+      // Update age in local state
       setplayerInfo(prev => ({
         ...prev,
-        ...updatedPlayer
+        age: calculatedAge.toString()
       }));
 
       toast({
@@ -359,19 +340,6 @@ export default function playerSettings() {
     loadplayerData(); // Reload original data
   };
 
-  const calculateAge = (dob: string): number => {
-    if (!dob) return 0;
-    const birthDate = new Date(dob);
-    const today = new Date();
-    let age = today.getFullYear() - birthDate.getFullYear();
-    const monthDiff = today.getMonth() - birthDate.getMonth();
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-      age--;
-    }
-    return age;
-  };
-
-  // Update the handleDOBChange function
   const handleDOBChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newDOB = e.target.value;
     const calculatedAge = calculateAge(newDOB);
@@ -382,7 +350,6 @@ export default function playerSettings() {
     }));
   };
 
-  // Modify input props to be disabled when not editing
   const inputProps = {
     disabled: !isEditing,
     className: !isEditing ? "bg-muted cursor-not-allowed" : ""
@@ -390,7 +357,6 @@ export default function playerSettings() {
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>, field: 'primaryPhone' | 'secondaryPhone') => {
     const value = e.target.value;
-    // Only allow digits and limit to 10 characters
     if (/^\d{0,10}$/.test(value)) {
       setplayerInfo(prev => ({ ...prev, [field]: value }));
     }
@@ -411,14 +377,24 @@ export default function playerSettings() {
     }
   };
 
+  if (isLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-2">Loading player data...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-screen overflow-hidden">
       <Sidebar />
       <div className="flex-1 p-8 overflow-y-auto">
-        <h1 className="text-3xl font-bold mb-8">player Settings</h1>
+        <h1 className="text-3xl font-bold mb-8">Player Settings</h1>
 
         <div className="space-y-6">
-          {/* Add Photo Card before Personal Information */}
           <Card>
             <CardHeader>
               <CardTitle>Profile Photo</CardTitle>
@@ -452,7 +428,7 @@ export default function playerSettings() {
                     type="file"
                     accept="image/*"
                     onChange={handlePhotoChange}
-                    {...inputProps}
+                    className="hidden"
                   />
                 </label>
               )}
@@ -506,9 +482,9 @@ export default function playerSettings() {
                 <Select
                   value={playerInfo.gender}
                   onValueChange={(value) => setplayerInfo(prev => ({ ...prev, gender: value }))}
-                  {...inputProps}
+                  disabled={!isEditing}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className={inputProps.className}>
                     <SelectValue placeholder="Select gender" />
                   </SelectTrigger>
                   <SelectContent>
@@ -524,9 +500,9 @@ export default function playerSettings() {
                 <Select
                   value={playerInfo.position}
                   onValueChange={(value) => setplayerInfo(prev => ({ ...prev, position: value }))}
-                  {...inputProps}
+                  disabled={!isEditing}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className={inputProps.className}>
                     <SelectValue placeholder="Select position" />
                   </SelectTrigger>
                   <SelectContent>
@@ -544,9 +520,9 @@ export default function playerSettings() {
                 <Select
                   value={playerInfo.secondaryPosition}
                   onValueChange={(value) => setplayerInfo(prev => ({ ...prev, secondaryPosition: value }))}
-                  {...inputProps}
+                  disabled={!isEditing}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className={inputProps.className}>
                     <SelectValue placeholder="Select position" />
                   </SelectTrigger>
                   <SelectContent>
@@ -564,9 +540,9 @@ export default function playerSettings() {
                 <Select
                   value={playerInfo.strongFoot}
                   onValueChange={(value) => setplayerInfo(prev => ({ ...prev, strongFoot: value }))}
-                  {...inputProps}
+                  disabled={!isEditing}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className={inputProps.className}>
                     <SelectValue placeholder="Select foot" />
                   </SelectTrigger>
                   <SelectContent>
@@ -582,9 +558,9 @@ export default function playerSettings() {
                 <Select
                   value={playerInfo.status}
                   onValueChange={(value) => setplayerInfo(prev => ({ ...prev, status: value }))}
-                  {...inputProps}
+                  disabled={!isEditing}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className={inputProps.className}>
                     <SelectValue placeholder="Select status" />
                   </SelectTrigger>
                   <SelectContent>
@@ -665,6 +641,7 @@ export default function playerSettings() {
                   onCheckedChange={(checked) => 
                     setplayerInfo(prev => ({ ...prev, hasDisability: checked }))
                   }
+                  disabled={!isEditing}
                 />
                 <Label htmlFor="hasDisability">Has Disability</Label>
               </div>
@@ -686,9 +663,9 @@ export default function playerSettings() {
                 <Select
                   value={playerInfo.bloodGroup}
                   onValueChange={(value) => setplayerInfo(prev => ({ ...prev, bloodGroup: value }))}
-                  {...inputProps}
+                  disabled={!isEditing}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className={inputProps.className}>
                     <SelectValue placeholder="Select blood group" />
                   </SelectTrigger>
                   <SelectContent>

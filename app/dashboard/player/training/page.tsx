@@ -42,17 +42,53 @@ const isPlayerAssignedToSession = (session: Session, playerId: string): boolean 
          Object.keys(session.attendance || {}).includes(playerId);
 };
 
+interface PlayerData {
+  id: string;
+  name: string;
+}
+
 export default function Training() {
   const { user } = useAuth();
   const [sessions, setSessions] = useState<Session[]>([]);
+  const [playerData, setPlayerData] = useState<PlayerData | null>(null);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("All");
   const [displayLimit, setDisplayLimit] = useState(20); // New state for pagination
 
+  // Fetch player data using the same method as profile page
+  useEffect(() => {
+    const fetchPlayerData = async () => {
+      try {
+        if (!user?.username) return;
+
+        const response = await fetch(`/api/db/ams-player-data/user/${encodeURIComponent(user.username)}`, {
+          credentials: 'include',
+        });
+
+        if (!response.ok) {
+          const data = await response.json();
+          throw new Error(data.error || 'Failed to load player data');
+        }
+
+        const data = await response.json();
+        setPlayerData(data);
+      } catch (error) {
+        console.error('Error fetching player data:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load player data",
+          variant: "destructive",
+        });
+      }
+    };
+
+    fetchPlayerData();
+  }, [user]);
+
   useEffect(() => {
     const fetchSessions = async () => {
       try {
-        if (!user?.username || !user?.academyId) return;
+        if (!user?.academyId || !playerData?.id) return;
 
         setLoading(true);
         const response = await fetch(
@@ -60,14 +96,13 @@ export default function Training() {
           { credentials: 'include' }
         );
 
-        if (!response.ok) throw new Error('Failed to fetch sessions');
+        if (!response.ok) throw new Error('极速赛车开奖结果历史记录 Failed to fetch sessions');
 
         const result = await response.json();
         if (result.success) {
-          const PLAYER_ID = 'player_dhs96a3m2_1755249651574';
-          // Filter sessions to only include those assigned to the specific player ID
+          // Filter sessions to only include those assigned to the player
           const playerSessions = result.data.filter((session: Session) => 
-            session.assignedPlayers.includes(PLAYER_ID)
+            session.assignedPlayers.includes(playerData.id)
           );
           setSessions(playerSessions);
         } else {
@@ -89,14 +124,16 @@ export default function Training() {
       }
     };
 
-    fetchSessions();
-  }, [user]);
+    if (playerData?.id) {
+      fetchSessions();
+    }
+  }, [user, playerData]);
 
   const getAttendanceStatus = (session: Session): string => {
-    const PLAYER_ID = 'player_dhs96a3m2_1755249651574';
+    if (!playerData?.id) return "Not marked";
     
-    if (session.attendance?.[PLAYER_ID]) {
-      return session.attendance[PLAYER_ID].status;
+    if (session.attendance?.[playerData.id]) {
+      return session.attendance[playerData.id].status;
     }
     
     return "Not marked";
