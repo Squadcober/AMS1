@@ -128,7 +128,7 @@ export default function playerSettings() {
       }
 
       const playerResponse = await fetch(
-        `${getBaseUrl()}/app/api/db/ams-player-data?academyId=${encodeURIComponent(user.academyId)}&userId=${encodeURIComponent(user.id)}`
+        `${getBaseUrl()}/api/db/ams-player-data?academyId=${encodeURIComponent(user.academyId)}&userId=${encodeURIComponent(user.id)}`
       )
       const playerData = await playerResponse.json()
       console.log("Player API Response:", playerData)
@@ -142,7 +142,7 @@ export default function playerSettings() {
         }
       }
 
-      const userResponse = await fetch(`${getBaseUrl()}/app/api/db/ams-users?userId=${user.id}`)
+      const userResponse = await fetch(`${getBaseUrl()}/api/db/ams-users?userId=${user.id}`)
       const userData = await userResponse.json()
       console.log("User API Response:", userData)
 
@@ -182,9 +182,9 @@ export default function playerSettings() {
         throw new Error("User data is incomplete");
       }
 
-      // Fetch player data first using the same endpoint as profile page
+      // Fetch player data using the main player data endpoint with academyId and userId
       const playerResponse = await fetch(
-        `${getBaseUrl()}/app/api/db/ams-player-data/user/${encodeURIComponent(user.username)}`,
+        `${getBaseUrl()}/api/db/ams-player-data?academyId=${encodeURIComponent(user.academyId)}&userId=${encodeURIComponent(user.id)}`,
         { credentials: 'include' }
       );
 
@@ -192,13 +192,20 @@ export default function playerSettings() {
         throw new Error('Failed to fetch player data');
       }
 
-      const playerData = await playerResponse.json();
-      console.log('Received player data:', playerData);
+      const playerResult = await playerResponse.json();
+      console.log('Received player data result:', playerResult);
+
+      if (!playerResult.success || !playerResult.data?.[0]) {
+        throw new Error('Player data not found');
+      }
+
+      const playerData = playerResult.data[0];
+      console.log('Player data:', playerData);
 
       // Rest of parallel fetches
       const [academyResponse, userResponse] = await Promise.all([
         fetch(
-          `${getBaseUrl()}/app/api/db/ams-academy/${encodeURIComponent(user.academyId)}`,
+          `${getBaseUrl()}/api/db/ams-academy/${encodeURIComponent(user.academyId)}`,
           { credentials: 'include' }
         ),
         fetch(
@@ -308,7 +315,7 @@ export default function playerSettings() {
       };
 
       // Use same endpoint and method as profile page
-      const response = await fetch(`${getBaseUrl()}/app/api/db/ams-player-data/${encodeURIComponent(playerInfo.pid)}`, {
+      const response = await fetch(`${getBaseUrl()}/api/db/ams-player-data/${encodeURIComponent(playerInfo.pid)}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
