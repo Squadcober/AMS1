@@ -308,7 +308,10 @@ const generateRecurringOccurrences = (session: Session): Session[] => {
     
     if (selectedDays.includes(dayName)) {
       // Create occurrence date string in YYYY-MM-DD format
-      const occurrenceDate = currentDate.toISOString().split('T')[0];
+      // Add 1 day to adjust for timezone offset (fix for off-by-one-day issue)
+      const adjustedDate = new Date(currentDate);
+      adjustedDate.setDate(adjustedDate.getDate() + 1);
+      const occurrenceDate = adjustedDate.toISOString().split('T')[0];
 
       // Create session start and end times for this occurrence
       const sessionDateTime = new Date(occurrenceDate);
@@ -3361,20 +3364,30 @@ const handleSaveChanges = async () => {
       return true;
     });
 
-    // Save each unique unsaved session to the database
-    for (const session of uniqueSessions) {
-      const response = await fetch('/api/sessions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({...session, academyId: user.academyId}),
-      });
+    // Use bulk create API for better performance, especially for recurring sessions
+    const response = await fetch('/api/db/session-management', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'addSessions',
+        sessions: uniqueSessions.map(session => ({
+          ...session,
+          academyId: user.academyId
+        }))
+      }),
+    });
 
-      if (!response.ok) {
-        throw new Error(`Failed to save session: ${session.name}`);
-      }
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to save sessions');
     }
 
-    
+    const result = await response.json();
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to save sessions');
+    }
+
+    console.log(`Successfully saved ${result.data.insertedCount} sessions`);
 
     // Clear unsaved sessions and refresh the session list
     setUnsavedSessions([]);
@@ -3383,7 +3396,7 @@ const handleSaveChanges = async () => {
 
     toast({
       title: "Success",
-      description: "All changes have been saved successfully.",
+      description: `All ${result.data.insertedCount} sessions have been saved successfully.`,
       variant: "default",
     });
   } catch (error) {

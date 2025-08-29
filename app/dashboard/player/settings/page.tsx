@@ -12,6 +12,14 @@ import { useAuth } from "@/contexts/AuthContext"
 import { toast } from "@/components/ui/use-toast"
 import { FileUp } from "lucide-react" // Add this import
 
+// Helper function to get base URL for API calls
+const getBaseUrl = () => {
+  if (typeof window !== 'undefined') {
+    return window.location.origin
+  }
+  return process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
+}
+
 interface playerInfo {
   pid: string
   name: string
@@ -120,7 +128,7 @@ export default function playerSettings() {
       }
 
       const playerResponse = await fetch(
-        `/api/db/ams-player-data?academyId=${encodeURIComponent(user.academyId)}&userId=${encodeURIComponent(user.id)}`
+        `${getBaseUrl()}/api/db/ams-player-data?academyId=${encodeURIComponent(user.academyId)}&userId=${encodeURIComponent(user.id)}`
       )
       const playerData = await playerResponse.json()
       console.log("Player API Response:", playerData)
@@ -134,7 +142,7 @@ export default function playerSettings() {
         }
       }
 
-      const userResponse = await fetch(`/api/db/ams-users?userId=${user.id}`)
+      const userResponse = await fetch(`${getBaseUrl()}/api/db/ams-users?userId=${user.id}`)
       const userData = await userResponse.json()
       console.log("User API Response:", userData)
 
@@ -176,7 +184,7 @@ export default function playerSettings() {
 
       // Fetch player data first using the same endpoint as profile page
       const playerResponse = await fetch(
-        `/api/db/ams-player-data/user/${encodeURIComponent(user.username)}`,
+        `${getBaseUrl()}/api/db/ams-player-data/user/${encodeURIComponent(user.username)}`,
         { credentials: 'include' }
       );
 
@@ -190,11 +198,11 @@ export default function playerSettings() {
       // Rest of parallel fetches
       const [academyResponse, userResponse] = await Promise.all([
         fetch(
-          `/api/db/ams-academy/${encodeURIComponent(user.academyId)}`,
+          `${getBaseUrl()}/api/db/ams-academy/${encodeURIComponent(user.academyId)}`,
           { credentials: 'include' }
         ),
         fetch(
-          `/api/db/ams-users/${encodeURIComponent(user.id)}`,
+          `${getBaseUrl()}/api/db/ams-users/${encodeURIComponent(user.id)}`,
           { credentials: 'include' }
         )
       ]);
@@ -300,7 +308,7 @@ export default function playerSettings() {
       };
 
       // Use same endpoint and method as profile page
-      const response = await fetch(`/api/db/ams-player-data/${encodeURIComponent(playerInfo.pid)}`, {
+      const response = await fetch(`${getBaseUrl()}/api/db/ams-player-data/${encodeURIComponent(playerInfo.pid)}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',

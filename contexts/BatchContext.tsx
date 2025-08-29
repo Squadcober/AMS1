@@ -39,7 +39,6 @@ export const BatchProvider = ({ children }: { children: React.ReactNode }) => {
       '/dashboard/admin/performance-reports',
       '/dashboard/admin/settings',
       '/dashboard/admin/user-management',
-      '/dashboard/admin',
       '/dashboard/coach/profile',
       '/dashboard/coach/settings',
       '/dashboard/coach/credentials',

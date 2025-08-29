@@ -102,6 +102,31 @@ export async function POST(request: Request) {
         );
         return NextResponse.json({ success: true });
 
+      case 'addSessions':
+        const { sessions: sessionsToAdd } = data;
+        if (!Array.isArray(sessionsToAdd) || sessionsToAdd.length === 0) {
+          return NextResponse.json({
+            success: false,
+            error: 'Invalid sessions data'
+          }, { status: 400 });
+        }
+
+        // Prepare sessions for insertion with timestamps
+        const sessionsWithTimestamps = sessionsToAdd.map(session => ({
+          ...session,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        }));
+
+        const insertResult = await db.collection('ams-sessions').insertMany(sessionsWithTimestamps);
+        return NextResponse.json({
+          success: true,
+          data: {
+            insertedCount: insertResult.insertedCount,
+            insertedIds: insertResult.insertedIds
+          }
+        });
+
       default:
         return NextResponse.json({ 
           success: false, 

@@ -7,15 +7,12 @@ import Sidebar from "@/components/Sidebar"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Loader2 } from "lucide-react"
-import { Checkbox } from "@/components/ui/checkbox"
 import * as XLSX from 'xlsx';
 
 export default function ExportDataPage() {
   const { user } = useAuth()
   const { toast } = useToast()
-  const [loading, setLoading] = useState<{ [key: string]: boolean }>({})
-  const [selectedData, setSelectedData] = useState<string[]>([])
-
+  const [loading, setLoading] = useState<string | null>(null)
   const exportOptions = [
     { id: 'players', label: 'Players Data' },
     { id: 'coaches', label: 'Coaches Data' },
@@ -57,15 +54,25 @@ export default function ExportDataPage() {
     switch (type) {
       case 'players':
         csvContent = [
-          'ID,Name,Position,Age,Overall Rating',
+          'ID,Name,Position,Age,Overall Rating,Shooting,Pace,Positioning,Passing,Ball Control,Crossing,Average Performance,Stamina,Enrollment Date',
           ...data.map(p => {
-            const overallRating = calculateOverallRating(p.attributes || {});
+            const attrs = p.attributes || {};
+            const overallRating = calculateOverallRating(attrs);
             return [
-              p.id,
-              p.name,
-              p.position,
-              p.age,
-              `${overallRating}%`
+              p.id || p._id,
+              `"${p.name || ''}"`,
+              `"${p.position || ''}"`,
+              p.age || '',
+              `${overallRating}%`,
+              attrs.shooting || '',
+              attrs.pace || '',
+              attrs.positioning || '',
+              attrs.passing || '',
+              attrs.ballControl || '',
+              attrs.crossing || '',
+              p.averagePerformance || '',
+              p.stamina || '',
+              p.enrollmentDate || ''
             ].join(',');
           }),
         ].join('\n');
@@ -75,27 +82,49 @@ export default function ExportDataPage() {
         csvContent = [
           'ID,Name,Email,Specialization,Experience,Rating',
           ...data.map(c => [
-            c.id,
-            c.name,
-            c.email,
-            c.specialization,
-            c.experience,
-            c.rating
+            c.id || c._id,
+            `"${c.name || ''}"`,
+            `"${c.email || ''}"`,
+            `"${c.specialization || ''}"`,
+            `"${c.experience || ''}"`,
+            c.rating || ''
           ].join(',')),
         ].join('\n');
         break;
 
       case 'performance':
+        // API returns flattened array of performance records with playerId, playerName, and session data
+        console.log('Performance export data received:', data); // Debug log
+        
+        if (!data || !Array.isArray(data) || data.length === 0) {
+          console.log('No performance data found');
+          return 'Player ID,Player Name,Date,Time,Session ID,Type,Shooting,Pace,Positioning,Passing,Ball Control,Crossing,Session Rating,Overall\n'; // Empty CSV with headers
+        }
+
+        console.log('Total performance records:', data.length); // Debug log
+
         csvContent = [
-          'Player ID,Player Name,Date,Time,Rating,Notes',
-          ...data.map(p => {
-            const { date, time } = formatDateTime(p.date);
+          'Player ID,Player Name,Date,Time,Session ID,Type,Shooting,Pace,Positioning,Passing,Ball Control,Crossing,Session Rating,Overall',
+          ...data.map((session: any) => {
+            const { date, time } = formatDateTime(session.date);
+            const attrs = session.attributes || {};
+            const overallRating = calculateOverallRating(attrs);
+            
             return [
-              p.playerId,
-              p.playerName,
+              session.playerId || '',
+              `"${session.playerName || ''}"`,
               date,
               time,
-              p.rating
+              session.sessionId || '',
+              session.type || 'training',
+              attrs.shooting || session.shooting || '',
+              attrs.pace || session.pace || '',
+              attrs.positioning || session.positioning || '',
+              attrs.passing || session.passing || '',
+              attrs.ballControl || session.ballControl || '',
+              attrs.crossing || session.crossing || '',
+              session.sessionRating || '',
+              `${overallRating}%`
             ].join(',');
           }),
         ].join('\n');
@@ -290,7 +319,17 @@ export default function ExportDataPage() {
   };
 
   const handleExport = async (type: string) => {
-    setLoading(prev => ({ ...prev, [type]: true }));
+    // Prevent multiple downloads at once
+    if (loading) {
+      toast({
+        title: "Export in Progress",
+        description: "Please wait for the current export to complete before starting another one.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setLoading(type);
     try {
       const response = await fetch(`/api/db/export?academyId=${user?.academyId}&collection=${type}`);
       if (!response.ok) throw new Error('Failed to fetch data');
@@ -299,6 +338,18 @@ export default function ExportDataPage() {
       if (type === 'finances') {
         const formattedData = formatFinancialData(data);
         downloadExcel(formattedData, 'financial_records');
+      } else if (type === 'performance') {
+        // For performance history, we need to get all players with their performance history
+        const csvContent = formatCSV(data, type);
+        if (!csvContent) {
+          toast({
+            title: "No Data",
+            description: "No performance history data found to export.",
+            variant: "destructive",
+          });
+          return;
+        }
+        downloadCSV(csvContent, 'performance_history.csv');
       } else if (type === 'batches') {
         const batches = Array.isArray(data) ? data : [data];
         for (const batch of batches) {
@@ -308,10 +359,6 @@ export default function ExportDataPage() {
           if ((!batch.playersData || !batch.playersData.length) && batch.players?.length) {
             batch.playersData = await fetchPlayerDetails(batch.players);
           }
-          // Debug: log batch data
-          console.log('Batch:', batch);
-          console.log('Coaches:', batch.coaches);
-          console.log('Players:', batch.playersData);
         }
         const csvContent = formatCSV(batches, type);
         downloadCSV(csvContent, 'batches.csv');
@@ -332,9 +379,11 @@ export default function ExportDataPage() {
         variant: "destructive",
       });
     } finally {
-      setLoading(prev => ({ ...prev, [type]: false }));
+      setLoading(null);
     }
   };
+
+  
 
   return (
     <div className="flex h-screen">
@@ -351,26 +400,14 @@ export default function ExportDataPage() {
               {exportOptions.map(option => (
                 <Card key={option.id} className="p-4">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <Checkbox
-                        checked={selectedData.includes(option.id)}
-                        onCheckedChange={(checked) => {
-                          setSelectedData(prev =>
-                            checked
-                              ? [...prev, option.id]
-                              : prev.filter(id => id !== option.id)
-                          );
-                        }}
-                      />
-                      <span>{option.label}</span>
-                    </div>
+                    <span className="font-medium">{option.label}</span>
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => handleExport(option.id)}
-                      disabled={loading[option.id]}
+                      disabled={loading !== null}
                     >
-                      {loading[option.id] ? (
+                      {loading === option.id ? (
                         <>
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                           Exporting...
@@ -383,23 +420,6 @@ export default function ExportDataPage() {
                 </Card>
               ))}
             </div>
-
-            <Button
-              className="w-full"
-              disabled={selectedData.length === 0 || Object.values(loading).some(Boolean)}
-              onClick={() => {
-                selectedData.forEach(type => handleExport(type));
-              }}
-            >
-              {Object.values(loading).some(Boolean) ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Exporting Selected...
-                </>
-              ) : (
-                `Export Selected (${selectedData.length})`
-              )}
-            </Button>
           </CardContent>
         </Card>
       </div>

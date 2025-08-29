@@ -10,6 +10,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { format, parseISO, isPast } from 'date-fns';
 import { toast } from "@/components/ui/use-toast";
 
+// Helper function to get base URL for API calls
+const getBaseUrl = () => {
+  if (typeof window !== 'undefined') {
+    return window.location.origin
+  }
+  return process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
+}
+
 interface Session {
   _id: string;
   name: string;
@@ -48,7 +56,7 @@ export default function Training() {
 
         setLoading(true);
         const response = await fetch(
-          `/api/db/ams-sessions?academyId=${user.academyId}`,
+          `${getBaseUrl()}/api/db/ams-sessions?academyId=${user.academyId}`,
           { credentials: 'include' }
         );
 

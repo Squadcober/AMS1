@@ -23,6 +23,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button"
 import { ArrowLeft, ArrowRight, RotateCcw } from "lucide-react"
 
+// Helper function to get base URL for API calls
+const getBaseUrl = () => {
+  if (typeof window !== 'undefined') {
+    return window.location.origin
+  }
+  return process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
+}
+
 // Register ChartJS components
 ChartJS.register(
   CategoryScale,
@@ -128,7 +136,7 @@ export default function Performance() {
           throw new Error('User not found');
         }
 
-        const response = await fetch(`/api/db/ams-player-data/user/${encodeURIComponent(user.username)}`, {
+        const response = await fetch(`${getBaseUrl()}/api/db/ams-player-data/user/${encodeURIComponent(user.username)}`, {
           credentials: 'include',
         });
 

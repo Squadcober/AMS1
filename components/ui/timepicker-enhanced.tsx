@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog"
 import { Clock as ClockComponent } from "@/components/ui/clock"
 
-interface TimePickerProps {
+interface TimePickerEnhancedProps {
   id: string
   value: string | null
   onChange: (time: string) => void
@@ -21,7 +21,7 @@ interface TimePickerProps {
   companionTime?: string // For calculating duration between two times
 }
 
-const TimePicker: React.FC<TimePickerProps> = ({
+const TimePickerEnhanced: React.FC<TimePickerEnhancedProps> = ({
   id,
   value,
   onChange,
@@ -198,4 +198,4 @@ const TimePicker: React.FC<TimePickerProps> = ({
   )
 }
 
-export { TimePicker }
+export { TimePickerEnhanced }
