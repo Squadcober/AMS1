@@ -128,7 +128,7 @@ export default function playerSettings() {
       }
 
       const playerResponse = await fetch(
-        `${getBaseUrl()}/api/db/ams-player-data?academyId=${encodeURIComponent(user.academyId)}&userId=${encodeURIComponent(user.id)}`
+        `${getBaseUrl()}/app/api/db/ams-player-data?academyId=${encodeURIComponent(user.academyId)}&userId=${encodeURIComponent(user.id)}`
       )
       const playerData = await playerResponse.json()
       console.log("Player API Response:", playerData)
@@ -142,7 +142,7 @@ export default function playerSettings() {
         }
       }
 
-      const userResponse = await fetch(`${getBaseUrl()}/api/db/ams-users?userId=${user.id}`)
+      const userResponse = await fetch(`${getBaseUrl()}/app/api/db/ams-users?userId=${user.id}`)
       const userData = await userResponse.json()
       console.log("User API Response:", userData)
 
@@ -184,7 +184,7 @@ export default function playerSettings() {
 
       // Fetch player data first using the same endpoint as profile page
       const playerResponse = await fetch(
-        `${getBaseUrl()}/api/db/ams-player-data/user/${encodeURIComponent(user.username)}`,
+        `${getBaseUrl()}/app/api/db/ams-player-data/user/${encodeURIComponent(user.username)}`,
         { credentials: 'include' }
       );
 
@@ -198,7 +198,7 @@ export default function playerSettings() {
       // Rest of parallel fetches
       const [academyResponse, userResponse] = await Promise.all([
         fetch(
-          `${getBaseUrl()}/api/db/ams-academy/${encodeURIComponent(user.academyId)}`,
+          `${getBaseUrl()}/app/api/db/ams-academy/${encodeURIComponent(user.academyId)}`,
           { credentials: 'include' }
         ),
         fetch(
@@ -308,7 +308,7 @@ export default function playerSettings() {
       };
 
       // Use same endpoint and method as profile page
-      const response = await fetch(`${getBaseUrl()}/api/db/ams-player-data/${encodeURIComponent(playerInfo.pid)}`, {
+      const response = await fetch(`${getBaseUrl()}/app/api/db/ams-player-data/${encodeURIComponent(playerInfo.pid)}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
