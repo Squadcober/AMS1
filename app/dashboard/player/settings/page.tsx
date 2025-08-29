@@ -202,7 +202,7 @@ export default function playerSettings() {
       // Set player info with proper data mapping
       setplayerInfo(prev => ({
         ...prev,
-        pid: playerData._id || playerData.id || "",
+        pid: playerData.id || playerData.id || "",
         photoUrl: playerData.photoUrl || "",
         name: playerData.name || "",
         email: user.email || "",
