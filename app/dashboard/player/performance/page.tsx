@@ -244,22 +244,40 @@ export default function Performance() {
           }
         });
 
-        // Process attribute history for the growth chart
+        // Process attribute history for the growth chart - use actual historical data
+        console.log('Processing performanceHistory for attributes:', performanceHistory);
+        
         const processedHistory = performanceHistory
-          .filter((entry: any) => entry.attributes && Object.keys(entry.attributes).length > 0)
-          .map((entry: any) => ({
-            date: new Date(entry.date).toLocaleDateString(),
-            shooting: entry.attributes?.shooting || null,
-            pace: entry.attributes?.pace || null,
-            positioning: entry.attributes?.positioning || null,
-            passing: entry.attributes?.passing || null,
-            ballControl: entry.attributes?.ballControl || null,
-            crossing: entry.attributes?.crossing || null,
-          }))
-          .filter((entry: any) => 
-            Object.values(entry).some(val => val !== null && val !== undefined)
-          );
+          .filter((entry: any) => {
+            // Only include entries that have attributes and are training type (which have attribute changes)
+            const hasAttributes = entry.attributes && Object.keys(entry.attributes).length > 0;
+            console.log('Entry:', entry.date, 'hasAttributes:', hasAttributes, 'attributes:', entry.attributes);
+            return hasAttributes;
+          })
+          .map((entry: any) => {
+            const processedEntry = {
+              date: new Date(entry.date).toLocaleDateString(),
+              shooting: Number(entry.attributes?.shooting) || null,
+              pace: Number(entry.attributes?.pace) || null,
+              positioning: Number(entry.attributes?.positioning) || null,
+              passing: Number(entry.attributes?.passing) || null,
+              ballControl: Number(entry.attributes?.ballControl) || null,
+              crossing: Number(entry.attributes?.crossing) || null,
+            };
+            console.log('Processed entry:', processedEntry);
+            return processedEntry;
+          })
+          .sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime()) // Sort by date
+          .filter((entry: any) => {
+            // Only include entries where at least one attribute has a valid number
+            const hasValidData = Object.values(entry).some(val => 
+              val !== null && val !== undefined && typeof val === 'number' && val > 0
+            );
+            console.log('Entry has valid data:', hasValidData, entry);
+            return hasValidData;
+          });
 
+        console.log('Final processedHistory:', processedHistory);
         setAttributeHistory(processedHistory);
 
         setPlayerData({
