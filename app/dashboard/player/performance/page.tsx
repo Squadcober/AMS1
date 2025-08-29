@@ -23,14 +23,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button"
 import { ArrowLeft, ArrowRight, RotateCcw } from "lucide-react"
 
-// Helper function to get base URL for API calls
-const getBaseUrl = () => {
-  if (typeof window !== 'undefined') {
-    return window.location.origin
-  }
-  return process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
-}
-
 // Register ChartJS components
 ChartJS.register(
   CategoryScale,
@@ -132,23 +124,43 @@ export default function Performance() {
   useEffect(() => {
     const fetchPlayerData = async () => {
       try {
+        setLoading(true);
+
         if (!user?.username) {
-          throw new Error('User not found');
+          console.error("Missing username:", user?.username);
+          throw new Error("Username is required");
         }
 
-        const response = await fetch(`${getBaseUrl()}/api/db/ams-player-data/user/${encodeURIComponent(user.username)}`, {
-          credentials: 'include',
-        });
+        console.log('Loading performance data for username:', user.username);
+
+        // Use the same approach as settings page - direct API call without base URL helper
+        const response = await fetch(
+          `/api/db/ams-player-data/user/${encodeURIComponent(user.username)}`,
+          { 
+            credentials: 'include',
+            headers: {
+              'Content-Type': 'application/json',
+            }
+          }
+        );
+
+        console.log('Player response status:', response.status);
 
         if (!response.ok) {
-          throw new Error('Failed to fetch player data');
+          const errorText = await response.text();
+          console.error('Player fetch failed:', {
+            status: response.status,
+            statusText: response.statusText,
+            error: errorText
+          });
+          throw new Error(`Failed to fetch player data: ${response.status}`);
         }
 
         const data = await response.json();
-        console.log("Raw player data:", data); // Debug log
+        console.log("Raw player data:", data);
         
         if (!data) {
-          throw new Error('No player data found');
+          throw new Error('No player data returned');
         }
 
         // Calculate overall rating from attributes
@@ -517,222 +529,259 @@ export default function Performance() {
     }
   }
 
+  if (loading) {
+    return (
+      <div className="flex h-screen">
+        <Sidebar />
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary mx-auto"></div>
+            <p className="mt-2">Loading performance data...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex h-screen">
+        <Sidebar />
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <p className="text-red-500">Error: {error}</p>
+            <Button 
+              onClick={() => window.location.reload()} 
+              className="mt-4"
+            >
+              Retry
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!playerData) {
+    return (
+      <div className="flex h-screen">
+        <Sidebar />
+        <div className="flex-1 flex items-center justify-center">
+          <p>No player data available</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-screen">
       <Sidebar />
       <div className="flex-1 p-8 overflow-auto">
-        {loading ? (
-          <div>Loading performance data...</div>
-        ) : error ? (
-          <div>Error: {error}</div>
-        ) : playerData ? (
-          <div className="space-y-6">
-            {/* Player Info Section */}
-            <div className="flex justify-between items-center">
-              <div>
-                <h1 className="text-2xl font-bold">{playerData.name}</h1>
-                <p className="text-muted-foreground">
-                  Age: {playerData.age || 'N/A'}
-                  <br />
-                  ID: {playerData.id}
-                </p>
-              </div>
+        <div className="space-y-6">
+          {/* Player Info Section */}
+          <div className="flex justify-between items-center">
+            <div>
+              <h1 className="text-2xl font-bold">{playerData.name}</h1>
+              <p className="text-muted-foreground">
+                Age: {playerData.age || 'N/A'}
+                <br />
+                ID: {playerData.id}
+              </p>
             </div>
+          </div>
 
-            {/* Summary Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>OVR</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-3xl font-bold">
-                    {playerData.calculatedMetrics.overallRating}
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Training Performance</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-3xl font-bold">
-                    {playerData.calculatedMetrics.trainingPerformance}/10
-                  </div>
-                  <p className="text-muted-foreground">TRAINING</p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Match Performance</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-3xl font-bold">
-                    {playerData.calculatedMetrics.matchPerformance}/10
-                  </div>
-                  <p className="text-muted-foreground">MATCH</p>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Performance Growth Chart with Time Range Selector */}
+          {/* Summary Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle>Attributes Growth</CardTitle>
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={() => navigateTime('backward')}
-                    >
-                      <ArrowLeft className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={() => setTimeOffset(0)}
-                    >
-                      <RotateCcw className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={() => navigateTime('forward')}
-                      disabled={timeOffset <= 0}
-                    >
-                      <ArrowRight className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  <Select value={timeRange} onValueChange={(value) => {
-                    setTimeRange(value);
-                    setTimeOffset(0); // Reset offset when changing time range
-                  }}>
-                    <SelectTrigger className="w-[180px]">
-                      <SelectValue placeholder="Select time range" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="daily">Daily</SelectItem>
-                      <SelectItem value="weekly">Weekly</SelectItem>
-                      <SelectItem value="monthly">Monthly</SelectItem>
-                      <SelectItem value="yearly">Yearly</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+              <CardHeader>
+                <CardTitle>OVR</CardTitle>
               </CardHeader>
-              <CardContent className="pt-6">
-                <PerformanceChart
-                  data={filterDataByTimeRange(attributeHistory, timeRange)}
-                  attributes={["shooting", "pace", "positioning", "passing", "ballControl", "crossing"]}
-                  colors={Object.values(attributeColors)}
+              <CardContent>
+                <div className="text-3xl font-bold">
+                  {playerData.calculatedMetrics.overallRating}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Training Performance</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold">
+                  {playerData.calculatedMetrics.trainingPerformance}/10
+                </div>
+                <p className="text-muted-foreground">TRAINING</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Match Performance</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold">
+                  {playerData.calculatedMetrics.matchPerformance}/10
+                </div>
+                <p className="text-muted-foreground">MATCH</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Performance Growth Chart with Time Range Selector */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle>Attributes Growth</CardTitle>
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => navigateTime('backward')}
+                  >
+                    <ArrowLeft className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setTimeOffset(0)}
+                  >
+                    <RotateCcw className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => navigateTime('forward')}
+                    disabled={timeOffset <= 0}
+                  >
+                    <ArrowRight className="h-4 w-4" />
+                  </Button>
+                </div>
+                <Select value={timeRange} onValueChange={(value) => {
+                  setTimeRange(value);
+                  setTimeOffset(0); // Reset offset when changing time range
+                }}>
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Select time range" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="daily">Daily</SelectItem>
+                    <SelectItem value="weekly">Weekly</SelectItem>
+                    <SelectItem value="monthly">Monthly</SelectItem>
+                    <SelectItem value="yearly">Yearly</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-6">
+              <PerformanceChart
+                data={filterDataByTimeRange(attributeHistory, timeRange)}
+                attributes={["shooting", "pace", "positioning", "passing", "ballControl", "crossing"]}
+                colors={Object.values(attributeColors)}
+              />
+            </CardContent>
+          </Card>
+
+          {/* Performance Charts */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Training Performance Trend</CardTitle>
+              </CardHeader>
+              <CardContent className="h-[300px]">
+                <Line
+                  data={{
+                    labels: chartData.training.labels,
+                    datasets: [{
+                      data: chartData.training.data,
+                      borderColor: "rgb(147, 51, 234)",
+                      tension: 0.1
+                    }]
+                  }}
+                  options={lineOptions}
                 />
               </CardContent>
             </Card>
 
-            {/* Performance Charts */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Training Performance Trend</CardTitle>
-                </CardHeader>
-                <CardContent className="h-[300px]">
-                  <Line
-                    data={{
-                      labels: chartData.training.labels,
-                      datasets: [{
-                        data: chartData.training.data,
-                        borderColor: "rgb(147, 51, 234)",
-                        tension: 0.1
-                      }]
-                    }}
-                    options={lineOptions}
-                  />
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Match Performance Trend</CardTitle>
-                </CardHeader>
-                <CardContent className="h-[300px]">
-                  <Line
-                    data={{
-                      labels: chartData.match.labels,
-                      datasets: [{
-                        data: chartData.match.data,
-                        borderColor: "rgb(52, 211, 153)",
-                        tension: 0.1
-                      }]
-                    }}
-                    options={lineOptions}
-                  />
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Attributes Radar Chart */}
             <Card>
               <CardHeader>
-                <CardTitle>Player Attributes Overview</CardTitle>
+                <CardTitle>Match Performance Trend</CardTitle>
               </CardHeader>
-              <CardContent className="flex justify-center items-center">
-                <div className="w-full max-w-[500px] h-[500px]">
-                  <Radar
-                    data={{
-                      labels: chartData.attributes.labels,
-                      datasets: [{
-                        data: chartData.attributes.data,
-                        backgroundColor: "rgba(99, 102, 241, 0.2)", // Indigo
-                        borderColor: "rgba(99, 102, 241, 0.8)",
-                        borderWidth: 2,
-                        fill: true,
-                        pointBackgroundColor: "rgb(99, 102, 241)",
-                        pointBorderColor: "#fff",
-                        pointHoverBackgroundColor: "#fff",
-                        pointHoverBorderColor: "rgb(99, 102, 241)",
-                        pointRadius: 4,
-                      }]
-                    }}
-                    options={radarOptions}
-                  />
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Match Stats */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Total Match Stats</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-3 gap-4 text-center">
-                  <div>
-                    <div className="text-2xl font-bold">
-                      {playerData.calculatedMetrics.matchStats.goals}
-                    </div>
-                    <p className="text-muted-foreground">Goals</p>
-                  </div>
-                  <div>
-                    <div className="text-2xl font-bold">
-                      {playerData.calculatedMetrics.matchStats.assists}
-                    </div>
-                    <p className="text-muted-foreground">Assists</p>
-                  </div>
-                  <div>
-                    <div className="text-2xl font-bold">
-                      {playerData.calculatedMetrics.matchStats.cleanSheets}
-                    </div>
-                    <p className="text-muted-foreground">Clean Sheets</p>
-                  </div>
-                </div>
+              <CardContent className="h-[300px]">
+                <Line
+                  data={{
+                    labels: chartData.match.labels,
+                    datasets: [{
+                      data: chartData.match.data,
+                      borderColor: "rgb(52, 211, 153)",
+                      tension: 0.1
+                    }]
+                  }}
+                  options={lineOptions}
+                />
               </CardContent>
             </Card>
           </div>
-        ) : null}
+
+          {/* Attributes Radar Chart */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Player Attributes Overview</CardTitle>
+            </CardHeader>
+            <CardContent className="flex justify-center items-center">
+              <div className="w-full max-w-[500px] h-[500px]">
+                <Radar
+                  data={{
+                    labels: chartData.attributes.labels,
+                    datasets: [{
+                      data: chartData.attributes.data,
+                      backgroundColor: "rgba(99, 102, 241, 0.2)", // Indigo
+                      borderColor: "rgba(99, 102, 241, 0.8)",
+                      borderWidth: 2,
+                      fill: true,
+                      pointBackgroundColor: "rgb(99, 102, 241)",
+                      pointBorderColor: "#fff",
+                      pointHoverBackgroundColor: "#fff",
+                      pointHoverBorderColor: "rgb(99, 102, 241)",
+                      pointRadius: 4,
+                    }]
+                  }}
+                  options={radarOptions}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Match Stats */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Total Match Stats</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-3 gap-4 text-center">
+                <div>
+                  <div className="text-2xl font-bold">
+                    {playerData.calculatedMetrics.matchStats.goals}
+                  </div>
+                  <p className="text-muted-foreground">Goals</p>
+                </div>
+                <div>
+                  <div className="text-2xl font-bold">
+                    {playerData.calculatedMetrics.matchStats.assists}
+                  </div>
+                  <p className="text-muted-foreground">Assists</p>
+                </div>
+                <div>
+                  <div className="text-2xl font-bold">
+                    {playerData.calculatedMetrics.matchStats.cleanSheets}
+                  </div>
+                  <p className="text-muted-foreground">Clean Sheets</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   )
 }
-
