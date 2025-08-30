@@ -701,16 +701,19 @@ export default function TeamBuilder() {
       return;
     }
 
-    // Get default position coordinates
-    const defaultCoordinates = getDefaultPositionStyle(selectedPosition.id);
+    // Get position coordinates - use existing coordinates if available, otherwise use default
+    const currentPositionData = selectedGamePlan.positions[selectedPosition.id];
+    const coordinates = currentPositionData && typeof currentPositionData === 'object' 
+      ? { top: currentPositionData.top, left: currentPositionData.left }
+      : getDefaultPositionStyle(selectedPosition.id);
 
     // Create a copy of the current positions
     const updatedPositions = {
       ...selectedGamePlan.positions,
       [selectedPosition.id]: {
         playerId,
-        top: defaultCoordinates.top,
-        left: defaultCoordinates.left,
+        top: coordinates.top,
+        left: coordinates.left,
       },
     };
 
@@ -775,13 +778,18 @@ export default function TeamBuilder() {
         return;
       }
 
-      const defaultCoordinates = getDefaultPositionStyle(positionId);
+      // Get position coordinates - use existing coordinates if available, otherwise use default
+      const currentPositionData = selectedGamePlan.positions[positionId];
+      const coordinates = currentPositionData && typeof currentPositionData === 'object' && currentPositionData.top && currentPositionData.left
+        ? { top: currentPositionData.top, left: currentPositionData.left }
+        : getDefaultPositionStyle(positionId);
+
       const updatedPositions = {
         ...selectedGamePlan.positions,
         [positionId]: {
           playerId,
-          top: defaultCoordinates.top,
-          left: defaultCoordinates.left,
+          top: coordinates.top,
+          left: coordinates.left,
         },
       };
 
@@ -829,27 +837,33 @@ export default function TeamBuilder() {
   };
 
   const handlePositionDragStart = (e: React.DragEvent<HTMLDivElement>, positionId: string) => {
-    e.dataTransfer.setData("positionId", positionId)
+    // Explicitly set drag data type
+    e.dataTransfer.setData("application/my-app-position", positionId);
+    e.dataTransfer.effectAllowed = "move";
+    setDraggedPosition(positionId); // Set dragged position state
   }
 
   const handlePositionDropOnMap = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault()
+    e.preventDefault();
     if (!showCustomizeMenu || !selectedGamePlan) return;
 
-    const positionId = e.dataTransfer.getData("positionId");
+    const positionId = e.dataTransfer.getData("application/my-app-position");
     if (!positionId) return;
 
     const rect = e.currentTarget.getBoundingClientRect();
-    const top = ((e.clientY - rect.top) / rect.height) * 100;
-    const left = ((e.clientX - rect.left) / rect.width) * 100;
+    let top = ((e.clientY - rect.top) / rect.height) * 100;
+    let left = ((e.clientX - rect.left) / rect.width) * 100;
+
+    // Clamp values between 0 and 100 to avoid overflow
+    top = Math.min(100, Math.max(0, top));
+    left = Math.min(100, Math.max(0, left));
 
     const currentPosition = selectedGamePlan.positions[positionId];
 
     const updatedPosition = {
-      ...(typeof currentPosition === 'object' && currentPosition !== null 
-        ? currentPosition 
-        : { playerId: currentPosition || "" }
-      ),
+      ...(typeof currentPosition === "object" && currentPosition !== null
+        ? currentPosition
+        : { playerId: currentPosition || "" }),
       top: `${top}%`,
       left: `${left}%`,
     };
@@ -868,16 +882,19 @@ export default function TeamBuilder() {
     setSelectedGamePlan(updatedGamePlan);
 
     // Update gamePlans and save immediately
-    setGamePlans(prevGamePlans => {
-      const newGamePlans = prevGamePlans.map(gp =>
+    setGamePlans((prevGamePlans) => {
+      const newGamePlans = prevGamePlans.map((gp) =>
         gp.id === selectedGamePlan.id ? updatedGamePlan : gp
       );
-      
+
       try {
-        const allGamePlans = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || '[]');
-        const otherGamePlans = allGamePlans.filter((plan: GamePlan) => 
-          plan.academyId !== updatedGamePlan.academyId || 
-          plan.coachId !== updatedGamePlan.coachId
+        const allGamePlans = JSON.parse(
+          localStorage.getItem(LOCAL_STORAGE_KEY) || "[]"
+        );
+        const otherGamePlans = allGamePlans.filter(
+          (plan: GamePlan) =>
+            plan.academyId !== updatedGamePlan.academyId ||
+            plan.coachId !== updatedGamePlan.coachId
         );
         const finalGamePlans = [...otherGamePlans, ...newGamePlans];
         localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(finalGamePlans));

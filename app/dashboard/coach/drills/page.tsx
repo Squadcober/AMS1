@@ -13,7 +13,6 @@ import { useAuth } from "@/contexts/AuthContext"
 import { TimePicker } from "@/components/ui/timepicker"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { DrillManager, DrillManagerInstance } from "@/lib/drill-management"
 import Sidebar from "@/components/Sidebar"
 import { useToast } from "@/components/ui/use-toast"
 import { useBatches } from "@/contexts/BatchContext"
@@ -25,17 +24,9 @@ interface Drill {
   assignedPlayers: { id: string, name: string }[]
   coachId: string
   coachName: string
-  recurrenceDays?: string[]
-  numberOfSessions?: number
-  isRecurring?: boolean
-  recurringEndDate?: string
-  selectedDays?: string[]
-  totalOccurrences?: number
   playersAssigned: string[]
   academyId: string
 }
-
-const LOCAL_STORAGE_KEY = "coach-drills"
 
 export default function DrillsPage() {
   const { toast } = useToast()
@@ -49,9 +40,6 @@ export default function DrillsPage() {
     assignedPlayers: [],
     coachId: user?.id || "",
     coachName: user?.name || "",
-    isRecurring: false,
-    selectedDays: [],
-    totalOccurrences: 1,
     playersAssigned: [],
     academyId: user?.academyId || "",
   })
@@ -85,7 +73,11 @@ export default function DrillsPage() {
         return;
       }
 
-      const academyId = typeof user.academyId === 'string' ? user.academyId : (user.academyId as { id: string })?.id;
+      const academyId = user.academyId 
+        ? (typeof user.academyId === 'string' 
+            ? user.academyId 
+            : (user.academyId as { id: string })?.id)
+        : null;
       if (!academyId) {
         console.error('No academyId available in user data:', user);
         toast({
@@ -159,6 +151,22 @@ export default function DrillsPage() {
   const handleBatchSelect = async (batchId: string) => {
     try {
       setIsLoading(true);
+      
+      if (batchId === "" || batchId === "none" || !batchId) {
+        // Clear batch selection and assigned players
+        setSelectedBatch("");
+        setNewDrill(prev => ({
+          ...prev,
+          assignedPlayers: []
+        }));
+        
+        toast({
+          title: "Cleared",
+          description: "Batch selection cleared",
+        });
+        return;
+      }
+      
       setSelectedBatch(batchId);
       
       const response = await fetch(`/api/db/ams-batches/${batchId}/players`);
@@ -206,9 +214,7 @@ export default function DrillsPage() {
       >
         <SelectTrigger>
           <SelectValue placeholder={
-            isLoading ? "Loading batches..." : 
-            !batches?.length ? "No batches available" : 
-            "Select a batch"
+            isLoading ? "Loading batches..." : selectedBatch ? "Selected batch" : "Select a batch"
           } />
         </SelectTrigger>
         <SelectContent>
@@ -217,13 +223,16 @@ export default function DrillsPage() {
           ) : !batches?.length ? (
             <SelectItem value="none" disabled>No batches available</SelectItem>
           ) : (
-            batches
-              .filter(batch => batch.academyId === user?.academyId)
-              .map((batch) => (
-                <SelectItem key={batch.id} value={batch.id}>
-                  {batch.name}
-                </SelectItem>
-              ))
+            <>
+              <SelectItem value="none">None (Clear Selection)</SelectItem>
+              {batches
+                .filter(batch => batch.academyId === user?.academyId)
+                .map((batch) => (
+                  <SelectItem key={batch.id} value={batch.id}>
+                    {batch.name}
+                  </SelectItem>
+                ))}
+            </>
           )}
         </SelectContent>
       </Select>
@@ -280,17 +289,16 @@ export default function DrillsPage() {
     </div>
   );
 
-  const getPlayerNameLocal = (playerId: string): string => {
+  const getPlayerNameLocal = async (playerId: string): Promise<string> => {
     const contextPlayer = getPlayerByUserId?.(playerId)
     if (contextPlayer?.name) return contextPlayer.name
 
     try {
-      const playerData = JSON.parse(localStorage.getItem('ams-player-data') || '[]')
-      const player = playerData.find((p: any) => 
-        p.id.toString() === playerId || 
-        p.userId?.toString() === playerId
-      )
-      if (player?.name) return player.name
+      const response = await fetch(`/api/db/ams-player-data/${playerId}`)
+      if (response.ok) {
+        const player = await response.json()
+        return player.name || player.username || 'Unknown Player'
+      }
     } catch (error) {
       console.error('Error getting player name:', error)
     }
@@ -354,32 +362,8 @@ export default function DrillsPage() {
   }, [drills]);
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      setDrills(prev => {
-        const updatedDrills = prev.map(drill => ({
-          ...drill,
-        }))
-        DrillManagerInstance.saveDrills(updatedDrills)
-        return updatedDrills
-      })
-    }, 60000)
-    
-    return () => clearInterval(interval)
   }, [])
 
-  const safeLocalStorage = {
-    getItem: (key: string) => {
-      if (typeof window !== 'undefined') {
-        return localStorage.getItem(key)
-      }
-      return null
-    },
-    setItem: (key: string, value: string) => {
-      if (typeof window !== 'undefined') {
-        localStorage.setItem(key, value)
-      }
-    }
-  }
 
   const handleSaveDrill = async () => {
     if (!user?.academyId || !user?.id || !newDrill.name) {
@@ -426,9 +410,6 @@ export default function DrillsPage() {
           assignedPlayers: [],
           coachId: user.id,
           coachName: user.name || "",
-          isRecurring: false,
-          selectedDays: [],
-          totalOccurrences: 1,
           playersAssigned: [],
           academyId: user.academyId,
         });
@@ -544,23 +525,18 @@ export default function DrillsPage() {
     if (viewDetailsDrillId) {
       const drill = drills.find(d => d.id === viewDetailsDrillId)
       if (drill) {
-        const playerData = JSON.parse(localStorage.getItem('ams-player-data') || '[]')
-        
         const initialPoints: { [key: string]: number } = {}
         drill.assignedPlayers.forEach(player => {
-          const playerInfo = playerData.find((p: any) => 
-            p.id.toString() === player.id || 
-            p.userId?.toString() === player.id
-          )
-          if (playerInfo?.attributes?.trainingPoints !== undefined) {
-            initialPoints[player.id] = playerInfo.attributes.trainingPoints
+          const playerData = getPlayerByUserId?.(player.id)
+          if (playerData?.attributes?.trainingPoints !== undefined) {
+            initialPoints[player.id] = playerData.attributes.trainingPoints
           }
         })
         
         setTrainingPoints(initialPoints)
       }
     }
-  }, [viewDetailsDrillId, drills])
+  }, [viewDetailsDrillId, drills, getPlayerByUserId])
 
   const renderDrillDetails = () => {
     const drill = drills.find(d => d.id === viewDetailsDrillId)
@@ -667,7 +643,6 @@ export default function DrillsPage() {
   }
 
   const handleSaveChanges = () => {
-    DrillManagerInstance.saveDrills(drills)
     setHasUnsavedChanges(false)
   }
 
@@ -683,12 +658,27 @@ export default function DrillsPage() {
 
     try {
       const updates = [];
+      const updatedTrainingPoints = { ...trainingPoints };
+      
+      console.log('Starting to save training points...');
+      console.log('Training points to save:', trainingPoints);
       
       for (const [playerId, points] of Object.entries(trainingPoints)) {
         const playerData = getPlayerByUserId?.(playerId);
         const currentPoints = playerData?.attributes?.trainingPoints || 0;
 
-        if (points === currentPoints) continue;
+        if (points === currentPoints) {
+          console.log(`Skipping player ${playerId} - no change in points (${points} vs ${currentPoints})`);
+          continue;
+        }
+
+        const requestBody = {
+          points: points,
+          drillId: viewDetailsDrillId,
+          previousPoints: currentPoints
+        };
+
+        console.log(`Making API call for player ${playerId}:`, requestBody);
 
         updates.push(
           fetch(`/api/db/ams-player-data/${playerId}/training-points`, {
@@ -696,16 +686,17 @@ export default function DrillsPage() {
             headers: {
               'Content-Type': 'application/json'
             },
-            body: JSON.stringify({
-              points: points,
-              drillId: viewDetailsDrillId,
-              previousPoints: currentPoints
-            })
-          }).then(res => res.json())
+            body: JSON.stringify(requestBody)
+          }).then(async res => {
+            const result = await res.json();
+            console.log(`API response for player ${playerId}:`, result);
+            return result;
+          })
         );
       }
 
       if (updates.length === 0) {
+        console.log('No updates to save');
         toast({
           title: "Info",
           description: "No changes to save",
@@ -713,41 +704,97 @@ export default function DrillsPage() {
         return;
       }
 
+      console.log(`Making ${updates.length} API calls...`);
       const results = await Promise.all(updates);
+      console.log('All API responses:', results);
+      
+      let updatedPlayers = [...players];
       
       results.forEach(result => {
+        console.log('Processing result:', result);
         if (result.success && result.data) {
+          console.log('Successfully updated player:', result.data);
           const updatedPlayer = result.data;
-          const updatedPlayers = players.map(p => {
-            if (p.id.toString() === (updatedPlayer.id || updatedPlayer._id).toString()) {
-              const attributes = {
-                shooting: updatedPlayer.attributes?.shooting || p.attributes.shooting || 0,
-                pace: updatedPlayer.attributes?.pace || p.attributes.pace || 0,
-                positioning: updatedPlayer.attributes?.positioning || p.attributes.positioning || 0,
-                passing: updatedPlayer.attributes?.passing || p.attributes.passing || 0,
-                ballControl: updatedPlayer.attributes?.ballControl || p.attributes.ballControl || 0,
-                crossing: updatedPlayer.attributes?.crossing || p.attributes.crossing || 0,
-                trainingPoints: updatedPlayer.attributes?.trainingPoints || p.attributes.trainingPoints || 0,
-                ...updatedPlayer.attributes
-              };
-
+          
+          // Update the players context with the new data
+          updatedPlayers = updatedPlayers.map(p => {
+            // Check if this is the updated player by comparing IDs
+            const updatedPlayerId = updatedPlayer.id || updatedPlayer._id;
+            if (p.id.toString() === updatedPlayerId.toString()) {
+              
+              console.log('Updating player in context:', p.name, 'with new training points:', updatedPlayer.attributes?.trainingPoints);
+              
               return {
                 ...p,
-                id: updatedPlayer.id || updatedPlayer._id || p.id,
+                id: updatedPlayer.id || p.id,
                 name: updatedPlayer.name || p.name,
                 academyId: updatedPlayer.academyId || p.academyId,
-                attributes
+                attributes: {
+                  ...p.attributes,
+                  ...updatedPlayer.attributes,
+                  trainingPoints: updatedPlayer.attributes?.trainingPoints || p.attributes.trainingPoints || 0
+                }
               } satisfies Player;
             }
             return p;
           });
-          setPlayers(updatedPlayers);
+        } else {
+          console.log('API call failed or returned no data:', result);
         }
       });
+      
+      // Update the players context with all the changes
+      setPlayers(updatedPlayers);
 
-      setTrainingPoints({});
-      setIsDrillDetailsDialogOpen(false);
-      setViewDetailsDrillId(null);
+      // Update the training points state to reflect the saved values
+      // Use the actual saved values from the API responses
+      setTrainingPoints(prev => {
+        const updated = { ...prev };
+        results.forEach(result => {
+          if (result.success && result.data) {
+            const updatedPlayer = result.data;
+            const playerId = updatedPlayer.id || updatedPlayer._id;
+            
+            // Check if the player data has the training points in the expected location
+            if (playerId) {
+              const trainingPointsValue = 
+                updatedPlayer.attributes?.trainingPoints || 
+                updatedPlayer.attributes?.drillTrainingPoints || 
+                0;
+              
+              console.log(`Updating training points for player ${playerId}:`, trainingPointsValue);
+              updated[playerId] = trainingPointsValue;
+            }
+          }
+        });
+        return updated;
+      });
+
+      // Refetch player details to ensure UI shows the most up-to-date data
+      try {
+        const academyId = user?.academyId 
+          ? (typeof user.academyId === 'string' 
+              ? user.academyId 
+              : (user.academyId as { id: string })?.id)
+          : null;
+        if (academyId) {
+          const playersRes = await fetch(`/api/db/ams-player-data?academyId=${academyId}`);
+          if (playersRes.ok) {
+            const playersData = await playersRes.json();
+            if (playersData.success) {
+              const formattedPlayers = playersData.data.map((player: any) => ({
+                ...player,
+                id: player._id || player.id,
+                name: player.name || player.username || 'Unknown Player',
+                academyId: player.academyId || academyId
+              }));
+              setPlayers(formattedPlayers);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error refetching player data:', error);
+      }
 
       toast({
         title: "Success",
@@ -790,7 +837,6 @@ export default function DrillsPage() {
       }
       return drill
     })
-    localStorage.setItem('drills', JSON.stringify(updatedDrills))
   }
 
   const handleAddPlayers = (drillId: string, newPlayers: { id: string, name: string }[]) => {
@@ -807,9 +853,6 @@ export default function DrillsPage() {
         }
         return drill
       })
-
-      localStorage.setItem('drills', JSON.stringify(updatedDrills))
-      DrillManagerInstance.saveDrills(updatedDrills)
 
       toast({
         title: "Success",
@@ -862,12 +905,17 @@ export default function DrillsPage() {
         </div>
         <DialogFooter>
           <Button
-            onClick={() => {
+            onClick={async () => {
               if (currentDrillId && selectedPlayers.length > 0) {
-                const newPlayers = selectedPlayers.map(id => ({
+                const playerNames = await Promise.all(
+                  selectedPlayers.map(id => getPlayerNameLocal(id))
+                );
+                
+                const newPlayers = selectedPlayers.map((id, index) => ({
                   id,
-                  name: getPlayerNameLocal(id)
-                }))
+                  name: playerNames[index]
+                }));
+                
                 handleAddPlayers(currentDrillId, newPlayers)
                 setSelectedPlayers([])
                 setShowPlayerSelector(false)
@@ -1002,44 +1050,6 @@ export default function DrillsPage() {
                     />
                     {renderPlayerSelection()}
                   </div>
-                </div>
-                <div>
-                  <Label>Recurring Drill</Label>
-                  <input
-                    type="checkbox"
-                    checked={newDrill.isRecurring}
-                    onChange={(e) => setNewDrill({ ...newDrill, isRecurring: e.target.checked })}
-                  />
-                  {newDrill.isRecurring && (
-                    <>
-                      <Label>Recurrence Days</Label>
-                      <div className="flex space-x-2">
-                        {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
-                          <Button
-                            key={day}
-                            variant={newDrill.selectedDays?.includes(day) ? "default" : "outline"}
-                            onClick={() => {
-                              const selectedDays = newDrill.selectedDays || []
-                              if (selectedDays.includes(day)) {
-                                setNewDrill({ ...newDrill, selectedDays: selectedDays.filter(d => d !== day) })
-                              } else {
-                                setNewDrill({ ...newDrill, selectedDays: [...selectedDays, day] })
-                              }
-                            }}
-                          >
-                            {day}
-                          </Button>
-                        ))}
-                      </div>
-                      <Label>Total Occurrences</Label>
-                      <Input
-                        type="number"
-                        min="1"
-                        value={newDrill.totalOccurrences}
-                        onChange={(e) => setNewDrill({ ...newDrill, totalOccurrences: parseInt(e.target.value) })}
-                      />
-                    </>
-                  )}
                 </div>
                 <DialogFooter>
                   <Button variant="default" onClick={handleSaveDrill}>Save</Button>

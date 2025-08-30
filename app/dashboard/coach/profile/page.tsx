@@ -192,76 +192,98 @@ const saveToCache = (key: string, data: any) => {
   }, [user?.username, user?.academyId])
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target
+  const { name, value } = e.target
+  
+  if (isEditing) {
+    // During editing, update the actual coachData state
+    setCoachData((prev) => ({ 
+      ...prev, 
+      [name]: name === 'age' ? parseInt(value) || 0 : value 
+    }))
+  } else {
+    // For non-editing mode (if needed)
     setCoachData((prev) => ({ ...prev, [name]: value }))
   }
+}
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) {
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        setTempPhotoUrl(reader.result as string)
-      }
-      reader.readAsDataURL(file)
+  const file = e.target.files?.[0]
+  if (file) {
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      const newPhotoUrl = reader.result as string
+      setTempPhotoUrl(newPhotoUrl)
+      // IMPORTANT: Also update coachData immediately so it's ready for save
+      setCoachData(prev => ({
+        ...prev,
+        photoUrl: newPhotoUrl
+      }))
     }
+    reader.readAsDataURL(file)
   }
+}
 
   const handleCancelEdit = () => {
-    setIsEditing(false)
-    setTempPhotoUrl("")
-    setEditFormData({
-      name: coachData.name,
-      age: coachData.age,
-      license: coachData.license,
-      about: coachData.about
-    })
-  }
+  setIsEditing(false)
+  setTempPhotoUrl("") // Clear temp photo
+  
+  // Revert any photo changes
+  setCoachData(prev => ({
+    ...prev,
+    name: editFormData.name,
+    age: editFormData.age,
+    license: editFormData.license,
+    about: editFormData.about,
+    // Don't revert photo here - let it stay as is
+  }))
+}
 
   const startEditing = () => {
-    setIsEditing(true)
-    setTempPhotoUrl(coachData.photoUrl)
-    setEditFormData({
-      name: coachData.name,
-      age: coachData.age,
-      license: coachData.license,
-      about: coachData.about
-    })
-  }
+  setIsEditing(true)
+  setTempPhotoUrl(coachData.photoUrl) // Set current photo as temp
+  setEditFormData({
+    name: coachData.name,
+    age: coachData.age,
+    license: coachData.license,
+    about: coachData.about
+  })
+}
 
   const handleSave = async () => {
-    try {
-      if (!userId || !user?.academyId) {
-        throw new Error('Missing required user data')
-      }
-
-      const response = await fetch(`/api/db/coach-profile/${userId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...coachData,
-          academyId: user.academyId
-        })
-      })
-
-      if (!response.ok) {
-        throw new Error("Failed to save coach data")
-      }
-
-      toast({
-        title: "Success",
-        description: "Profile updated successfully"
-      })
-      setIsEditing(false)
-    } catch (error) {
-      console.error("Error saving coach data:", error)
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to save changes",
-        variant: "destructive"
-      })
+  try {
+    if (!userId || !user?.academyId) {
+      throw new Error('Missing required user data')
     }
+
+    // coachData already contains the updated photo from handlePhotoChange
+    const response = await fetch(`/api/db/coach-profile/${userId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...coachData,
+        academyId: user.academyId
+      })
+    })
+
+    if (!response.ok) {
+      throw new Error("Failed to save coach data")
+    }
+
+    toast({
+      title: "Success",
+      description: "Profile updated successfully"
+    })
+    setIsEditing(false)
+    setTempPhotoUrl("") // Clear temp photo after successful save
+  } catch (error) {
+    console.error("Error saving coach data:", error)
+    toast({
+      title: "Error",
+      description: error instanceof Error ? error.message : "Failed to save changes",
+      variant: "destructive"
+    })
   }
+}
 
   const averageRating = useMemo(() => {
     if (!ratings.length) return "N/A"
@@ -282,36 +304,36 @@ const saveToCache = (key: string, data: any) => {
 
   // Update the photo display section (replace the existing photo element):
   const photoDisplaySection = (
-    <div className="relative w-32 h-32">
-      {isEditing ? (
-        <label className="cursor-pointer w-full h-full flex items-center justify-center border-2 border-dashed border-gray-300 rounded-full overflow-hidden">
-          {tempPhotoUrl ? (
-            <Image
-              src={tempPhotoUrl}
-              alt="Preview"
-              width={128}
-              height={128}
-              className="rounded-full object-cover"
-            />
-          ) : (
-            <div className="text-center">
-              <FileUp className="mx-auto h-6 w-6 text-gray-400" />
-              <span className="mt-1 text-xs font-medium">Upload Photo</span>
-            </div>
-          )}
-          <input type="file" className="hidden" accept="image/*" onChange={handlePhotoChange} />
-        </label>
-      ) : (
-        <Image
-          src={coachData.photoUrl || "/placeholder.svg"}
-          alt={coachData.name}
-          width={128}
-          height={128}
-          className="rounded-full object-cover"
-        />
-      )}
-    </div>
-  )
+  <div className="relative w-32 h-32">
+    {isEditing ? (
+      <label className="cursor-pointer w-full h-full flex items-center justify-center border-2 border-dashed border-gray-300 rounded-full overflow-hidden">
+        {(tempPhotoUrl || coachData.photoUrl) && coachData.photoUrl !== "/placeholder.svg" ? (
+          <Image
+            src={tempPhotoUrl || coachData.photoUrl}
+            alt="Preview"
+            width={128}
+            height={128}
+            className="rounded-full object-cover"
+          />
+        ) : (
+          <div className="text-center">
+            <FileUp className="mx-auto h-6 w-6 text-gray-400" />
+            <span className="mt-1 text-xs font-medium">Upload Photo</span>
+          </div>
+        )}
+        <input type="file" className="hidden" accept="image/*" onChange={handlePhotoChange} />
+      </label>
+    ) : (
+      <Image
+        src={coachData.photoUrl || "/placeholder.svg"}
+        alt={coachData.name}
+        width={128}
+        height={128}
+        className="rounded-full object-cover"
+      />
+    )}
+  </div>
+)
 
   // Update the buttons section:
   const actionButtons = (

@@ -13,10 +13,25 @@ export async function PATCH(
     const client = await getClientPromise();
     const db = client.db(process.env.MONGODB_DB);
 
+    // Handle multiple ID formats like the main route does
+    const playerId = params.id;
+    const objectIds = ObjectId.isValid(playerId) ? [new ObjectId(playerId)] : [];
+    
+    const orConditions: any[] = [
+      { id: playerId },
+      { pid: playerId },
+      { userId: playerId },
+      { username: playerId }
+    ];
+    
+    if (objectIds.length) {
+      orConditions.push({ _id: { $in: objectIds } });
+    }
+
+    const query = orConditions.length === 1 ? orConditions[0] : { $or: orConditions };
+
     // First get current player data
-    const player = await db.collection('ams-player-data').findOne({
-      id: new ObjectId(params.id)
-    });
+    const player = await db.collection('ams-player-data').findOne(query);
 
     if (!player) {
       return NextResponse.json({ 
@@ -35,16 +50,23 @@ export async function PATCH(
       difference: points - (previousPoints || 0),
     };
 
-    // Update player document
+    // Update player document using the same query
     const result = await db.collection('ams-player-data').updateOne(
-      { id: new ObjectId(params.id) },
+      query,
       {
         $set: {
           'attributes.trainingPoints': points,
+          'attributes.drillTrainingPoints': points, // New drill-specific field
           'attributes.lastUpdated': new Date()
         },
         $push: {
-          performanceHistory: historyEntry
+          performanceHistory: historyEntry,
+          drillPerformanceHistory: { // New drill-specific history
+            date: new Date(),
+            drillId,
+            points,
+            type: 'drill_training'
+          }
         } as any // Cast $push as any to avoid TypeScript type error with MongoDB driver
       }
     );
@@ -54,9 +76,7 @@ export async function PATCH(
     }
 
     // Get updated player data
-    const updatedPlayer = await db.collection('ams-player-data').findOne({
-      id: new ObjectId(params.id)
-    });
+    const updatedPlayer = await db.collection('ams-player-data').findOne(query);
 
     return NextResponse.json({
       success: true,
