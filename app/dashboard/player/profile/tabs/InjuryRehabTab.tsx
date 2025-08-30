@@ -12,7 +12,7 @@ import { usePlayers } from "@/contexts/PlayerContext"
 import { useAuth } from "@/contexts/AuthContext"
 import Image from "next/image"
 import { useToast } from "@/components/ui/use-toast"
-import { FileText, Trash2 } from "lucide-react"
+import { FileText, Trash2, Upload, Eye } from "lucide-react"
 
 const STORAGE_KEY = 'player-injuries-data'
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
@@ -65,6 +65,12 @@ export default function InjuryRehab({ playerData }: InjuryRehabProps) {
   const [selectedPdfUrl, setSelectedPdfUrl] = useState<string | null>(null);
   const [showPdfViewer, setShowPdfViewer] = useState(false);
   const [selectedInjuryIndex, setSelectedInjuryIndex] = useState<number>(0);
+  const [showViewOptions, setShowViewOptions] = useState(false);
+  const [currentViewInjury, setCurrentViewInjury] = useState<Injury | null>(null);
+  const [showXrayViewer, setShowXrayViewer] = useState(false);
+  const [showImageEnlarged, setShowImageEnlarged] = useState(false);
+  const [enlargedImageUrl, setEnlargedImageUrl] = useState<string>("");
+  const [enlargedImageTitle, setEnlargedImageTitle] = useState<string>("");
 
   useEffect(() => {
     const loadPlayerData = async () => {
@@ -84,7 +90,6 @@ export default function InjuryRehab({ playerData }: InjuryRehabProps) {
             );
 
             if (playerMatch) {
-              // setPlayerData(playerMatch); // Remove this line, as playerData is a prop and cannot be set here
               setIsLoading(false);
             } else {
               console.error("No matching player found for username:", user.username);
@@ -217,10 +222,65 @@ export default function InjuryRehab({ playerData }: InjuryRehabProps) {
     }
   };
 
-  const handleImageUpload = async (injuryIndex: number, type: "xray" | "prescription" | "other", imageIndex = 0) => {
+  const handleImageUpload = async (type: "xray" | "prescription" | "other", imageIndex = 0) => {
     const input = document.createElement("input");
     input.type = "file";
-    input.accept = "image/*";
+    input.accept = type === "prescription" ? ".pdf" : "image/*";
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file || !user?.username || !user?.academyId) return;
+  
+      if (file.size > MAX_FILE_SIZE) {
+        toast({
+          title: "Error",
+          description: `File size exceeds the limit of ${MAX_FILE_SIZE / (1024 * 1024)}MB`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Convert file to base64 for immediate preview and storage
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const base64 = e.target?.result as string;
+        
+        if (type === "xray") {
+          // Update the xray images in the current injury being edited
+          setNewInjury(prev => {
+            const newXrayImages = [...(prev.xrayImages || ["/placeholder.svg", "/placeholder.svg", "/placeholder.svg"])];
+            newXrayImages[imageIndex] = base64;
+            return {
+              ...prev,
+              xrayImages: newXrayImages
+            };
+          });
+        } else if (type === "prescription") {
+          // Update the prescription in the current injury being edited
+          setNewInjury(prev => ({
+            ...prev,
+            prescription: base64
+          }));
+        }
+
+        toast({
+          title: "Success",
+          description: `${type === "prescription" ? "Prescription" : "X-ray image"} uploaded successfully`
+        });
+      };
+
+      if (type === "prescription") {
+        reader.readAsDataURL(file);
+      } else {
+        reader.readAsDataURL(file);
+      }
+    };
+    input.click();
+  };
+
+  const handlePrescriptionUpload = async () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".pdf";
     input.onchange = async (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (!file || !user?.username || !user?.academyId) return;
@@ -234,44 +294,23 @@ export default function InjuryRehab({ playerData }: InjuryRehabProps) {
         return;
       }
   
-      try {
-        const formData = new FormData();
-        formData.append('files', file);
-        formData.append('data', JSON.stringify({
-          playerId: user.username,
-          academyId: user.academyId,
-          type,
-          imageIndex,
-          injuryId: injuries[injuryIndex]?._id || undefined
+      // Convert PDF file to base64 for storage
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const base64 = e.target?.result as string;
+        
+        // Update the prescription in the current injury being edited
+        setNewInjury(prev => ({
+          ...prev,
+          prescription: base64
         }));
-  
-        const response = await fetch('/api/db/ams-injury', {
-          method: 'POST',
-          body: formData,
-          credentials: 'include'
-        });
-  
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || 'Failed to upload image');
-        }
-  
-        const result = await response.json();
-        if (result.success) {
-          await refreshInjuries();
-          toast({
-            title: "Success",
-            description: "Image uploaded successfully"
-          });
-        }
-      } catch (error) {
-        console.error('Error uploading image:', error);
+        
         toast({
-          title: "Error",
-          description: "Failed to upload image",
-          variant: "destructive",
+          title: "Success",
+          description: "Prescription uploaded successfully"
         });
-      }
+      };
+      reader.readAsDataURL(file);
     };
     input.click();
   };
@@ -605,6 +644,37 @@ export default function InjuryRehab({ playerData }: InjuryRehabProps) {
     }
   };
 
+  const handleViewCertificate = (injury: Injury) => {
+    setCurrentViewInjury(injury);
+    setShowViewOptions(true);
+  };
+
+  const handleViewXray = () => {
+    setShowViewOptions(false);
+    setShowXrayViewer(true);
+  };
+
+  const handleViewPrescription = () => {
+    setShowViewOptions(false);
+    if (currentViewInjury?.prescription && currentViewInjury.prescription !== "/placeholder.svg") {
+      handleViewPdf(currentViewInjury.prescription);
+    } else {
+      toast({
+        title: "Error",
+        description: "No prescription available",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleImageClick = (imageUrl: string, title: string) => {
+    if (imageUrl && imageUrl !== "/placeholder.svg") {
+      setEnlargedImageUrl(imageUrl);
+      setEnlargedImageTitle(title);
+      setShowImageEnlarged(true);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center p-6">
@@ -643,22 +713,13 @@ export default function InjuryRehab({ playerData }: InjuryRehabProps) {
   return (
     <div className="space-y-6 p-6">
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold">Injuries</h2>
-        <div className="space-x-4">
-          <Button 
-            onClick={handlePdfUpload}
-            className="bg-[#85FFC4] text-black hover:bg-[#85FFC4]/80"
-          >
-            <FileText className="w-4 h-4 mr-2" />
-            Upload PDF Documents
-          </Button>
-          <Button 
-            onClick={handleCreateNewInjury}
-            className="bg-[#85FFC4] text-black hover:bg-[#85FFC4]/80"
-          >
-            Add New Injury
-          </Button>
-        </div>
+        <h2 className="text-2xl font-bold">Injury and Rehab</h2>
+        <Button 
+          onClick={handleCreateNewInjury}
+          className="bg-[#85FFC4] text-black hover:bg-[#85FFC4]/80"
+        >
+          Add New Injury
+        </Button>
       </div>
 
       {injuries.length > 1 && (
@@ -747,13 +808,9 @@ export default function InjuryRehab({ playerData }: InjuryRehabProps) {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() =>
-                        handleViewPdf(
-                          injury.certificateUrl ?? injury.certificationUrl ?? ""
-                        )
-                      }
+                      onClick={() => handleViewCertificate(injury)}
                     >
-                      View Certificate
+                      View Documents
                     </Button>
                     <Button
                       variant="destructive"
@@ -770,14 +827,15 @@ export default function InjuryRehab({ playerData }: InjuryRehabProps) {
         </CardContent>
       </Card>
 
+      {/* Edit/Add Injury Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>
               {editingInjury ? "Edit Injury" : "Add New Injury"}
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
+          <div className="space-y-4 max-h-[60vh] overflow-y-auto">
             <div>
               <Label htmlFor="type">Injury Type</Label>
               <Input
@@ -827,6 +885,104 @@ export default function InjuryRehab({ playerData }: InjuryRehabProps) {
                 </SelectContent>
               </Select>
             </div>
+            
+            {/* X-ray Images Upload Section */}
+            <div className="space-y-3">
+              <Label>X-ray Images</Label>
+              <div className="grid grid-cols-3 gap-4">
+                {[0, 1, 2].map((imageIndex) => (
+                  <div key={imageIndex} className="space-y-2">
+                    <div 
+                      className="relative aspect-square w-full bg-gray-100 rounded-lg overflow-hidden cursor-pointer hover:opacity-80 transition-opacity"
+                      onClick={() => handleImageClick(
+                        newInjury.xrayImages?.[imageIndex] || "/placeholder.svg",
+                        `X-ray ${imageIndex + 1}`
+                      )}
+                    >
+                      <Image
+                        src={newInjury.xrayImages?.[imageIndex] || "/placeholder.svg"}
+                        alt={`X-ray ${imageIndex + 1}`}
+                        fill
+                        style={{ objectFit: 'contain' }}
+                        className="rounded-lg"
+                      />
+                    </div>
+                    <div className="flex gap-1">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="flex-1"
+                        onClick={() => handleImageUpload("xray", imageIndex)}
+                      >
+                        <Upload className="w-3 h-3 mr-1" />
+                        Upload
+                      </Button>
+                      {newInjury.xrayImages?.[imageIndex] !== '/placeholder.svg' && (
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={() => {
+                            setNewInjury(prev => ({
+                              ...prev,
+                              xrayImages: prev.xrayImages?.map((img, i) => 
+                                i === imageIndex ? '/placeholder.svg' : img
+                              )
+                            }));
+                          }}
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Prescription Upload Section */}
+            <div className="space-y-3">
+              <Label>Prescription</Label>
+              <div className="space-y-2">
+                <div 
+                  className="relative aspect-[4/3] w-full max-w-md bg-gray-100 rounded-lg overflow-hidden cursor-pointer hover:opacity-80 transition-opacity"
+                  onClick={() => handleImageClick(
+                    newInjury.prescription || "/placeholder.svg",
+                    "Prescription"
+                  )}
+                >
+                  <Image
+                    src={newInjury.prescription || "/placeholder.svg"}
+                    alt="Prescription"
+                    fill
+                    style={{ objectFit: 'contain' }}
+                    className="rounded-lg"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => handleImageUpload("prescription")}
+                  >
+                    <Upload className="w-4 h-4 mr-2" />
+                    Upload Prescription PDF
+                  </Button>
+                  {newInjury.prescription !== '/placeholder.svg' && (
+                    <Button
+                      variant="destructive"
+                      onClick={() => {
+                        setNewInjury(prev => ({
+                          ...prev,
+                          prescription: '/placeholder.svg'
+                        }));
+                      }}
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Remove
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
@@ -839,82 +995,73 @@ export default function InjuryRehab({ playerData }: InjuryRehabProps) {
         </DialogContent>
       </Dialog>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
-        {[0, 1, 2].map((imageIndex) => (
-          <Dialog key={imageIndex}>
-            <DialogTrigger asChild>
-              <div className="relative aspect-[4/3] w-full cursor-pointer group rounded-lg overflow-hidden">
-                <Image
-                  src={injuries[selectedInjuryIndex]?.xrayImages?.[imageIndex] || "/placeholder.svg"}
-                  alt={`X-ray ${imageIndex + 1}`}
-                  fill
-                  style={{ objectFit: 'contain' }}
-                  className="rounded-lg bg-black/20 hover:scale-105 transition-transform"
-                />
-                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 bg-black/50 transition-opacity">
-                  <div className="flex gap-2">
-                    <Button
-                      className="bg-[#85FFC4] text-black hover:bg-[#85FFC4]/80"
-                      onClick={() => handleImageUpload(selectedInjuryIndex, "xray", imageIndex)}
-                    >
-                      Add
-                    </Button>
-                    {injuries[selectedInjuryIndex]?.xrayImages?.[imageIndex] !== '/placeholder.svg' && (
-                      <Button
-                        variant="destructive"
-                        onClick={() => handleDelete(injuries[selectedInjuryIndex]._id ?? '', 'image', imageIndex)}
-                      >
-                        Delete
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </DialogTrigger>
-            <DialogContent className="max-w-[90vw] max-h-[90vh]">
-              <DialogHeader>
-                <DialogTitle>X-ray Image {imageIndex + 1}</DialogTitle>
-              </DialogHeader>
-              <div className="relative w-full h-[calc(90vh-8rem)]">
-                <Image
-                  src={injuries[selectedInjuryIndex]?.xrayImages?.[imageIndex] || "/placeholder.svg"}
-                  alt={`X-ray ${imageIndex + 1}`}
-                  fill
-                  style={{ objectFit: 'contain' }}
-                  className="rounded-lg"
-                />
-              </div>
-            </DialogContent>
-          </Dialog>
-        ))}
-      </div>
-
-      <Dialog>
-        <DialogTrigger asChild>
-          <div className="relative aspect-[4/3] w-full max-w-2xl mx-auto cursor-pointer group rounded-lg overflow-hidden">
-            <Image
-              src={injuries[selectedInjuryIndex]?.prescription || "/placeholder.svg"}
-              alt="Prescription"
-              fill
-              style={{ objectFit: 'contain' }}
-              className="rounded-lg bg-black/20 hover:scale-105 transition-transform"
-            />
+      {/* View Options Dialog */}
+      <Dialog open={showViewOptions} onOpenChange={setShowViewOptions}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>View Documents</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
             <Button
-              className="absolute bottom-4 left-4 bg-[#85FFC4] text-black hover:bg-[#85FFC4]/80 z-10"
-              onClick={() => handleImageUpload(selectedInjuryIndex, "prescription")}
+              className="w-full justify-start"
+              variant="outline"
+              onClick={handleViewXray}
             >
-              ADD
+              <Eye className="w-4 h-4 mr-2" />
+              View X-ray Images
+            </Button>
+            <Button
+              className="w-full justify-start"
+              variant="outline"
+              onClick={handleViewPrescription}
+            >
+              <FileText className="w-4 h-4 mr-2" />
+              View Prescription
             </Button>
           </div>
-        </DialogTrigger>
-        <DialogContent className="max-w-[90vw] max-h-[90vh]">
+        </DialogContent>
+      </Dialog>
+
+      {/* X-ray Images Viewer Dialog */}
+      <Dialog open={showXrayViewer} onOpenChange={setShowXrayViewer}>
+        <DialogContent className="max-w-6xl w-full h-[90vh]">
           <DialogHeader>
-            <DialogTitle>Prescription</DialogTitle>
+            <DialogTitle>X-ray Images - {currentViewInjury?.type}</DialogTitle>
           </DialogHeader>
-          <div className="relative w-full h-[calc(90vh-8rem)]">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 h-[calc(90vh-8rem)] overflow-y-auto">
+            {currentViewInjury?.xrayImages?.map((image, index) => (
+              <div key={index} className="space-y-2">
+                <div 
+                  className="relative aspect-square w-full bg-gray-100 rounded-lg overflow-hidden cursor-pointer hover:opacity-80 transition-opacity"
+                  onClick={() => handleImageClick(image || "/placeholder.svg", `X-ray ${index + 1}`)}
+                >
+                  <Image
+                    src={image || "/placeholder.svg"}
+                    alt={`X-ray ${index + 1}`}
+                    fill
+                    style={{ objectFit: 'contain' }}
+                    className="rounded-lg"
+                  />
+                </div>
+                <p className="text-center text-sm text-muted-foreground">
+                  X-ray {index + 1}
+                </p>
+              </div>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Image Enlargement Dialog */}
+      <Dialog open={showImageEnlarged} onOpenChange={setShowImageEnlarged}>
+        <DialogContent className="max-w-[98vw] max-h-[98vh] w-[95vw] h-[95vh] p-4">
+          <DialogHeader className="pb-4">
+            <DialogTitle className="text-xl">{enlargedImageTitle}</DialogTitle>
+          </DialogHeader>
+          <div className="relative w-full h-[calc(95vh-6rem)] flex items-center justify-center bg-gray-50 rounded-lg">
             <Image
-              src={injuries[selectedInjuryIndex]?.prescription || "/placeholder.svg"}
-              alt="Prescription"
+              src={enlargedImageUrl}
+              alt={enlargedImageTitle}
               fill
               style={{ objectFit: 'contain' }}
               className="rounded-lg"
@@ -923,6 +1070,7 @@ export default function InjuryRehab({ playerData }: InjuryRehabProps) {
         </DialogContent>
       </Dialog>
 
+      {/* PDF Viewer Dialog */}
       <Dialog open={showPdfViewer} onOpenChange={setShowPdfViewer}>
         <DialogContent className="max-w-4xl w-full h-[90vh]">
           <DialogHeader>

@@ -43,6 +43,14 @@ const InjuryRehabTab = dynamic(() => import('./tabs/InjuryRehabTab'), {
 })
 ChartJS.register(RadialLinearScale, PointElement, LineElement, Filler, Tooltip, Legend)
 
+// Helper function to get base URL for API calls
+const getBaseUrl = () => {
+  if (typeof window !== 'undefined') {
+    return window.location.origin
+  }
+  return process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
+}
+
 // Update the calculateOverallRating function to handle NaN
 const calculateOverallRating = (attributes: any): number => {
   if (!attributes) return 0;
@@ -64,9 +72,47 @@ const calculateOverallRating = (attributes: any): number => {
   return isNaN(average) ? 0 : Math.round((average / 10) * 100);
 };
 
-const calculateSessionsAttended = (performanceHistory: any[]): number => {
-  if (!performanceHistory) return 0;
-  return performanceHistory.filter(session => session.attendance === true).length;
+// Fixed function to calculate sessions attended from API
+const calculateSessionsAttended = async (playerId: string, academyId: string): Promise<number> => {
+  try {
+    console.log('Calculating sessions for player:', playerId, 'academy:', academyId);
+    const response = await fetch(`${getBaseUrl()}/api/db/ams-sessions?academyId=${academyId}`, {
+      credentials: 'include'
+    });
+
+    if (!response.ok) {
+      console.error('Failed to fetch sessions:', response.status);
+      return 0;
+    }
+
+    const result = await response.json();
+    console.log('Sessions API result:', result);
+    
+    if (!result.success) {
+      console.error('Sessions API returned success: false');
+      return 0;
+    }
+
+    // Filter sessions assigned to the player and count those marked as present
+    const attendedSessions = result.data.filter((session: any) => {
+      // Check if player is assigned to this session
+      const isAssigned = session.assignedPlayers.includes(playerId);
+      
+      // Check if player's attendance is marked as present (case-insensitive check)
+      const attendanceStatus = session.attendance?.[playerId]?.status;
+      
+      console.log(`Session ${session.name}: assigned=${isAssigned}, status=${attendanceStatus}`);
+      
+      // Case-insensitive check for "present" status
+      return isAssigned && attendanceStatus?.toLowerCase() === 'present';
+    });
+
+    console.log('Total attended sessions:', attendedSessions.length);
+    return attendedSessions.length;
+  } catch (error) {
+    console.error('Error calculating sessions attended:', error);
+    return 0;
+  }
 };
 
 // Add this helper function at the top of the file
@@ -117,22 +163,27 @@ const calculateAveragePerformance = (performanceHistory: any[] = []): number => 
   return validEntries > 0 ? Number((totalSum / validEntries).toFixed(1)) : 0;
 };
 
-const renderPlayerProfile = (player: any) => {
+const renderPlayerProfile = (player: any, filter: "latest" | "overall", sessionsAttended: number, setAttributeFilter: (filter: "latest" | "overall") => void) => {
+  // Get attributes based on filter
+  const attributes = filter === "overall" 
+    ? calculateAverageAttributes(player, sessionsAttended)
+    : player?.attributes || {};
+
   const radarData = {
     labels: ["Shooting", "Pace", "Positioning", "Passing", "Ball Control", "Crossing"],
     datasets: [
       {
-        label: "Player Attributes",
+        label: filter === "overall" ? "Overall Attributes" : "Latest Attributes",
         data: [
-          player?.attributes?.shooting || 0,
-          player?.attributes?.pace || 0,
-          player?.attributes?.positioning || 0,
-          player?.attributes?.passing || 0,
-          player?.attributes?.ballControl || 0,
-          player?.attributes?.crossing || 0,
+          attributes.shooting || 0,
+          attributes.pace || 0,
+          attributes.positioning || 0,
+          attributes.passing || 0,
+          attributes.ballControl || 0,
+          attributes.crossing || 0,
         ],
-        backgroundColor: "rgba(147, 51, 234, 0.2)",
-        borderColor: "rgb(147, 51, 234)",
+        backgroundColor: filter === "overall" ? "rgba(59, 130, 246, 0.2)" : "rgba(147, 51, 234, 0.2)",
+        borderColor: filter === "overall" ? "rgb(59, 130, 246)" : "rgb(147, 51, 234)",
         borderWidth: 1,
         fill: true,
       },
@@ -177,7 +228,25 @@ const renderPlayerProfile = (player: any) => {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Player Attributes</CardTitle>
+        <CardTitle className="flex justify-between items-center">
+          <span>Player Attributes</span>
+          <div className="flex gap-2">
+            <Button
+              variant={filter === "latest" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setAttributeFilter("latest")}
+            >
+              LATEST
+            </Button>
+            <Button
+              variant={filter === "overall" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setAttributeFilter("overall")}
+            >
+              OVERALL
+            </Button>
+          </div>
+        </CardTitle>
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -189,12 +258,12 @@ const renderPlayerProfile = (player: any) => {
           {/* Right column: Attributes in single column */}
           <div className="space-y-4">
             {[
-              { label: "Shooting", value: player.attributes?.shooting || 0 },
-              { label: "Pace", value: player.attributes?.pace || 0 },
-              { label: "Positioning", value: player.attributes?.positioning || 0 },
-              { label: "Passing", value: player.attributes?.passing || 0 },
-              { label: "Ball Control", value: player.attributes?.ballControl || 0 },
-              { label: "Crossing", value: player.attributes?.crossing || 0 },
+              { label: "Shooting", value: attributes.shooting || 0 },
+              { label: "Pace", value: attributes.pace || 0 },
+              { label: "Positioning", value: attributes.positioning || 0 },
+              { label: "Passing", value: attributes.passing || 0 },
+              { label: "Ball Control", value: attributes.ballControl || 0 },
+              { label: "Crossing", value: attributes.crossing || 0 },
             ].map((attr) => (
               <div key={attr.label} className="space-y-2">
                 <div className="flex justify-between">
@@ -229,12 +298,58 @@ const calculateAge = (dob: string): number => {
   return age;
 };
 
+// Function to calculate average attributes for OVERALL filter
+const calculateAverageAttributes = (player: any, sessionsAttended: number) => {
+  if (!player?.performanceHistory?.length || sessionsAttended <= 0) {
+    return player?.attributes || {};
+  }
+
+  const attributeKeys = ['shooting', 'pace', 'positioning', 'passing', 'ballControl', 'crossing'];
+  const averageAttributes: any = {};
+
+  console.log('Calculating average attributes for player:', player.name);
+  console.log('Performance history entries:', player.performanceHistory.length);
+  console.log('Sessions attended:', sessionsAttended);
+
+  attributeKeys.forEach(key => {
+    // Sum all attribute scores from performance history
+    let totalScore = 0;
+    let validEntries = 0;
+
+    player.performanceHistory.forEach((entry: any, index: number) => {
+      if (entry.attributes && typeof entry.attributes[key] === 'number' && entry.attributes[key] > 0) {
+        console.log(`Entry ${index} - ${key}:`, entry.attributes[key]);
+        totalScore += entry.attributes[key];
+        validEntries++;
+      }
+    });
+
+    // Add latest attribute score to the total
+    const latestScore = player.attributes?.[key] || 0;
+    console.log(`Latest ${key}:`, latestScore);
+    if (latestScore > 0) {
+      totalScore += latestScore;
+      validEntries++;
+    }
+
+    // Calculate average: (total attribute score + latest attribute score) / total sessions
+    const average = validEntries > 0 ? totalScore / validEntries : 0;
+    averageAttributes[key] = Math.round(average * 10) / 10; // Round to 1 decimal place
+    
+    console.log(`Average ${key}:`, averageAttributes[key], `(total: ${totalScore}, entries: ${validEntries})`);
+  });
+
+  console.log('Final average attributes:', averageAttributes);
+  return averageAttributes;
+};
+
 export default function playerProfile() {
   const { players, getPlayerByUserId, updatePlayerAttributes } = usePlayers()
   const { user } = useAuth()
   const router = useRouter()
   const [isEditing, setIsEditing] = useState(false)
   const [playerData, setPlayerData] = useState<any>(null)
+  const [sessionsAttended, setSessionsAttended] = useState<number>(0) // Add this state
   const [error, setError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState("profile")
   const [isAuthLoading, setIsAuthLoading] = useState(true)
@@ -245,6 +360,7 @@ export default function playerProfile() {
     playingStyle: "",
     photoUrl: "",
   })
+  const [attributeFilter, setAttributeFilter] = useState<"latest" | "overall">("latest")
 
   // Move the keyboard navigation useEffect here, before any conditional returns
   useEffect(() => {
@@ -356,6 +472,39 @@ export default function playerProfile() {
       mounted = false;
     };
   }, [user, router]);
+
+  // Add this useEffect to fetch sessions attended count
+  useEffect(() => {
+    const fetchSessionsAttended = async () => {
+      if (playerData?.id && user?.academyId) {
+        console.log('Fetching sessions for player:', playerData.id, 'academy:', user.academyId);
+        try {
+          const count = await calculateSessionsAttended(playerData.id, user.academyId);
+          console.log('Sessions attended count:', count);
+          setSessionsAttended(count);
+        } catch (error) {
+          console.error('Error fetching sessions attended:', error);
+          setSessionsAttended(sessionsAttended);
+        }
+      }
+    };
+
+    if (playerData?.id && user?.academyId) {
+      fetchSessionsAttended();
+    }
+  }, [playerData?.id, user?.academyId]);
+
+  // Add this useEffect to fetch sessions attended count
+  useEffect(() => {
+    const fetchSessionsAttended = async () => {
+      if (playerData?.id && user?.academyId) {
+        const count = await calculateSessionsAttended(playerData.id, user.academyId);
+        setSessionsAttended(count);
+      }
+    };
+
+    fetchSessionsAttended();
+  }, [playerData?.id, user?.academyId]);
 
   // Update the error display to handle auth loading state
   if (isAuthLoading) {
@@ -578,14 +727,14 @@ export default function playerProfile() {
                 <TabsTrigger value="profile">Profile</TabsTrigger>
                 <TabsTrigger value="payments">Payments</TabsTrigger>
                 <TabsTrigger value="gallery">Gallery</TabsTrigger>
-                <TabsTrigger value="injury-rehab">Injury Rehab</TabsTrigger>
+                <TabsTrigger value="injury-rehab">Injury and Rehab</TabsTrigger>
                 <TabsTrigger value="achievements">Achievements</TabsTrigger>
               </TabsList>
 
               <div className="mt-4 h-full">
                 <TabsContent value="profile" className="h-full m-0 p-0">
                   <div className="grid gap-6 h-full">
-                    {renderPlayerProfile(playerData)}
+                    {renderPlayerProfile(playerData, attributeFilter, sessionsAttended, setAttributeFilter)}
                     <Card className="w-full">
                       <CardHeader>
                         <CardTitle>Training Performance</CardTitle>
@@ -600,7 +749,7 @@ export default function playerProfile() {
                           </div>
                           <div className="text-center">
                             <div className="text-xl font-bold">
-                              {calculateSessionsAttended(playerData?.performanceHistory) || 0}
+                              {sessionsAttended}
                             </div>
                             <div className="text-sm text-gray-400">SESSIONS ATTENDED</div>
                           </div>
@@ -649,4 +798,3 @@ export default function playerProfile() {
     </div>
   )
 }
-
