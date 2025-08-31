@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react"
 import Image from "next/image"
-import { Plus, X, Save, Edit, Facebook, Instagram, Youtube, Twitter, Upload, FileImage, FileVideo, FileText, Download, Eye } from "lucide-react"
+import { Plus, X, Save, Edit, Facebook, Instagram, Youtube, Twitter, Upload, FileImage, FileText, Download, Eye } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { CollateralModal } from "@/components/collateral-modal"
@@ -75,6 +75,7 @@ type AboutPageData = {
 const STORAGE_KEY = 'aboutPageData'
 
 export default function AboutPage() {
+  console.log("🚀 AboutPage with upload/download features loaded!");
   const { user } = useAuth()
   const [isEditing, setIsEditing] = useState(false)
   const [formData, setFormData] = useState<AboutPageData>({
@@ -92,11 +93,6 @@ export default function AboutPage() {
         name: "Images & Graphics",
         files: [],
         acceptedTypes: ".jpg,.jpeg,.png,.gif"
-      },
-      {
-        name: "Videos",
-        files: [],
-        acceptedTypes: ".mp4,.mov,.avi"
       },
       {
         name: "Documents",
@@ -410,7 +406,6 @@ export default function AboutPage() {
   // Helper function to get file type icon
   const getFileIcon = (fileType: string) => {
     if (fileType.startsWith('image/')) return <FileImage className="w-4 h-4" />
-    if (fileType.startsWith('video/')) return <FileVideo className="w-4 h-4" />
     return <FileText className="w-4 h-4" />
   }
 
@@ -454,7 +449,6 @@ export default function AboutPage() {
                   <CardTitle className="flex items-center justify-between">
                     <span className="flex items-center space-x-2">
                       {collateral.name === "Images & Graphics" && <FileImage className="w-5 h-5" />}
-                      {collateral.name === "Videos" && <FileVideo className="w-5 h-5" />}
                       {collateral.name === "Documents" && <FileText className="w-5 h-5" />}
                       <span>{collateral.name}</span>
                     </span>
@@ -501,7 +495,6 @@ export default function AboutPage() {
                         <div className="text-center py-8 text-gray-500">
                           <div className="mb-2">
                             {collateral.name === "Images & Graphics" && <FileImage className="w-8 h-8 mx-auto mb-2 opacity-50" />}
-                            {collateral.name === "Videos" && <FileVideo className="w-8 h-8 mx-auto mb-2 opacity-50" />}
                             {collateral.name === "Documents" && <FileText className="w-8 h-8 mx-auto mb-2 opacity-50" />}
                           </div>
                           <p className="text-sm">No files uploaded</p>
@@ -777,14 +770,6 @@ export default function AboutPage() {
                       className="max-w-full h-auto rounded-lg"
                     />
                   </div>
-                ) : selectedFile.type.startsWith("video/") ? (
-                  <video 
-                    controls 
-                    className="w-full h-[400px] rounded-lg"
-                    src={selectedFile.url}
-                  >
-                    Your browser does not support the video tag.
-                  </video>
                 ) : (
                   <div className="text-center py-8">
                     <FileText className="w-16 h-16 mx-auto mb-4 text-gray-400" />
