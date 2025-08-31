@@ -145,7 +145,7 @@ export default function AboutPage() {
               name: name.charAt(0).toUpperCase() + name.slice(1),
               url: url as string
             })),
-            collaterals: data.collaterals || formData.collaterals.map(col => ({
+            collaterals: (data.collaterals && data.collaterals.length > 0) ? data.collaterals : formData.collaterals.map(col => ({
               ...col,
               academyId: user.academyId
             }))
@@ -377,7 +377,7 @@ export default function AboutPage() {
             name: name.charAt(0).toUpperCase() + name.slice(1),
             url: url as string
           })),
-          collaterals: data.collaterals || formData.collaterals
+          collaterals: (data.collaterals && data.collaterals.length > 0) ? data.collaterals : formData.collaterals
         });
       }
     } catch (error) {
