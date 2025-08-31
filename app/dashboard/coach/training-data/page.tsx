@@ -76,7 +76,7 @@ export interface Session {
   };
   attendance: {
     [playerId: string]: {
-      status: "Present" | "Absent"
+      status: "Present" | "Absent" | "Unmarked"; // Change this to include "Unmarked"
       markedAt: string
       markedBy: string
     }
@@ -1999,6 +1999,75 @@ const PlayerMetricsDialog = () => {
   );
 };
 
+// AttendanceSelector component for three-state attendance
+const AttendanceSelector = ({ 
+  currentStatus, 
+  onStatusChange, 
+  disabled = false,
+  playerId,
+  sessionStatus 
+}: {
+  currentStatus?: "Present" | "Absent" | "Unmarked";
+  onStatusChange: (status: "Present" | "Absent" | "Unmarked") => void;
+  disabled?: boolean;
+  playerId: string;
+  sessionStatus: string;
+}) => {
+  const status = currentStatus || "Unmarked";
+  
+  const getStatusConfig = (status: string) => {
+    switch (status) {
+      case "Present":
+        return {
+          color: "bg-green-500 hover:bg-green-600 text-white border-green-500",
+          text: "Present",
+          next: "Absent"
+        };
+      case "Absent":
+        return {
+          color: "bg-red-500 hover:bg-red-600 text-white border-red-500",
+          text: "Absent", 
+          next: "Unmarked"
+        };
+      case "Unmarked":
+      default:
+        return {
+          color: "bg-gray-500 hover:bg-gray-600 text-white border-gray-500",
+          text: "Unmarked",
+          next: "Present"
+        };
+    }
+  };
+
+  const config = getStatusConfig(status);
+
+  const handleClick = () => {
+    if (disabled) return;
+    onStatusChange(config.next as "Present" | "Absent" | "Unmarked");
+  };
+
+  return (
+    <div className="flex items-center space-x-2">
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={handleClick}
+        disabled={disabled}
+        className={`min-w-[90px] text-xs transition-colors ${config.color} ${
+          disabled ? 'opacity-50 cursor-not-allowed' : ''
+        }`}
+      >
+        {config.text}
+      </Button>
+      {!disabled && (
+        <span className="text-xs text-gray-400">
+          Click → {config.next}
+        </span>
+      )}
+    </div>
+  );
+};
+
   // Add this new function
   const handleSelectAllPlayers = (checked: boolean) => {
     if (newSession.assignedBatch) {
@@ -2224,46 +2293,45 @@ const renderSessionDetails = (session: Session | undefined) => {
                     </div>
                   </div>
                   <div className="flex items-center space-x-4">
-                    <div className="flex items-center space-x-2">
-                      <Switch
-                        checked={isPresent}
-                        onCheckedChange={async (checked) => {
-                            setIsOccurrencesDialogOpen(false)
-                            await handleAttendanceChange(
-                            session.id,
-                            player.id,
-                            checked,
-                            viewDetailsSessionData,
-                            setViewDetailsSessionData,
-                            user,
-                            sessions,
-                            setSessions,
-                            user?.academyId ?? "" // Pass academyId as explicit parameter, fallback to empty string
-                            );
-                        }}
-                        disabled={currentStatus === "Upcoming"}
-                      />
-                      <span className="text-sm">
-                        {isPresent ? "Present" : "Absent"}
-                      </span>
-                    </div>
-                    {isPresent && currentStatus === "Finished" && (
-                      <Button
-                        size="sm"
-                        variant="outline" 
-                        onClick={() => {
-                          if (typeof handleMetricsClick === "function") {
-                            setIsOccurrencesDialogOpen(false);
-                            handleMetricsClick(player.id, player.name, session.id);
-                          } else {
-                            console.error("handleMetricsClick is not defined");
-                          }
-                        }}
-                      >
-                        Input Metrics
-                      </Button>
-                    )}
-                  </div>
+                  <AttendanceSelector
+                    currentStatus={session.attendance?.[player.id]?.status || "Unmarked"}
+                    onStatusChange={async (newStatus) => {
+                      if (!user?.academyId) {
+                        toast({
+                          title: "Error",
+                          description: "No academy ID available. Please contact administrator.",
+                          variant: "destructive",
+                        });
+                        return;
+                      }
+                      if (setSessions && setViewDetailsSessionData) {
+                        await handleAttendanceChange(
+                          Number(session.id),
+                          player.id,
+                          newStatus, // ✅ Now passing string instead of boolean
+                          viewDetailsSessionData ?? null,
+                          setViewDetailsSessionData,
+                          user ?? null,
+                          sessions,
+                          setSessions,
+                          user?.academyId ?? ""
+                        );
+                      }
+                    }}
+                    disabled={currentStatus === "Upcoming"}
+                    playerId={player.id}
+                    sessionStatus={currentStatus}
+                  />
+                  {(session.attendance?.[player.id]?.status === "Present") && currentStatus === "Finished" && (
+                    <Button
+                      size="sm"
+                      variant="outline" 
+                      onClick={() => handleMetricsClick(player.id, player.name, session.id)}
+                    >
+                      Input Metrics
+                    </Button>
+                  )}
+                </div>
                 </div>
               );
             })
@@ -2294,13 +2362,11 @@ const renderSessionDetails = (session: Session | undefined) => {
   );
 };
 
-  // Add this new handler for attendance
-  // Update handleAttendanceChange to handle occurrence sessions correctly
-  // Update handleAttendanceChange to always use the academyId passed as argument (do not use user?.academyId from closure)
+ 
   const handleAttendanceChange = async (
     sessionId: number | string,
     playerId: string,
-    isPresent: boolean,
+    newStatus: string,
     viewDetailsSessionData: Session | null,
     setViewDetailsSessionData: (session: Session | null) => void,
     user: { academyId?: string; id?: string } | null,
@@ -2329,7 +2395,7 @@ const renderSessionDetails = (session: Session | undefined) => {
     const updatedAttendance = {
       ...session.attendance,
       [playerId]: {
-        status: isPresent ? "Present" : "Absent",
+        status: newStatus,
         markedAt: new Date().toISOString(),
         markedBy: user?.id || ''
       }
@@ -2379,7 +2445,7 @@ const renderSessionDetails = (session: Session | undefined) => {
     if (typeof toast === "function") {
       toast({
         title: "Updating",
-        description: `Marking as ${isPresent ? "Present" : "Absent"}...`,
+        description: `Marking as ${newStatus === "Present" ? "Present" : "Absent"}...`,
       });
     }
 
@@ -2429,7 +2495,7 @@ const renderSessionDetails = (session: Session | undefined) => {
       if (typeof toast === "function") {
         toast({
           title: "Success",
-          description: `Attendance saved as ${isPresent ? "Present" : "Absent"}`,
+          description: `Attendance saved as ${newStatus === "Present" ? "Present" : newStatus === "Absent" ? "Absent" : "Unmarked"}`,
           variant: "default",
         });
       }
@@ -2815,6 +2881,74 @@ const renderSessionDetails = (
   const filteredPlayers = (session.assignedPlayersData || []).filter(player => 
     player.name.toLowerCase().includes(detailsPlayerSearchQuery.toLowerCase())
   );
+  // AttendanceSelector component for three-state attendance
+const AttendanceSelector = ({ 
+  currentStatus, 
+  onStatusChange, 
+  disabled = false,
+  playerId,
+  sessionStatus 
+}: {
+  currentStatus?: "Present" | "Absent" | "Unmarked";
+  onStatusChange: (status: "Present" | "Absent" | "Unmarked") => void;
+  disabled?: boolean;
+  playerId: string;
+  sessionStatus: string;
+}) => {
+  const status = currentStatus || "Unmarked";
+  
+  const getStatusConfig = (status: string) => {
+    switch (status) {
+      case "Present":
+        return {
+          color: "bg-green-500 hover:bg-green-600 text-white border-green-500",
+          text: "Present",
+          next: "Absent"
+        };
+      case "Absent":
+        return {
+          color: "bg-red-500 hover:bg-red-600 text-white border-red-500",
+          text: "Absent", 
+          next: "Unmarked"
+        };
+      case "Unmarked":
+      default:
+        return {
+          color: "bg-gray-500 hover:bg-gray-600 text-white border-gray-500",
+          text: "Unmarked",
+          next: "Present"
+        };
+    }
+  };
+
+  const config = getStatusConfig(status);
+
+  const handleClick = () => {
+    if (disabled) return;
+    onStatusChange(config.next as "Present" | "Absent" | "Unmarked");
+  };
+
+  return (
+    <div className="flex items-center space-x-2">
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={handleClick}
+        disabled={disabled}
+        className={`min-w-[90px] text-xs transition-colors ${config.color} ${
+          disabled ? 'opacity-50 cursor-not-allowed' : ''
+        }`}
+      >
+        {config.text}
+      </Button>
+      {!disabled && (
+        <span className="text-xs text-gray-400">
+          Click → {config.next}
+        </span>
+      )}
+    </div>
+  );
+};
 
   // Use the passed-in function or fallback to a no-op to avoid errors
   const handleMetricsClickSafe =
@@ -2850,47 +2984,45 @@ const renderSessionDetails = (
                 </div>
               </div>
               <div className="flex items-center space-x-4">
-                <div className="flex items-center space-x-2">
-                  <Switch
-                  checked={isPresent}
-                  onCheckedChange={(checked) => {
-                    if (!user?.academyId) {
-                    toast({
-                      title: "Error",
-                      description: "No academy ID available. Please contact administrator.",
-                      variant: "destructive",
-                    });
-                    return;
-                    }
-                    if (setSessions && setViewDetailsSessionData) {
-                    handleAttendanceChange(
-                      Number(session.id),
-                      player.id,
-                      checked,
-                      viewDetailsSessionData ?? null,
-                      setViewDetailsSessionData,
-                      user ?? null,
-                      sessions,
-                      setSessions
-                    );
-                    }
-                  }}
-                  disabled={currentStatus === "Upcoming"}
+                  <AttendanceSelector
+                    currentStatus={session.attendance?.[player.id]?.status || "Unmarked"}
+                    onStatusChange={async (newStatus) => {
+                      if (!user?.academyId) {
+                        toast({
+                          title: "Error",
+                          description: "No academy ID available. Please contact administrator.",
+                          variant: "destructive",
+                        });
+                        return;
+                      }
+                      if (setSessions && setViewDetailsSessionData) {
+                        await handleAttendanceChange(
+                          Number(session.id),
+                          player.id,
+                          newStatus, // ✅ Now passing string instead of boolean
+                          viewDetailsSessionData ?? null,
+                          setViewDetailsSessionData,
+                          user ?? null,
+                          sessions,
+                          setSessions,
+                          user?.academyId ?? ""
+                        );
+                      }
+                    }}
+                    disabled={currentStatus === "Upcoming"}
+                    playerId={player.id}
+                    sessionStatus={currentStatus}
                   />
-                  <span className="text-sm">
-                  {isPresent ? "Present" : "Absent"}
-                  </span>
+                  {(session.attendance?.[player.id]?.status === "Present") && currentStatus === "Finished" && (
+                    <Button
+                      size="sm"
+                      variant="outline" 
+                      onClick={() => handleMetricsClickSafe(player.id, player.name, session.id)}
+                    >
+                      Input Metrics
+                    </Button>
+                  )}
                 </div>
-                {isPresent && currentStatus === "Finished" && (
-                  <Button
-                    size="sm"
-                    variant="outline" 
-                    onClick={() => handleMetricsClickSafe(player.id, player.name, session.id)}
-                  >
-                    Input Metrics
-                  </Button>
-                )}
-              </div>
             </div>
           );
         })}
@@ -2905,7 +3037,7 @@ const renderSessionDetails = (
 const handleAttendanceChange = async (
   sessionId: number | string,
   playerId: string,
-  isPresent: boolean,
+  newStatus: string,
   viewDetailsSessionData: Session | null,
   setViewDetailsSessionData: (session: Session | null) => void,
   user: { academyId?: string; id?: string } | null,
@@ -2935,7 +3067,7 @@ const handleAttendanceChange = async (
 
   const timestamp = new Date().toISOString();
   const newEntry = {
-    status: isPresent ? "Present" : "Absent",
+    status: newStatus,
     markedAt: timestamp,
     markedBy: user?.id || ''
   };
@@ -2950,7 +3082,7 @@ const handleAttendanceChange = async (
             ...s.attendance,
             [playerId]: {
               ...newEntry,
-              status: (isPresent ? "Present" : "Absent") as "Present" | "Absent"
+              status: (newStatus === "Present" ? "Present" : newStatus === "Absent" ? "Absent" : "Unmarked") as "Present" | "Absent" | "Unmarked"
             }
           }
         };
@@ -2968,14 +3100,14 @@ const handleAttendanceChange = async (
         ...viewDetailsSessionData.attendance,
         [playerId]: { 
           ...newEntry, 
-          status: (isPresent ? "Present" : "Absent") as "Present" | "Absent"
+          status: (newStatus === "Present" ? "Present" : newStatus === "Absent" ? "Absent" : "Unmarked") as "Present" | "Absent" | "Unmarked"
         }
       }
     });
   }
 
   if (typeof toast === "function") {
-    toast({ title: "Updating", description: `Marking as ${isPresent ? "Present" : "Absent"}...` });
+    toast({ title: "Updating", description: `Marking as ${newStatus === "Present" ? "Present" : newStatus === "Absent" ? "Absent" : "Unmarked"}...` });
   }
 
   // Find correct API id
@@ -3061,7 +3193,7 @@ const handleAttendanceChange = async (
     }
 
     if (typeof toast === "function") {
-      toast({ title: "Success", description: `Attendance saved as ${isPresent ? 'Present' : 'Absent'}`, variant: "default" });
+      toast({ title: "Success", description: `Attendance saved as ${newStatus === "Present" ? 'Present' : newStatus === "Absent" ? 'Absent' : 'Unmarked'}`, variant: "default" });
     }
   } catch (error) {
     // Revert optimistic update on error
