@@ -1664,7 +1664,7 @@ const renderSessionTable = (status: Session["status"] | "All") => {
         <CardTitle>{status} Sessions</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="w-full max-h-[450px] overflow-y-auto">
+        <div className="w-full max-h-[calc(100vh-200px)] overflow-y-auto">
           <Table>
             <TableHeader>
               <TableRow>
@@ -3981,7 +3981,7 @@ const handleSaveChanges = async () => {
           </AlertDialogContent>
         </AlertDialog>
         {/* Add export button and alert at the bottom */}
-        <div className="fixed bottom-8 right-8">
+        <div className=" flex justify-end p-4 ">
           <Button 
             variant="outline"
             className="bg-red-600 hover:bg-red-700 text-white"
