@@ -2366,51 +2366,77 @@ const handleConfirmExport = async () => {
   }, [activeLog, searchTerm])
 
   const getPlayerCurrentMetrics = async (playerId: string, sessionId: number, sessions: Session[]) => {
-    const cacheKey = `${playerId}-${sessionId}`;
-    const now = Date.now();
-  
-    // Return cached data if available and not expired
-    if (metricsCache[cacheKey] && now - metricsCache[cacheKey].timestamp < 300000) { // 5 minutes
-      return metricsCache[cacheKey].data;
+  const cacheKey = `${playerId}-${sessionId}`;
+  const now = Date.now();
+
+  // Return cached data if available and not expired
+  if (metricsCache[cacheKey] && now - metricsCache[cacheKey].timestamp < 300000) { // 5 minutes
+    return metricsCache[cacheKey].data;
+  }
+
+  try {
+    // Get player's data from MongoDB (including performanceHistory)
+    const response = await fetch(`/api/db/ams-player-data/${playerId}`);
+    if (!response.ok) throw new Error('Failed to fetch player data');
+    const playerData = await response.json();
+
+    if (!playerData.success || !playerData.data) {
+      throw new Error('Invalid player data response');
     }
-  
-    try {
-      // First try to get session-specific metrics
-      const session = sessions.find(s => s.id === sessionId);
-      const sessionMetrics = session?.playerMetrics?.[playerId];
-  
-      // Get player's current attributes from MongoDB
-      const response = await fetch(`/api/db/ams-player-data/${playerId}`);
-      if (!response.ok) throw new Error('Failed to fetch player data');
-      const playerData = await response.json();
-  
-      const metrics = {
-        shooting: sessionMetrics?.shooting?.toString() || playerData?.attributes?.shooting?.toString() || "0",
-        pace: sessionMetrics?.pace?.toString() || playerData?.attributes?.pace?.toString() || "0",
-        positioning: sessionMetrics?.positioning?.toString() || playerData?.attributes?.positioning?.toString() || "0",
-        passing: sessionMetrics?.passing?.toString() || playerData?.attributes?.passing?.toString() || "0",
-        ballControl: sessionMetrics?.ballControl?.toString() || playerData?.attributes?.ballControl?.toString() || "0",
-        crossing: sessionMetrics?.crossing?.toString() || playerData?.attributes?.crossing?.toString() || "0",
-        sessionRating: sessionMetrics?.sessionRating?.toString() || "0"
+
+    const player = playerData.data;
+
+    // Check if sessionId exists in player's performanceHistory
+    const sessionMetrics = player.performanceHistory?.find((entry: any) => {
+      // Handle both direct sessionId match and occurrence sessionId match
+      return entry.sessionId === sessionId || 
+             entry.sessionId === sessionId.toString() ||
+             (typeof entry.sessionId === 'string' && entry.sessionId.includes(sessionId.toString()));
+    });
+
+    let metrics;
+    
+    if (sessionMetrics && sessionMetrics.attributes) {
+      // If session-specific metrics exist, use them
+      metrics = {
+        shooting: sessionMetrics.attributes.shooting?.toString() || "0",
+        pace: sessionMetrics.attributes.pace?.toString() || "0",
+        positioning: sessionMetrics.attributes.positioning?.toString() || "0",
+        passing: sessionMetrics.attributes.passing?.toString() || "0",
+        ballControl: sessionMetrics.attributes.ballControl?.toString() || "0",
+        crossing: sessionMetrics.attributes.crossing?.toString() || "0",
+        sessionRating: sessionMetrics.sessionRating?.toString() || "0"
       };
-  
-      // Cache the metrics
-      metricsCache[cacheKey] = {
-        data: metrics,
-        timestamp: now,
-        isDirty: false
-      };
-  
-      return metrics;
-    } catch (error) {
-      console.error('Error getting player metrics:', error);
-      return metricsCache[cacheKey]?.data || {
-        shooting: "0", pace: "0", positioning: "0",
-        passing: "0", ballControl: "0", crossing: "0",
-        sessionRating: "0"
+    } else {
+      // If no session-specific metrics, use player's current attributes (latest)
+      metrics = {
+        shooting: player.attributes?.shooting?.toString() || "0",
+        pace: player.attributes?.pace?.toString() || "0",
+        positioning: player.attributes?.positioning?.toString() || "0",
+        passing: player.attributes?.passing?.toString() || "0",
+        ballControl: player.attributes?.ballControl?.toString() || "0",
+        crossing: player.attributes?.crossing?.toString() || "0",
+        sessionRating: "0" // Default session rating for unmarked sessions
       };
     }
-  };
+
+    // Cache the metrics
+    metricsCache[cacheKey] = {
+      data: metrics,
+      timestamp: now,
+      isDirty: false
+    };
+
+    return metrics;
+  } catch (error) {
+    console.error('Error getting player metrics:', error);
+    return metricsCache[cacheKey]?.data || {
+      shooting: "0", pace: "0", positioning: "0",
+      passing: "0", ballControl: "0", crossing: "0",
+      sessionRating: "0"
+    };
+  }
+};
   
   const handleMetricsClick = async (playerId: string, playerName: string, sessionId: number | string) => {
     try {
@@ -3927,7 +3953,7 @@ const handleSaveChanges = async () => {
               {renderSessionDetails(viewDetailsSessionData ?? undefined)}
             </div>
             <DialogFooter>
-              <Button variant="default" onClick={() => setViewDetailsSessionId(null)}>
+              <Button variant="default" onClick={() => {setIsOccurrencesDialogOpen(true);setViewDetailsSessionId(null)}}>
                 Close
               </Button>
             </DialogFooter>
