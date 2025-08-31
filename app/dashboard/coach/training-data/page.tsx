@@ -1213,7 +1213,7 @@ const renderSessionTable = (status: Session["status"] | "All") => {
         <CardTitle>{status} Sessions</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="w-full max-h-[450px] overflow-y-auto">
+        <div className="w-full max-h-[calc(100vh-200px)] overflow-y-auto">
           <Table>
             <TableHeader>
               <TableRow>
