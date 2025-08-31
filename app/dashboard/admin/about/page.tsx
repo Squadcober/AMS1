@@ -761,24 +761,54 @@ export default function AboutPage() {
               </DialogHeader>
               <div className="py-4">
                 {selectedFile.type.startsWith("image/") ? (
-                  <div className="flex justify-center">
-                    <Image 
-                      src={selectedFile.url} 
-                      alt={selectedFile.name} 
-                      width={600} 
-                      height={400} 
-                      className="max-w-full h-auto rounded-lg"
-                    />
-                  </div>
+                  (selectedFile.size && selectedFile.size > 1024 * 1024) ? (
+                    <div className="text-center py-8">
+                      <FileImage className="w-16 h-16 mx-auto mb-4 text-gray-400" />
+                      <p className="mb-2 text-lg font-medium">File too large to preview</p>
+                      <p className="mb-4 text-gray-400">
+                        Files larger than 1MB cannot be previewed.<br />
+                        File size: {formatFileSize(selectedFile.size)}
+                      </p>
+                      <Button onClick={() => handleFileDownload(selectedFile)}>
+                        <Download className="w-4 h-4 mr-2" />
+                        Download to View
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="flex justify-center">
+                      <Image 
+                        src={selectedFile.url} 
+                        alt={selectedFile.name} 
+                        width={600} 
+                        height={400} 
+                        className="max-w-full h-auto rounded-lg"
+                      />
+                    </div>
+                  )
                 ) : (
-                  <div className="text-center py-8">
-                    <FileText className="w-16 h-16 mx-auto mb-4 text-gray-400" />
-                    <p className="mb-4">Preview not available for this file type</p>
-                    <Button onClick={() => handleFileDownload(selectedFile)}>
-                      <Download className="w-4 h-4 mr-2" />
-                      Download to View
-                    </Button>
-                  </div>
+                  (selectedFile.size && selectedFile.size > 1024 * 1024) ? (
+                    <div className="text-center py-8">
+                      <FileText className="w-16 h-16 mx-auto mb-4 text-gray-400" />
+                      <p className="mb-2 text-lg font-medium">Document too large to preview</p>
+                      <p className="mb-4 text-gray-400">
+                        Files larger than 1MB cannot be previewed.<br />
+                        File size: {formatFileSize(selectedFile.size)}
+                      </p>
+                      <Button onClick={() => handleFileDownload(selectedFile)}>
+                        <Download className="w-4 h-4 mr-2" />
+                        Download to View
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <FileText className="w-16 h-16 mx-auto mb-4 text-gray-400" />
+                      <p className="mb-4">Preview not available for this file type</p>
+                      <Button onClick={() => handleFileDownload(selectedFile)}>
+                        <Download className="w-4 h-4 mr-2" />
+                        Download to View
+                      </Button>
+                    </div>
+                  )
                 )}
               </div>
               <DialogFooter className="flex justify-between">
