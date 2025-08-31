@@ -20,71 +20,69 @@ export default function SettingsPage() {
   const [formData, setFormData] = useState({
     phone: "",
     address: "",
-    bio: "",
     photoUrl: "",
-    experience: "",
     specializations: [] as string[],
     id: undefined as string | undefined,
     socialLinks: {
       twitter: "",
       linkedin: "",
-      website: ""
+      website: "",
     },
-    certificates: [] as { name: string; issueDate: string; issuingAuthority: string }[]
+    certificates: [] as { name: string; issueDate: string; issuingAuthority: string }[],
   })
 
   useEffect(() => {
     const fetchUserInfo = async () => {
-      if (!user?.id) return;
+      if (!user?.id) return
 
       try {
-        setIsLoading(true);
-        const response = await fetch(`/api/db/ams-users-info?userId=${encodeURIComponent(user.id)}`);
-        
+        setIsLoading(true)
+        const response = await fetch(`/api/db/ams-users-info?userId=${encodeURIComponent(user.id)}`)
+
         if (response.ok) {
-          const result = await response.json();
+          const result = await response.json()
           if (result.success) {
-            setFormData(prev => ({
+            setFormData((prev) => ({
               ...prev,
-              ...result.data
-            }));
+              ...result.data,
+            }))
           }
         }
       } catch (error) {
-        console.error('Error fetching user info:', error);
+        console.error("Error fetching user info:", error)
         toast({
           title: "Error",
           description: "Failed to load user information",
           variant: "destructive",
-        });
+        })
       } finally {
-        setIsLoading(false);
+        setIsLoading(false)
       }
-    };
+    }
 
-    fetchUserInfo();
-  }, [user?.id]);
+    fetchUserInfo()
+  }, [user?.id])
 
-  const handleEdit = () => setIsEditing(true);
+  const handleEdit = () => setIsEditing(true)
 
   const handleCancel = () => {
-    setIsEditing(false);
+    setIsEditing(false)
     // Reload user info to revert changes
     if (user?.id) {
-      setIsLoading(true);
+      setIsLoading(true)
       fetch(`/api/db/ams-users-info?userId=${encodeURIComponent(user.id)}`)
-        .then(res => res.json())
-        .then(result => {
+        .then((res) => res.json())
+        .then((result) => {
           if (result.success) {
-            setFormData(prev => ({
+            setFormData((prev) => ({
               ...prev,
-              ...result.data
-            }));
+              ...result.data,
+            }))
           }
         })
-        .finally(() => setIsLoading(false));
+        .finally(() => setIsLoading(false))
     }
-  };
+  }
 
   const handleSave = async () => {
     if (!user?.id || !user?.academyId) {
@@ -92,85 +90,74 @@ export default function SettingsPage() {
         title: "Error",
         description: "User ID or Academy ID is missing",
         variant: "destructive",
-      });
-      return;
+      })
+      return
     }
 
     try {
-      setIsSaving(true);
-      
+      setIsSaving(true)
+
       // Only include the fields we want to update
-      const { 
-        phone, 
-        address, 
-        bio, 
-        photoUrl, 
-        experience, 
-        specializations,
-        socialLinks,
-        certificates
-      } = formData;
+      const { phone, address, photoUrl, specializations, socialLinks, certificates } = formData
 
       const dataToSave = {
         userId: user.id,
         academyId: user.academyId,
         phone,
         address,
-        bio,
         photoUrl,
-        experience,
         specializations,
         socialLinks,
         certificates,
-        updatedAt: new Date().toISOString()
-      };
+        updatedAt: new Date().toISOString(),
+      }
 
-      const response = await fetch('/api/db/ams-users-info', {
-        method: 'POST',
+      const response = await fetch("/api/db/ams-users-info", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify(dataToSave),
-      });
+      })
 
-      const result = await response.json();
+      const result = await response.json()
 
       if (!response.ok) {
-        throw new Error(result.error || 'Failed to save settings');
+        throw new Error(result.error || "Failed to save settings")
       }
 
       if (result.success && result.data) {
-        setFormData(prev => ({
+        setFormData((prev) => ({
           ...prev,
           ...result.data,
-        }));
-        setIsEditing(false);
+        }))
+        setIsEditing(false)
         toast({
           title: "Success",
           description: "Settings saved successfully",
-        });
+        })
       } else {
-        throw new Error(result.error || 'Failed to save settings');
+        throw new Error(result.error || "Failed to save settings")
       }
     } catch (error) {
-      console.error('Error saving settings:', error);
+      console.error("Error saving settings:", error)
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to save settings",
         variant: "destructive",
-      });
+      })
     } finally {
-      setIsSaving(false);
+      setIsSaving(false)
     }
-  };
+  }
 
   const inputProps = {
     disabled: !isEditing,
-    className: !isEditing ? "bg-muted cursor-not-allowed" : ""
-  };
+    className: !isEditing ? "bg-muted cursor-not-allowed" : "",
+  }
 
   if (isLoading) {
-    return <div className="flex items-center justify-center h-screen">Loading...</div>;
+    return <div className="flex items-center justify-center h-screen">Loading...</div>
   }
 
   return (
@@ -181,7 +168,9 @@ export default function SettingsPage() {
           <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
           {isEditing ? (
             <div className="flex gap-2">
-              <Button onClick={handleCancel} variant="outline" disabled={isSaving}>Cancel</Button>
+              <Button onClick={handleCancel} variant="outline" disabled={isSaving}>
+                Cancel
+              </Button>
               <Button onClick={handleSave} disabled={isSaving}>
                 {isSaving ? "Saving..." : "Save changes"}
               </Button>
@@ -205,15 +194,7 @@ export default function SettingsPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid gap-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="bio">Bio</Label>
-                    <Textarea
-                      id="bio"
-                      value={formData.bio}
-                      onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
-                      {...inputProps}
-                    />
-                  </div>
+                  {/* Removed Bio */}
                   <div className="grid gap-2">
                     <Label htmlFor="phone">Phone</Label>
                     <Input
@@ -232,15 +213,7 @@ export default function SettingsPage() {
                       {...inputProps}
                     />
                   </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="experience">Experience</Label>
-                    <Textarea
-                      id="experience"
-                      value={formData.experience}
-                      onChange={(e) => setFormData({ ...formData, experience: e.target.value })}
-                      {...inputProps}
-                    />
-                  </div>
+                  {/* Removed Experience */}
                 </div>
               </CardContent>
             </Card>
@@ -258,10 +231,12 @@ export default function SettingsPage() {
                     <Input
                       id="twitter"
                       value={formData.socialLinks.twitter}
-                      onChange={(e) => setFormData({
-                        ...formData,
-                        socialLinks: { ...formData.socialLinks, twitter: e.target.value }
-                      })}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          socialLinks: { ...formData.socialLinks, twitter: e.target.value },
+                        })
+                      }
                       {...inputProps}
                     />
                   </div>
@@ -270,10 +245,12 @@ export default function SettingsPage() {
                     <Input
                       id="linkedin"
                       value={formData.socialLinks.linkedin}
-                      onChange={(e) => setFormData({
-                        ...formData,
-                        socialLinks: { ...formData.socialLinks, linkedin: e.target.value }
-                      })}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          socialLinks: { ...formData.socialLinks, linkedin: e.target.value },
+                        })
+                      }
                       {...inputProps}
                     />
                   </div>
@@ -282,10 +259,12 @@ export default function SettingsPage() {
                     <Input
                       id="website"
                       value={formData.socialLinks.website}
-                      onChange={(e) => setFormData({
-                        ...formData,
-                        socialLinks: { ...formData.socialLinks, website: e.target.value }
-                      })}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          socialLinks: { ...formData.socialLinks, website: e.target.value },
+                        })
+                      }
                       {...inputProps}
                     />
                   </div>
@@ -306,9 +285,9 @@ export default function SettingsPage() {
                       placeholder="Certificate Name"
                       value={cert.name}
                       onChange={(e) => {
-                        const newCerts = [...formData.certificates];
-                        newCerts[index] = { ...cert, name: e.target.value };
-                        setFormData({ ...formData, certificates: newCerts });
+                        const newCerts = [...formData.certificates]
+                        newCerts[index] = { ...cert, name: e.target.value }
+                        setFormData({ ...formData, certificates: newCerts })
                       }}
                       {...inputProps}
                     />
@@ -317,9 +296,9 @@ export default function SettingsPage() {
                         type="date"
                         value={cert.issueDate}
                         onChange={(e) => {
-                          const newCerts = [...formData.certificates];
-                          newCerts[index] = { ...cert, issueDate: e.target.value };
-                          setFormData({ ...formData, certificates: newCerts });
+                          const newCerts = [...formData.certificates]
+                          newCerts[index] = { ...cert, issueDate: e.target.value }
+                          setFormData({ ...formData, certificates: newCerts })
                         }}
                         {...inputProps}
                       />
@@ -327,9 +306,9 @@ export default function SettingsPage() {
                         placeholder="Issuing Authority"
                         value={cert.issuingAuthority}
                         onChange={(e) => {
-                          const newCerts = [...formData.certificates];
-                          newCerts[index] = { ...cert, issuingAuthority: e.target.value };
-                          setFormData({ ...formData, certificates: newCerts });
+                          const newCerts = [...formData.certificates]
+                          newCerts[index] = { ...cert, issuingAuthority: e.target.value }
+                          setFormData({ ...formData, certificates: newCerts })
                         }}
                         {...inputProps}
                       />
@@ -337,8 +316,8 @@ export default function SettingsPage() {
                         <Button
                           variant="destructive"
                           onClick={() => {
-                            const newCerts = formData.certificates.filter((_, i) => i !== index);
-                            setFormData({ ...formData, certificates: newCerts });
+                            const newCerts = formData.certificates.filter((_, i) => i !== index)
+                            setFormData({ ...formData, certificates: newCerts })
                           }}
                         >
                           Remove
@@ -353,11 +332,8 @@ export default function SettingsPage() {
                     onClick={() => {
                       setFormData({
                         ...formData,
-                        certificates: [
-                          ...formData.certificates,
-                          { name: "", issueDate: "", issuingAuthority: "" }
-                        ]
-                      });
+                        certificates: [...formData.certificates, { name: "", issueDate: "", issuingAuthority: "" }],
+                      })
                     }}
                   >
                     Add Certificate

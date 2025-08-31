@@ -7,7 +7,7 @@ import { CustomTooltip } from "@/components/custom-tooltip"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { FileUp, Calendar } from "lucide-react"
+import { FileUp, Calendar, Award } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Sidebar } from "@/components/Sidebar" // Import the Sidebar component
 import { Separator } from "@/components/ui/separator"
@@ -31,7 +31,8 @@ export default function CoachProfilePage() {
     name: "",
     age: 0,
     license: "",
-    about: ""
+    about: "",
+    experience: 0 // Add experience to editFormData
   })
   const [coachData, setCoachData] = useState({
     name: "",
@@ -40,7 +41,8 @@ export default function CoachProfilePage() {
     ratings: [] as Rating[],
     about: "",
     photoUrl: "/placeholder.svg",
-    sessionsCount: 0
+    sessionsCount: 0,
+    experience: 0 // Add experience to coachData
   })
   const [ratings, setRatings] = useState<Rating[]>([])
   const [userId, setUserId] = useState<string | undefined>(undefined)
@@ -137,10 +139,11 @@ const saveToCache = (key: string, data: any) => {
           }))
         }
 
-        // 3) fetch profile and ratings in parallel to save time
-        const [profileResp, ratingsResp] = await Promise.all([
+        // 3) fetch profile, ratings, and user info in parallel to save time
+        const [profileResp, ratingsResp, userInfoResp] = await Promise.all([
           fetch(`/api/db/coach-profile/${id}`, { signal }),
-          fetch(`/api/db/coach-ratings?coachId=${id}`, { signal })
+          fetch(`/api/db/coach-ratings?coachId=${id}`, { signal }),
+          fetch(`/api/db/ams-users-info?userId=${id}`, { signal })
         ])
 
         if (!profileResp.ok) throw new Error("Failed to fetch coach profile")
@@ -148,9 +151,11 @@ const saveToCache = (key: string, data: any) => {
 
         const profileJson = await profileResp.json()
         const ratingsJson = await ratingsResp.json()
+        const userInfoJson = userInfoResp.ok ? await userInfoResp.json() : { data: {} }
 
         const profileData = profileJson?.data || {}
         const ratingsData = Array.isArray(ratingsJson?.data) ? ratingsJson.data : []
+        const userInfoData = userInfoJson?.data || {}
 
         // process and set states
         const processedRatings = processRatings(ratingsData)
@@ -161,13 +166,14 @@ const saveToCache = (key: string, data: any) => {
           ratings: processedRatings,
           about: profileData.about || "",
           photoUrl: profileData.photoUrl || "/placeholder.svg",
-          sessionsCount: profileData.sessionsCount || 0
+          sessionsCount: profileData.sessionsCount || 0,
+          experience: parseInt(userInfoData.experience) || 0 // Get experience from user info
         })
 
         setRatings(processedRatings)
 
         // save to cache for next load
-        saveToCache(id, { profile: profileData, ratings: ratingsData })
+        saveToCache(id, { profile: profileData, ratings: ratingsData, userInfo: userInfoData })
       } catch (err) {
         if ((err as any)?.name === "AbortError") {
           // aborted, ignore
@@ -198,7 +204,7 @@ const saveToCache = (key: string, data: any) => {
     // During editing, update the actual coachData state
     setCoachData((prev) => ({ 
       ...prev, 
-      [name]: name === 'age' ? parseInt(value) || 0 : value 
+      [name]: name === 'age' || name === 'experience' ? parseInt(value) || 0 : value 
     }))
   } else {
     // For non-editing mode (if needed)
@@ -234,6 +240,7 @@ const saveToCache = (key: string, data: any) => {
     age: editFormData.age,
     license: editFormData.license,
     about: editFormData.about,
+    experience: editFormData.experience,
     // Don't revert photo here - let it stay as is
   }))
 }
@@ -245,7 +252,8 @@ const saveToCache = (key: string, data: any) => {
     name: coachData.name,
     age: coachData.age,
     license: coachData.license,
-    about: coachData.about
+    about: coachData.about,
+    experience: coachData.experience
   })
 }
 
@@ -255,18 +263,40 @@ const saveToCache = (key: string, data: any) => {
       throw new Error('Missing required user data')
     }
 
-    // coachData already contains the updated photo from handlePhotoChange
-    const response = await fetch(`/api/db/coach-profile/${userId}`, {
+    // Save coach profile data (existing API)
+    const profileResponse = await fetch(`/api/db/coach-profile/${userId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        ...coachData,
+        name: coachData.name,
+        age: coachData.age,
+        license: coachData.license,
+        about: coachData.about,
+        photoUrl: coachData.photoUrl,
         academyId: user.academyId
       })
     })
 
-    if (!response.ok) {
-      throw new Error("Failed to save coach data")
+    if (!profileResponse.ok) {
+      throw new Error("Failed to save coach profile")
+    }
+
+    // Save experience to user info (same endpoint as settings page)
+    const userInfoResponse = await fetch('/api/db/ams-users-info', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        userId: userId,
+        academyId: user.academyId,
+        experience: coachData.experience.toString(), // Convert to string as it's stored as string in settings
+        updatedAt: new Date().toISOString()
+      }),
+    })
+
+    if (!userInfoResponse.ok) {
+      throw new Error("Failed to save experience data")
     }
 
     toast({
@@ -366,7 +396,7 @@ const saveToCache = (key: string, data: any) => {
 
           <div className="text-right">
             <CustomTooltip content="Your personal information">
-              <div className="flex justify-end items-center space-x-4">
+              <div className="flex justify-end items-start space-x-4">
                 <div>
                   {isEditing ? (
                     <>
@@ -404,7 +434,20 @@ const saveToCache = (key: string, data: any) => {
                     </>
                   )}
                 </div>
-                {photoDisplaySection}
+                <div className="flex flex-col items-center space-y-3">
+                  {photoDisplaySection}
+                  {/* Move action buttons here */}
+                  <div className="flex gap-2">
+                    {isEditing ? (
+                      <>
+                        <Button variant="outline" onClick={handleCancelEdit} size="sm">Cancel</Button>
+                        <Button onClick={handleSave} size="sm">Save Changes</Button>
+                      </>
+                    ) : (
+                      <Button onClick={startEditing} size="sm">Edit Profile</Button>
+                    )}
+                  </div>
+                </div>
               </div>
             </CustomTooltip>
           </div>
@@ -425,6 +468,47 @@ const saveToCache = (key: string, data: any) => {
                 />
               ) : (
                 <p className="text-sm mt-2 leading-relaxed">{coachData.about}</p>
+              )}
+            </CardContent>
+          </Card>
+        </CustomTooltip>
+
+        {/* NEW: Experience Section */}
+        <CustomTooltip content="Your coaching experience in years">
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Award className="h-5 w-5" />
+                Experience
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {isEditing ? (
+                <div className="space-y-2">
+                  <Label htmlFor="experience">Years of Experience</Label>
+                  <Input
+                    id="experience"
+                    name="experience"
+                    type="number"
+                    min="0"
+                    max="50"
+                    value={coachData.experience}
+                    onChange={handleInputChange}
+                    className="w-32"
+                    placeholder="0"
+                  />
+                  <p className="text-xs text-gray-400">Enter your total years of coaching experience</p>
+                </div>
+              ) : (
+                <div className="flex items-center gap-4">
+                  <div>
+                    <p className="text-3xl font-bold">{coachData.experience}</p>
+                    <p className="text-sm text-gray-400">Years of Experience</p>
+                  </div>
+                  <div className="h-12 w-12 rounded-full bg-blue-500/10 flex items-center justify-center">
+                    <Award className="h-6 w-6 text-blue-500" />
+                  </div>
+                </div>
               )}
             </CardContent>
           </Card>
@@ -480,20 +564,10 @@ const saveToCache = (key: string, data: any) => {
                 <p className="text-2xl font-bold">{coachData.sessionsCount}</p>
                 <p className="text-sm text-muted-foreground">Total Sessions Conducted</p>
               </div>
-              <div className="h-12 w-12 rounded-full bg-green-500/10 flex items-center justify-center">
-                <Calendar className="h-6 w-6 text-green-500" />
-              </div>
             </div>
-            <Separator className="my-4" />
-            <p className="text-sm text-muted-foreground">
-              Completed training sessions across all batches
-            </p>
           </CardContent>
         </Card>
-
-        {actionButtons}
       </div>
     </div>
   )
 }
-

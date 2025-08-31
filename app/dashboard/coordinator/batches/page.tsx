@@ -73,6 +73,7 @@ export default function BatchesPage() {
   const [selectedCoaches, setSelectedCoaches] = useState<string[]>([])
   const [isCoachDetailsOpen, setIsCoachDetailsOpen] = useState(false)
   const [selectedCoachDetails, setSelectedCoachDetails] = useState<any>(null)
+  const [attributeFilter, setAttributeFilter] = useState<"latest" | "overall">("latest")
 
   useEffect(() => {
     const fetchBatches = async () => {
@@ -836,7 +837,25 @@ export default function BatchesPage() {
                   </div>
                   
                   <div>
-                    <h3 className="text-xl font-semibold mb-4">Attributes</h3>
+                    <div className="flex justify-between items-center mb-4">
+                      <h3 className="text-xl font-semibold">Attributes</h3>
+                      <div className="flex gap-2">
+                        <Button
+                          variant={attributeFilter === "latest" ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setAttributeFilter("latest")}
+                        >
+                          Latest
+                        </Button>
+                        <Button
+                          variant={attributeFilter === "overall" ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setAttributeFilter("overall")}
+                        >
+                          Overall
+                        </Button>
+                      </div>
+                    </div>
                     <div className="grid grid-cols-2 gap-4">
                       {Object.entries(selectedPlayerDetails.attributes).map(([key, value]) => (
                         <div key={key} className="bg-secondary/50 p-3 rounded-lg">

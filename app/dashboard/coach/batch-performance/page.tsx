@@ -59,6 +59,7 @@ export default function BatchPerformancePage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [selectedAttribute, setSelectedAttribute] = useState<string>("shooting")
   const [searchTerm, setSearchTerm] = useState<string>("")
+  const [attributeFilter, setAttributeFilter] = useState<"latest" | "overall">("latest")
 
   useEffect(() => {
     const fetchBatches = async () => {
@@ -204,6 +205,58 @@ export default function BatchPerformancePage() {
     return 0;
   };
 
+  // Function to calculate average attributes for OVERALL filter
+  const calculateAverageAttributes = (player: any) => {
+    if (!player?.performanceHistory?.length) {
+      return player?.attributes || {};
+    }
+
+    const attributeKeys = ['shooting', 'pace', 'positioning', 'passing', 'ballControl', 'crossing'];
+    const averageAttributes: any = {};
+
+    console.log('Calculating average attributes for player:', player.name);
+    console.log('Performance history entries:', player.performanceHistory.length);
+
+    attributeKeys.forEach(key => {
+      // Sum all attribute scores from performance history
+      let totalScore = 0;
+      let validEntries = 0;
+
+      player.performanceHistory.forEach((entry: any, index: number) => {
+        if (entry.attributes && typeof entry.attributes[key] === 'number' && entry.attributes[key] > 0) {
+          console.log(`Entry ${index} - ${key}:`, entry.attributes[key]);
+          totalScore += entry.attributes[key];
+          validEntries++;
+        }
+      });
+
+      // Add latest attribute score to the total
+      const latestScore = player.attributes?.[key] || 0;
+      console.log(`Latest ${key}:`, latestScore);
+      if (latestScore > 0) {
+        totalScore += latestScore;
+        validEntries++;
+      }
+
+      // Calculate average: (total attribute score + latest attribute score) / total sessions
+      const average = validEntries > 0 ? totalScore / validEntries : 0;
+      averageAttributes[key] = Math.round(average * 10) / 10; // Round to 1 decimal place
+      
+      console.log(`Average ${key}:`, averageAttributes[key], `(total: ${totalScore}, entries: ${validEntries})`);
+    });
+
+    console.log('Final average attributes:', averageAttributes);
+    return averageAttributes;
+  };
+
+  const getAttributeValue = (player: any, attribute: string): number => {
+    if (attributeFilter === "overall") {
+      const avgAttributes = calculateAverageAttributes(player);
+      return avgAttributes[attribute] || 0;
+    }
+    return getLatestAttributeValue(player, attribute);
+  };
+
   const generateComparisonData = (selectedPlayers: string[]) => {
     // Get dates from the last month
     const today = new Date();
@@ -283,16 +336,17 @@ export default function BatchPerformancePage() {
       console.log('Generating radar data for player:', {
         playerId,
         playerName: player?.name || player?.username,
-        attributes: player?.attributes
+        attributes: player?.attributes,
+        filter: attributeFilter
       });
 
       const dataPoints = [
-        getLatestAttributeValue(player, 'shooting'),
-        getLatestAttributeValue(player, 'pace'),
-        getLatestAttributeValue(player, 'positioning'),
-        getLatestAttributeValue(player, 'passing'),
-        getLatestAttributeValue(player, 'ballControl'),
-        getLatestAttributeValue(player, 'crossing'),
+        getAttributeValue(player, 'shooting'),
+        getAttributeValue(player, 'pace'),
+        getAttributeValue(player, 'positioning'),
+        getAttributeValue(player, 'passing'),
+        getAttributeValue(player, 'ballControl'),
+        getAttributeValue(player, 'crossing'),
       ];
 
       console.log('Generated data points:', dataPoints);
@@ -448,7 +502,7 @@ export default function BatchPerformancePage() {
     // Get all values for this attribute from selected players (including 0)
     const values = selectedPlayers.map(playerId => {
       const player = batchPlayers.find(p => p._id.toString() === playerId || p.id.toString() === playerId);
-      return getLatestAttributeValue(player, attribute);
+      return getAttributeValue(player, attribute);
     });
 
     if (values.length === 0) return "";
@@ -486,7 +540,7 @@ export default function BatchPerformancePage() {
             </TableCell>
             {selectedPlayers.map((playerId) => {
               const player = batchPlayers.find((p) => p._id.toString() === playerId || p.id.toString() === playerId);
-              const value = getLatestAttributeValue(player, attr);
+              const value = getAttributeValue(player, attr);
               return (
                 <TableCell key={playerId} className={getColorForAttribute(attr, value)}>
                   {value.toFixed(1)}
@@ -614,6 +668,29 @@ export default function BatchPerformancePage() {
                   >
                     Deselect All
                   </Button>
+                </div>
+              </div>
+
+              {/* Attribute Filter Toggle */}
+              <div className="flex justify-center mb-6">
+                <div className="flex items-center space-x-4 bg-muted p-2 rounded-lg">
+                  <span className="text-sm font-medium">View:</span>
+                  <div className="flex space-x-2">
+                    <Button
+                      variant={attributeFilter === "latest" ? "default" : "outline"}
+                      onClick={() => setAttributeFilter("latest")}
+                      size="sm"
+                    >
+                      Latest Values
+                    </Button>
+                    <Button
+                      variant={attributeFilter === "overall" ? "default" : "outline"}
+                      onClick={() => setAttributeFilter("overall")}
+                      size="sm"
+                    >
+                      Overall Average
+                    </Button>
+                  </div>
                 </div>
               </div>
 

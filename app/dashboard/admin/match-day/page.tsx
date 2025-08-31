@@ -65,6 +65,7 @@ interface GamePlan {
   _id: string;
   name: string;
   academyId: string;
+  size: string; // e.g. "11"
   positions: {
     gk?: { playerId: string; top: string; left: string };
     lb?: { playerId: string; top: string; left: string };
@@ -150,6 +151,27 @@ const calculateMatchStatus = (match: any) => {
   } else {
     return "Finished";
   }
+};
+
+const filterGamePlansByFormat = (format: string | undefined, allGamePlans: GamePlan[]) => {
+  if (!format || !allGamePlans.length) return allGamePlans;
+  
+  const formatNumber = parseInt(format);
+  if (isNaN(formatNumber)) return allGamePlans;
+  
+  // Filter gameplans where size matches the format
+  const filtered = allGamePlans.filter(gameplan => {
+    const gamePlanSize = parseInt(gameplan.size);
+    return gamePlanSize === formatNumber;
+  });
+  
+  console.log(`Filtering gameplans for format ${format}:`, {
+    total: allGamePlans.length,
+    filtered: filtered.length,
+    gameplans: filtered.map(gp => ({ name: gp.name, size: gp.size }))
+  });
+  
+  return filtered;
 };
 
 const debugMatch = (match: any) => {
@@ -253,66 +275,94 @@ export default function MatchDay() {
   const [isLoading, setIsLoading] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
 
+  const [filteredGamePlans, setFilteredGamePlans] = useState<GamePlan[]>([]);
+
   useEffect(() => {
-    const fetchData = async () => {
-      if (!user?.academyId) return;
-      
-      try {
-        const [matchesResponse, gameplansResponse, playersResponse] = await Promise.all([
-          fetch(`/api/db/ams-match-day?academyId=${user.academyId}`),
-          fetch(`/api/db/ams-gameplan?academyId=${user.academyId}`),
-          fetch(`/api/db/ams-player-data?academyId=${user.academyId}`)
-        ]);
+  const fetchData = async () => {
+    if (!user?.academyId) return;
+    
+    try {
+      const [matchesResponse, gameplansResponse, playersResponse] = await Promise.all([
+        fetch(`/api/db/ams-match-day?academyId=${user.academyId}`),
+        fetch(`/api/db/ams-gameplan?academyId=${user.academyId}`),
+        fetch(`/api/db/ams-player-data?academyId=${user.academyId}`)
+      ]);
 
-        const [matchesData, gameplansData, playersData] = await Promise.all([
-          matchesResponse.json(),
-          gameplansResponse.json(),
-          playersResponse.json()
-        ]);
+      const [matchesData, gameplansData, playersData] = await Promise.all([
+        matchesResponse.json(),
+        gameplansResponse.json(),
+        playersResponse.json()
+      ]);
 
-        console.log('Fetched gameplan data:', gameplansData);
+      console.log('Fetched gameplan data:', gameplansData);
 
-        if (matchesData.success) {
-          setMatches(matchesData.data);
-        }
+      if (matchesData.success) {
+        setMatches(matchesData.data);
+      }
 
-        if (gameplansData.success) {
-          // Store full gameplan data including players
-          setGamePlans(gameplansData.data.map((gp: any) => gp.name));
-          setGamePlansData(gameplansData.data.map((gp: any) => ({
+      if (gameplansData.success) {
+        // Filter out deleted gameplans and format the data
+        const activeGameplans = gameplansData.data
+          .filter((gp: any) => !gp.isDeleted && !gp.deletedAt)
+          .map((gp: any) => ({
             ...gp,
             players: Array.isArray(gp.players) ? gp.players : []
-          })));
-        }
-
-        if (playersData.success && Array.isArray(playersData.data)) {
-          const formattedPlayers = playersData.data.map((player: any) => ({
-            ...player,
-            id: player._id || player.id,
-            name: player.name || player.username || 'Unknown Player',
-            academyId: player.academyId || user.academyId,
-            position: player.position || player.attributes?.position || ""
           }));
-          
-          console.log('Setting players:', formattedPlayers.length);
-          debugPlayerData(formattedPlayers);
-          setPlayers(formattedPlayers);
-        } else {
-          console.error('Invalid player data format:', playersData);
-        }
 
-      } catch (error) {
-        console.error('Error fetching data:', error);
-        toast({
-          title: "Error",
-          description: "Failed to load data",
-          variant: "destructive",
-        });
+        // Store full gameplan data including players
+        setGamePlans(activeGameplans.map((gp: any) => gp.name));
+        setGamePlansData(activeGameplans);
+        
+        // Initialize filtered gameplans with the current format
+        const currentFormat = newMatch.format || "11";
+        const filtered = filterGamePlansByFormat(currentFormat, activeGameplans);
+        setFilteredGamePlans(filtered);
       }
-    };
 
-    fetchData();
-  }, [user?.academyId]);
+      if (playersData.success && Array.isArray(playersData.data)) {
+        const formattedPlayers = playersData.data.map((player: any) => ({
+          ...player,
+          id: player._id || player.id,
+          name: player.name || player.username || 'Unknown Player',
+          academyId: player.academyId || user.academyId,
+          position: player.position || player.attributes?.position || ""
+        }));
+        
+        console.log('Setting players:', formattedPlayers.length);
+        debugPlayerData(formattedPlayers);
+        setPlayers(formattedPlayers);
+      } else {
+        console.error('Invalid player data format:', playersData);
+      }
+
+    } catch (error) {
+      console.error('Error fetching data:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load data",
+        variant: "destructive",
+      });
+    }
+  };
+
+  fetchData();
+}, [user?.academyId]);
+
+useEffect(() => {
+  if (gamePlansData.length > 0) {
+    const filtered = filterGamePlansByFormat(newMatch.format, gamePlansData);
+    setFilteredGamePlans(filtered);
+    
+    // If current selected gameplan is not in filtered list, clear it
+    if (newMatch.gameplan && !filtered.some(gp => gp.name === newMatch.gameplan)) {
+      setNewMatch(prev => ({
+        ...prev,
+        gameplan: "",
+        players: [] // Clear players when gameplan is cleared
+      }));
+    }
+  }
+}, [newMatch.format, gamePlansData]);
 
   useEffect(() => {
     if (viewDetailsMatchId) {
@@ -1023,20 +1073,48 @@ export default function MatchDay() {
                       type="number"
                       min="0"
                       className="w-16"
-                      value={match.team1Score ?? ''}
+                      value={match.team1Score ?? 0}
                       onChange={(e) => handleUpdateScore(match._id, {
                         team1Score: parseInt(e.target.value) || 0
                       })}
+                      disabled={calculateMatchStatus({
+                        ...match,
+                        date: new Date(match.date),
+                        startTime: match.startTime || '',
+                        endTime: match.endTime || ''
+                      }) === 'Upcoming'}
+                      style={{
+                        cursor: calculateMatchStatus({
+                          ...match,
+                          date: new Date(match.date),
+                          startTime: match.startTime || '',
+                          endTime: match.endTime || ''
+                        }) === 'Upcoming' ? 'not-allowed' : 'text'
+                      }}
                     />
                     <span className="font-bold">-</span>
                     <Input
                       type="number"
                       min="0"
                       className="w-16"
-                      value={match.team2Score ?? ''}
+                      value={match.team2Score ?? 0}
                       onChange={(e) => handleUpdateScore(match._id, {
                         team2Score: parseInt(e.target.value) || 0
                       })}
+                      disabled={calculateMatchStatus({
+                        ...match,
+                        date: new Date(match.date),
+                        startTime: match.startTime || '',
+                        endTime: match.endTime || ''
+                      }) === 'Upcoming'}
+                      style={{
+                        cursor: calculateMatchStatus({
+                          ...match,
+                          date: new Date(match.date),
+                          startTime: match.startTime || '',
+                          endTime: match.endTime || ''
+                        }) === 'Upcoming' ? 'not-allowed' : 'text'
+                      }}
                     />
                   </div>
                 </TableCell>
@@ -1257,216 +1335,34 @@ export default function MatchDay() {
   };
 
   const renderNewMatchForm = () => (
-    <div className="space-y-4">
-      <div className="grid md:grid-cols-2 gap-6">
-        <div className="space-y-4">
-          <div>
-            <Label>Date</Label>
-            <Calendar
-              mode="single"
-              selected={newMatch.date}
-              onSelect={(date) => date && setNewMatch({ ...newMatch, date })} 
-              className="rounded-md border"
-            />
-          </div>
-          <div>
-            <Label>Venue</Label>
-            <Input
-              value={newMatch.venue}
-              onChange={(e) => setNewMatch({ ...newMatch, venue: e.target.value })}
-            />
-          </div>
-          <div>
-            <Label>Tournament</Label>
-            <Input
-              value={newMatch.tournamentName}
-              onChange={(e) => setNewMatch({ ...newMatch, tournamentName: e.target.value })} 
-            />
-          </div>
-        </div>
-        <div className="space-y-4">
-          <div>
-            <Label>Duration (minutes)</Label>
-            <Input
-              type="number"
-              value={newMatch.duration}
-              onChange={(e) => {
-                const duration = Number.parseInt(e.target.value);
-                setNewMatch(prev => ({
-                  ...prev,
-                  duration,
-                  endTime: calculateEndTime(prev.startTime, duration)
-                }));
-              }}
-            />
-          </div>
-          <div>
-            <Label>Format (number of players per team)</Label>
-            <Input
-              type="number"
-              min={2}
-              max={11}
-              value={parseInt(newMatch.format || "11")}
-              onChange={(e) => {
-                let value = Number.parseInt(e.target.value);
-                if (isNaN(value)) value = 11;
-                if (value < 2) value = 2;
-                if (value > 11) value = 11;
-                setNewMatch({ ...newMatch, format: value.toString() });
-              }}
-              placeholder="Enter number between 2 and 11"
-            />
-          </div>
-          <div>
-            <Label>Squad Size</Label>
-            <Input
-              type="number"
-              value={newMatch.squadSize}
-              onChange={(e) => setNewMatch({ ...newMatch, squadSize: Number.parseInt(e.target.value) })}
-            />
-          </div>
-          <div>
-            <Label>Gameplan</Label>
-            <Select
-              value={newMatch.gameplan}
-              onValueChange={(value) => {
-                console.log('Selected gameplan value:', value);
-                const selectedGamePlan = gamePlansData.find(gp => gp.name === value);
-                console.log('Found gameplan data:', selectedGamePlan);
-
-                if (selectedGamePlan?.positions) {
-                  // Extract player IDs from positions and substitutes
-                  const positionPlayerIds = Object.values(selectedGamePlan.positions)
-                    .filter(pos => pos && pos.playerId)
-                    .map(pos => pos.playerId)
-                    .filter(id => id.startsWith('player_'));
-
-                  const substitutePlayerIds = (selectedGamePlan.substitutes || [])
-                    .map(sub => sub.playerId)
-                    .filter(id => id && id.startsWith('player_'));
-
-                  // Combine all player IDs
-                  const allPlayerIds = [...new Set([...positionPlayerIds, ...substitutePlayerIds])];
-                  
-                  console.log('Extracted player IDs:', allPlayerIds);
-
-                  // Update match with gameplan and its players
-                  setNewMatch(prev => ({
-                    ...prev,
-                    gameplan: value,
-                    players: allPlayerIds
-                  }));
-
-                  // Log the update
-                  console.log('Updated match players:', allPlayerIds);
-                } else {
-                  console.log('No positions found in gameplan');
-                  setNewMatch(prev => ({
-                    ...prev,
-                    gameplan: value
-                  }));
-                }
-                
-                if (value) handleGamePlanClick(value);
-              }}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select gameplan" />
-              </SelectTrigger>
-              <SelectContent>
-                {gamePlans.map((gamePlan) => (
-                  <SelectItem key={gamePlan} value={gamePlan}>
-                    {gamePlan}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-      </div>
-      <div>
-        <Label>Players</Label>
-        <div className="grid grid-cols-2 gap-2 border rounded-md p-4 max-h-[200px] overflow-y-auto">
-          {players
-            .filter((player) => player.academyId === user?.academyId)
-            .map((player) => {
-              const playerId = player.id.toString();
-              const isSelected = newMatch.players.includes(playerId);
-              
-              return (
-                <div key={playerId} className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    checked={isSelected}
-                    onChange={(e) => {
-                      console.log('Player selection change:', {
-                        player: player.name,
-                        id: playerId,
-                        checked: e.target.checked,
-                        currentPlayers: newMatch.players
-                      });
-                      
-                      setNewMatch(prev => ({
-                        ...prev,
-                        players: e.target.checked
-                          ? [...prev.players, playerId]
-                          : prev.players.filter(id => id !== playerId)
-                      }));
-                    }}
-                  />
-                  <span>{player.name}</span>
-                </div>
-              );
-            })}
-        </div>
-      </div>
-      <div>
-        <Label>Injuries (comma-separated)</Label>
-        <Input
-          value={newMatch.injuries?.join(", ") || ""}
-          onChange={(e) =>
-            setNewMatch({ ...newMatch, injuries: e.target.value.split(",").map((s) => s.trim()) })
-          }
-          placeholder="Enter injuries separated by commas"
-        />
-      </div>
-      <div>
-        <Label>Comments</Label>
-        <textarea
-          className="w-full p-2 border rounded-md bg-blue-900 text-white"
-          value={newMatch.comments}
-          onChange={(e) => setNewMatch({ ...newMatch, comments: e.target.value })}
-          rows={3}
-        />
-      </div>
-      <div className="grid grid-cols-2 gap-4">
+  <div className="space-y-4">
+    <div className="grid md:grid-cols-2 gap-6">
+      <div className="space-y-4">
         <div>
-          <Label>Team 1</Label>
+          <Label>Date</Label>
+          <Calendar
+            mode="single"
+            selected={newMatch.date}
+            onSelect={(date) => date && setNewMatch({ ...newMatch, date })} 
+            className="rounded-md border"
+          />
+        </div>
+        <div>
+          <Label>Venue</Label>
           <Input
-            value={newMatch.team1}
-            onChange={(e) => setNewMatch({ ...newMatch, team1: e.target.value })}
-            placeholder="Our Team"
+            value={newMatch.venue}
+            onChange={(e) => setNewMatch({ ...newMatch, venue: e.target.value })}
           />
         </div>
         <div>
-          <Label>Team 2</Label>
+          <Label>Tournament</Label>
           <Input
-            value={newMatch.team2 || newMatch.opponent}
-            onChange={(e) => setNewMatch({ ...newMatch, team2: e.target.value, opponent: e.target.value })}
-            placeholder="Opponent Team"
+            value={newMatch.tournamentName}
+            onChange={(e) => setNewMatch({ ...newMatch, tournamentName: e.target.value })} 
           />
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <Label>Start Time</Label>
-          <TimePicker
-            id="start-time-picker"
-            value={newMatch.startTime}
-            onChange={handleStartTimeChange}
-            className="w-full bg-blue-900 text-white"
-          />
-        </div>
+      <div className="space-y-4">
         <div>
           <Label>Duration (minutes)</Label>
           <Input
@@ -1482,9 +1378,211 @@ export default function MatchDay() {
             }}
           />
         </div>
+        <div>
+          <Label>Format (number of players per team)</Label>
+          <Input
+            type="number"
+            min={2}
+            max={11}
+            value={parseInt(newMatch.format || "11")}
+            onChange={(e) => {
+              let value = Number.parseInt(e.target.value);
+              if (isNaN(value)) value = 11;
+              if (value < 2) value = 2;
+              if (value > 11) value = 11;
+              setNewMatch(prev => ({ 
+                ...prev, 
+                format: value.toString(),
+                gameplan: "", // Clear gameplan when format changes
+                players: [] // Clear players when format changes
+              }));
+            }}
+            placeholder="Enter number between 2 and 11"
+          />
+        </div>
+        <div>
+          <Label>Squad Size</Label>
+          <Input
+            type="number"
+            value={newMatch.squadSize}
+            onChange={(e) => setNewMatch({ ...newMatch, squadSize: Number.parseInt(e.target.value) })}
+          />
+        </div>
+        <div>
+          <Label>Gameplan</Label>
+          <Select
+            value={newMatch.gameplan}
+            onValueChange={(value) => {
+              console.log('Selected gameplan value:', value);
+              const selectedGamePlan = filteredGamePlans.find(gp => gp.name === value);
+              console.log('Found gameplan data:', selectedGamePlan);
+
+              if (selectedGamePlan?.positions) {
+                // Extract player IDs from positions and substitutes
+                const positionPlayerIds = Object.values(selectedGamePlan.positions)
+                  .filter(pos => pos && pos.playerId)
+                  .map(pos => pos.playerId)
+                  .filter(id => id.startsWith('player_'));
+
+                const substitutePlayerIds = (selectedGamePlan.substitutes || [])
+                  .map(sub => sub.playerId)
+                  .filter(id => id && id.startsWith('player_'));
+
+                // Combine all player IDs
+                const allPlayerIds = [...new Set([...positionPlayerIds, ...substitutePlayerIds])];
+                
+                console.log('Extracted player IDs:', allPlayerIds);
+
+                // Update match with gameplan and its players
+                setNewMatch(prev => ({
+                  ...prev,
+                  gameplan: value,
+                  players: allPlayerIds
+                }));
+
+                // Log the update
+                console.log('Updated match players:', allPlayerIds);
+              } else {
+                console.log('No positions found in gameplan');
+                setNewMatch(prev => ({
+                  ...prev,
+                  gameplan: value
+                }));
+              }
+              
+              if (value) handleGamePlanClick(value);
+            }}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder={
+                filteredGamePlans.length === 0 
+                  ? `No gameplans available for ${newMatch.format} players`
+                  : "Select gameplan"
+              } />
+            </SelectTrigger>
+            <SelectContent>
+              {filteredGamePlans.length === 0 ? (
+                <div className="p-2 text-sm text-muted-foreground">
+                  No gameplans found for {newMatch.format} players
+                </div>
+              ) : (
+                filteredGamePlans.map((gamePlan) => (
+                  <SelectItem key={gamePlan.name} value={gamePlan.name}>
+                    {gamePlan.name} ({gamePlan.size} players)
+                  </SelectItem>
+                ))
+              )}
+            </SelectContent>
+          </Select>
+          {filteredGamePlans.length > 0 && (
+            <p className="text-sm text-muted-foreground mt-1">
+              {filteredGamePlans.length} gameplan(s) available for {newMatch.format} players
+            </p>
+          )}
+        </div>
       </div>
     </div>
-  );
+    <div>
+      <Label>Players</Label>
+      <div className="grid grid-cols-2 gap-2 border rounded-md p-4 max-h-[200px] overflow-y-auto">
+        {players
+          .filter((player) => player.academyId === user?.academyId)
+          .map((player) => {
+            const playerId = player.id.toString();
+            const isSelected = newMatch.players.includes(playerId);
+            
+            return (
+              <div key={playerId} className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  checked={isSelected}
+                  onChange={(e) => {
+                    console.log('Player selection change:', {
+                      player: player.name,
+                      id: playerId,
+                      checked: e.target.checked,
+                      currentPlayers: newMatch.players
+                    });
+                    
+                    setNewMatch(prev => ({
+                      ...prev,
+                      players: e.target.checked
+                        ? [...prev.players, playerId]
+                        : prev.players.filter(id => id !== playerId)
+                    }));
+                  }}
+                />
+                <span>{player.name}</span>
+              </div>
+            );
+          })}
+      </div>
+    </div>
+    <div>
+      <Label>Injuries (comma-separated)</Label>
+      <Input
+        value={newMatch.injuries?.join(", ") || ""}
+        onChange={(e) =>
+          setNewMatch({ ...newMatch, injuries: e.target.value.split(",").map((s) => s.trim()) })
+        }
+        placeholder="Enter injuries separated by commas"
+      />
+    </div>
+    <div>
+      <Label>Comments</Label>
+      <textarea
+        className="w-full p-2 border rounded-md bg-blue-900 text-white"
+        value={newMatch.comments}
+        onChange={(e) => setNewMatch({ ...newMatch, comments: e.target.value })}
+        rows={3}
+      />
+    </div>
+    <div className="grid grid-cols-2 gap-4">
+      <div>
+        <Label>Team 1</Label>
+        <Input
+          value={newMatch.team1}
+          onChange={(e) => setNewMatch({ ...newMatch, team1: e.target.value })}
+          placeholder="Our Team"
+        />
+      </div>
+      <div>
+        <Label>Team 2</Label>
+        <Input
+          value={newMatch.team2 || newMatch.opponent}
+          onChange={(e) => setNewMatch({ ...newMatch, team2: e.target.value, opponent: e.target.value })}
+          placeholder="Opponent Team"
+        />
+      </div>
+    </div>
+    <div className="grid grid-cols-2 gap-4">
+      <div>
+        <Label>Start Time</Label>
+        <TimePicker
+          id="start-time-picker"
+          value={newMatch.startTime}
+          onChange={handleStartTimeChange}
+          className="w-full bg-blue-900 text-white"
+        />
+      </div>
+      <div>
+        <Label>Duration (minutes)</Label>
+        <Input
+          type="number"
+          value={newMatch.duration}
+          onChange={(e) => {
+            const duration = Number.parseInt(e.target.value);
+            setNewMatch(prev => ({
+              ...prev,
+              duration,
+              endTime: calculateEndTime(prev.startTime, duration)
+            }));
+          }}
+        />
+      </div>
+    </div>
+  </div>
+);
 
   return (
     <div className="flex">

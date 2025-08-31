@@ -395,6 +395,33 @@ export default function playerSettings() {
         <h1 className="text-3xl font-bold mb-8">Player Settings</h1>
 
         <div className="space-y-6">
+          <div className="flex justify-end space-x-4">
+            {isEditing ? (
+              <>
+                <Button
+                  size="lg"
+                  variant="outline"
+                  onClick={handleCancel}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  size="lg"
+                  onClick={handleSave}
+                  disabled={!canSave || isSaving}
+                >
+                  {isSaving ? "Saving..." : "Save Changes"}
+                </Button>
+              </>
+            ) : (
+              <Button
+                size="lg"
+                onClick={handleEdit}
+              >
+                Edit
+              </Button>
+            )}
+          </div>
           <Card>
             <CardHeader>
               <CardTitle>Profile Photo</CardTitle>
@@ -434,6 +461,7 @@ export default function playerSettings() {
               )}
             </CardContent>
           </Card>
+          
 
           <Card>
             <CardHeader>
@@ -760,33 +788,7 @@ export default function playerSettings() {
             </CardContent>
           </Card>
 
-          <div className="flex justify-end space-x-4">
-            {isEditing ? (
-              <>
-                <Button
-                  size="lg"
-                  variant="outline"
-                  onClick={handleCancel}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  size="lg"
-                  onClick={handleSave}
-                  disabled={!canSave || isSaving}
-                >
-                  {isSaving ? "Saving..." : "Save Changes"}
-                </Button>
-              </>
-            ) : (
-              <Button
-                size="lg"
-                onClick={handleEdit}
-              >
-                Edit
-              </Button>
-            )}
-          </div>
+          
         </div>
       </div>
     </div>

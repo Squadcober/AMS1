@@ -23,6 +23,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button"
 import { ArrowLeft, ArrowRight, RotateCcw } from "lucide-react"
 
+// Helper function to get base URL for API calls
+const getBaseUrl = () => {
+  if (typeof window !== 'undefined') {
+    return window.location.origin
+  }
+  return process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
+}
+
 // Register ChartJS components
 ChartJS.register(
   CategoryScale,
@@ -76,6 +84,85 @@ const getMatchPoints = (matchEntry: any): number => {
   return Number(points) || 0;
 };
 
+// Function to calculate average attributes for OVERALL filter
+const calculateAverageAttributes = (player: any, sessionsAttended: number) => {
+  if (!player?.performanceHistory?.length || sessionsAttended <= 0) {
+    return player?.attributes || {};
+  }
+
+  const attributeKeys = ['shooting', 'pace', 'positioning', 'passing', 'ballControl', 'crossing'];
+  const averageAttributes: any = {};
+
+  attributeKeys.forEach(key => {
+    // Sum all attribute scores from performance history
+    let totalScore = 0;
+    let validEntries = 0;
+
+    player.performanceHistory.forEach((entry: any) => {
+      if (entry.attributes && typeof entry.attributes[key] === 'number' && entry.attributes[key] > 0) {
+        totalScore += entry.attributes[key];
+        validEntries++;
+      }
+    });
+
+    // Add latest attribute score to the total
+    const latestScore = player.attributes?.[key] || 0;
+    if (latestScore > 0) {
+      totalScore += latestScore;
+      validEntries++;
+    }
+
+    // Calculate average: (total attribute score + latest attribute score) / total sessions
+    const average = validEntries > 0 ? totalScore / validEntries : 0;
+    averageAttributes[key] = Math.round(average * 10) / 10; // Round to 1 decimal place
+  });
+
+  return averageAttributes;
+};
+
+// Fixed function to calculate sessions attended from API
+const calculateSessionsAttended = async (playerId: string, academyId: string): Promise<number> => {
+  try {
+    console.log('Calculating sessions for player:', playerId, 'academy:', academyId);
+    const response = await fetch(`${getBaseUrl()}/api/db/ams-sessions?academyId=${academyId}`, {
+      credentials: 'include'
+    });
+
+    if (!response.ok) {
+      console.error('Failed to fetch sessions:', response.status);
+      return 0;
+    }
+
+    const result = await response.json();
+    console.log('Sessions API result:', result);
+    
+    if (!result.success) {
+      console.error('Sessions API returned success: false');
+      return 0;
+    }
+
+    // Filter sessions assigned to the player and count those marked as present
+    const attendedSessions = result.data.filter((session: any) => {
+      // Check if player is assigned to this session
+      const isAssigned = session.assignedPlayers.includes(playerId);
+      
+      // Check if player's attendance is marked as present (case-insensitive check)
+      const attendanceStatus = session.attendance?.[playerId]?.status;
+      
+      console.log(`Session ${session.name}: assigned=${isAssigned}, status=${attendanceStatus}`);
+      
+      // Case-insensitive check for "present" status
+      return isAssigned && attendanceStatus?.toLowerCase() === 'present';
+    });
+
+    console.log('Total attended sessions:', attendedSessions.length);
+    return attendedSessions.length;
+  } catch (error) {
+    console.error('Error calculating sessions attended:', error);
+    return 0;
+  }
+};
+
 // Update getLastNDays function
 const getLastNDays = (n: number, timeOffset: number, timeRange: string) => {
   const result = [];
@@ -107,6 +194,8 @@ export default function Performance() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const [timeOffset, setTimeOffset] = useState(0)
+  const [sessionsAttended, setSessionsAttended] = useState<number>(0)
+  const [attributeFilter, setAttributeFilter] = useState<"latest" | "overall">("latest")
   type ChartDataType = {
     training: { labels: string[]; data: number[] };
     match: { labels: string[]; data: number[] };
@@ -284,6 +373,8 @@ export default function Performance() {
           id: data.id,
           name: data.name,
           age: data.age,
+          attributes: data.attributes || {},
+          performanceHistory: data.performanceHistory || [],
           calculatedMetrics: {
             overallRating: Number(overallRating.toFixed(1))*10, // This is already out of 10
             trainingPerformance: Number(trainingPerformance.toFixed(1)),
@@ -291,6 +382,12 @@ export default function Performance() {
             matchStats
           }
         });
+        // Calculate sessions attended for the player
+        const academyId = data.academyId || ""; // Adjust if academyId is stored elsewhere
+        if (data.id && academyId) {
+          const sessionsCount = await calculateSessionsAttended(data.id, academyId);
+          setSessionsAttended(sessionsCount);
+        }
 
       } catch (error) {
         console.error('Error fetching player data:', error);
@@ -304,6 +401,34 @@ export default function Performance() {
       fetchPlayerData();
     }
   }, [user?.username]);
+  
+  // Update chartData.attributes.data when attributeFilter or sessionsAttended changes
+  useEffect(() => {
+    if (!playerData) return;
+    
+    // Get the latest attributes from the player data structure
+    const latestAttributes = playerData.attributes || {};
+    let attributesToUse = latestAttributes;
+    
+    if (attributeFilter === "overall") {
+      attributesToUse = calculateAverageAttributes(playerData, sessionsAttended);
+    }
+    
+    setChartData(prev => ({
+      ...prev,
+      attributes: {
+        labels: ["Shooting", "Pace", "Positioning", "Passing", "Ball Control", "Crossing"],
+        data: [
+          attributesToUse.shooting || 0,
+          attributesToUse.pace || 0,
+          attributesToUse.positioning || 0,
+          attributesToUse.passing || 0,
+          attributesToUse.ballControl || 0,
+          attributesToUse.crossing || 0
+        ]
+      }
+    }));
+  }, [attributeFilter, sessionsAttended, playerData]);
 
   const lineOptions = {
     responsive: true,
@@ -648,49 +773,47 @@ export default function Performance() {
 
           {/* Performance Growth Chart with Time Range Selector */}
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Attributes Growth</CardTitle>
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => navigateTime('backward')}
-                  >
-                    <ArrowLeft className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => setTimeOffset(0)}
-                  >
-                    <RotateCcw className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => navigateTime('forward')}
-                    disabled={timeOffset <= 0}
-                  >
-                    <ArrowRight className="h-4 w-4" />
-                  </Button>
-                </div>
-                <Select value={timeRange} onValueChange={(value) => {
-                  setTimeRange(value);
-                  setTimeOffset(0); // Reset offset when changing time range
-                }}>
-                  <SelectTrigger className="w-[180px]">
-                    <SelectValue placeholder="Select time range" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="daily">Daily</SelectItem>
-                    <SelectItem value="weekly">Weekly</SelectItem>
-                    <SelectItem value="monthly">Monthly</SelectItem>
-                    <SelectItem value="yearly">Yearly</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle>Attributes Growth</CardTitle>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => navigateTime('backward')}
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setTimeOffset(0)}
+              >
+                <RotateCcw className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => navigateTime('forward')}
+                disabled={timeOffset <= 0}
+              >
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+              <Select value={timeRange} onValueChange={(value) => {
+                setTimeRange(value);
+                setTimeOffset(0); // Reset offset when changing time range
+              }}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Select time range" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="daily">Daily</SelectItem>
+                  <SelectItem value="weekly">Weekly</SelectItem>
+                  <SelectItem value="monthly">Monthly</SelectItem>
+                  <SelectItem value="yearly">Yearly</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </CardHeader>
             <CardContent className="pt-6">
               <PerformanceChart
                 data={filterDataByTimeRange(attributeHistory, timeRange)}
@@ -743,8 +866,24 @@ export default function Performance() {
 
           {/* Attributes Radar Chart */}
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Player Attributes Overview</CardTitle>
+              <div className="flex items-center space-x-2">
+                <Button
+                  variant={attributeFilter === "latest" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setAttributeFilter("latest")}
+                >
+                  Latest
+                </Button>
+                <Button
+                  variant={attributeFilter === "overall" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setAttributeFilter("overall")}
+                >
+                  Overall
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="flex justify-center items-center">
               <div className="w-full max-w-[500px] h-[500px]">

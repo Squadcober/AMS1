@@ -1,5 +1,7 @@
 "use client"
 
+import type React from "react"
+
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -11,6 +13,16 @@ import { useAuth } from "@/contexts/AuthContext"
 import { useToast } from "@/components/ui/use-toast"
 import Sidebar from "@/components/Sidebar"
 import { Download, Eye } from "lucide-react"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 interface Credential {
   _id: string
@@ -23,11 +35,11 @@ interface Credential {
   createdAt: string
 }
 
-const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB in bytes
+const MAX_FILE_SIZE = 1 * 1024 * 1024 // 1MB in bytes
 
 const LoadingSpinner = () => (
   <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-);
+)
 
 export default function Credentials() {
   const { user } = useAuth()
@@ -37,100 +49,110 @@ export default function Credentials() {
     title: "",
     issuer: "",
     date: "",
-    document: ""
+    document: "",
   })
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [page, setPage] = useState(1)
   const [hasMore, setHasMore] = useState(true)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [previewDoc, setPreviewDoc] = useState<{url: string, type: string} | null>(null);
-  const [isAddingCredential, setIsAddingCredential] = useState(false); // Add this state near other state declarations
+  const [previewDoc, setPreviewDoc] = useState<{ url: string; type: string } | null>(null)
+  const [isAddingCredential, setIsAddingCredential] = useState(false) // Add this state near other state declarations
+  const [addDialogOpen, setAddDialogOpen] = useState(false)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [credentialToDelete, setCredentialToDelete] = useState<Credential | null>(null)
+  const [fileTooLargeOpen, setFileTooLargeOpen] = useState(false)
+  const [fileTooLargeName, setFileTooLargeName] = useState<string | null>(null)
+  const [fileTooLargeSizeMB, setFileTooLargeSizeMB] = useState<number | null>(null)
   const ITEMS_PER_PAGE = 10
 
   useEffect(() => {
-    let isSubscribed = true;
+    let isSubscribed = true
 
     const fetchCredentials = async () => {
       try {
-        setIsLoading(true);
-        setError(null);
-        
+        setIsLoading(true)
+        setError(null)
+
         if (!user?.username || !user?.academyId) {
-          throw new Error('User data is missing');
+          throw new Error("User data is missing")
         }
 
         // Get user's ID first
-        const userResponse = await fetch(`/api/db/ams-users?username=${encodeURIComponent(user.username)}`);
-        const userData = await userResponse.json();
-        
+        const userResponse = await fetch(`/api/db/ams-users?username=${encodeURIComponent(user.username)}`)
+        const userData = await userResponse.json()
+
         if (!userData.success || !userData.data?.[0]?.id) {
-          throw new Error('Failed to fetch user data');
+          throw new Error("Failed to fetch user data")
         }
 
-        const userId = userData.data[0].id;
-        
+        const userId = userData.data[0].id
+
         // Fetch credentials with pagination
         const response = await fetch(
-          `/api/db/ams-credentials?userId=${userId}&academyId=${user.academyId}&page=${page}&limit=10`
-        );
-        
+          `/api/db/ams-credentials?userId=${userId}&academyId=${user.academyId}&page=${page}&limit=10`,
+        )
+
         if (!response.ok) {
-          throw new Error('Failed to fetch credentials');
+          throw new Error("Failed to fetch credentials")
         }
 
-        const result = await response.json();
-        
+        const result = await response.json()
+
         if (!result.success) {
-          throw new Error(result.error || 'Failed to fetch credentials');
+          throw new Error(result.error || "Failed to fetch credentials")
         }
 
         if (isSubscribed) {
-          setCredentials(prev => page === 1 ? result.data : [...prev, ...result.data]);
-          setHasMore(result.pagination.hasMore);
+          setCredentials((prev) => (page === 1 ? result.data : [...prev, ...result.data]))
+          setHasMore(result.pagination.hasMore)
         }
       } catch (error) {
         if (isSubscribed) {
-          console.error('Error fetching credentials:', error);
-          setError(error instanceof Error ? error.message : 'Failed to fetch credentials');
+          console.error("Error fetching credentials:", error)
+          setError(error instanceof Error ? error.message : "Failed to load credentials")
           toast({
             title: "Error",
             description: error instanceof Error ? error.message : "Failed to load credentials",
-            variant: "destructive"
-          });
+            variant: "destructive",
+          })
         }
       } finally {
         if (isSubscribed) {
-          setIsLoading(false);
+          setIsLoading(false)
         }
       }
-    };
+    }
 
-    fetchCredentials();
+    fetchCredentials()
 
     return () => {
-      isSubscribed = false;
-    };
-  }, [user?.username, user?.academyId, page]);
+      isSubscribed = false
+    }
+  }, [user?.username, user?.academyId, page])
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
       if (file.size > MAX_FILE_SIZE) {
-        toast({
-          title: "Error",
-          description: "File size must be less than 2MB",
-          variant: "destructive"
-        });
-        return;
+        const sizeMB = Math.round((file.size / (1024 * 1024)) * 100) / 100
+        setFileTooLargeName(file.name)
+        setFileTooLargeSizeMB(sizeMB)
+        setFileTooLargeOpen(true)
+
+        // Reset file input and state
+        ;(e.target as HTMLInputElement).value = ""
+        setSelectedFile(null)
+        setNewCredential((prev) => ({ ...prev, document: "" }))
+        return
       }
       // Convert file to base64
       const reader = new FileReader()
       reader.onload = () => {
         setSelectedFile(file)
-        setNewCredential(prev => ({
+        setNewCredential((prev) => ({
           ...prev,
-          document: reader.result as string
+          document: reader.result as string,
         }))
       }
       reader.readAsDataURL(file)
@@ -138,175 +160,188 @@ export default function Credentials() {
   }
 
   const handleAddCredential = async () => {
-    if (isAddingCredential) return; // Prevent multiple submissions
-    
+    if (isAddingCredential) return // Prevent multiple submissions
+
     if (!user?.username || !user?.academyId) {
-      console.error('Missing user data:', { username: user?.username, academyId: user?.academyId });
+      console.error("Missing user data:", { username: user?.username, academyId: user?.academyId })
       toast({
         title: "Error",
         description: "User data missing",
-        variant: "destructive"
-      });
-      return;
+        variant: "destructive",
+      })
+      return
     }
 
     try {
-      setIsAddingCredential(true); // Set loading state
+      setIsAddingCredential(true) // Set loading state
       // Get user ID from ams-users collection
-      const userResponse = await fetch(`/api/db/ams-users?username=${encodeURIComponent(user.username)}`);
-      const userData = await userResponse.json();
-      console.log('User data from ams-users:', userData);
+      const userResponse = await fetch(`/api/db/ams-users?username=${encodeURIComponent(user.username)}`)
+      const userData = await userResponse.json()
+      console.log("User data from ams-users:", userData)
 
       if (!userData.success || !userData.data?.[0]?.id) {
-        console.error('Invalid user data:', userData);
-        throw new Error('Failed to fetch user data');
+        console.error("Invalid user data:", userData)
+        throw new Error("Failed to fetch user data")
       }
 
-      const userId = userData.data[0].id; // Use the id field instead of _id
-      console.log('Using userId:', userId);
+      const userId = userData.data[0].id // Use the id field instead of _id
+      console.log("Using userId:", userId)
 
       // Ensure all required fields are present
       if (!newCredential.title || !newCredential.issuer || !newCredential.date) {
-        console.error('Missing credential fields:', newCredential);
-        throw new Error('Missing required fields: title, issuer, or date');
+        console.error("Missing credential fields:", newCredential)
+        throw new Error("Missing required fields: title, issuer, or date")
       }
 
       const credentialData = {
         ...newCredential,
         userId, // Use the _id from ams-users
         academyId: user.academyId,
-        createdAt: new Date().toISOString()
-      };
-      
-      console.log('Sending credential data:', credentialData);
+        createdAt: new Date().toISOString(),
+      }
+
+      console.log("Sending credential data:", credentialData)
 
       // Add credential
-      const response = await fetch('/api/db/ams-credentials', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(credentialData)
-      });
+      const response = await fetch("/api/db/ams-credentials", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(credentialData),
+      })
 
       if (!response.ok) {
-        const errorData = await response.json();
-        console.error('Credential creation failed:', errorData);
-        throw new Error(errorData.error || 'Failed to add credential');
+        const errorData = await response.json()
+        console.error("Credential creation failed:", errorData)
+        throw new Error(errorData.error || "Failed to add credential")
       }
 
-      const result = await response.json();
-      console.log('Credential creation response:', result);
+      const result = await response.json()
+      console.log("Credential creation response:", result)
 
       if (result.success) {
-        setCredentials(prev => [...prev, result.data]);
-        setNewCredential({ title: "", issuer: "", date: "", document: "" });
-        setSelectedFile(null);
-        toast({ 
-          title: "Success", 
-          description: "Credential added successfully" 
-        });
+        setCredentials((prev) => [...prev, result.data])
+        setNewCredential({ title: "", issuer: "", date: "", document: "" })
+        setSelectedFile(null)
+        setAddDialogOpen(false) // Close the dialog after adding
+        toast({
+          title: "Success",
+          description: "Credential added successfully",
+        })
       } else {
-        throw new Error(result.error || 'Failed to add credential');
+        throw new Error(result.error || "Failed to add credential")
       }
     } catch (error) {
-      console.error('Error adding credential:', error);
+      console.error("Error adding credential:", error)
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to add credential",
-        variant: "destructive"
-      });
+        variant: "destructive",
+      })
     } finally {
-      setIsAddingCredential(false); // Reset loading state
+      setIsAddingCredential(false) // Reset loading state
     }
-  };
+  }
 
-  const handleDeleteCredential = async (credentialId: string) => {
+  const performDeleteCredential = async (credentialId: string) => {
     try {
       if (!user?.username || !user?.academyId) {
         toast({
           title: "Error",
           description: "User data missing",
-          variant: "destructive"
-        });
-        return;
+          variant: "destructive",
+        })
+        return
       }
 
       const response = await fetch(`/api/db/ams-credentials/${credentialId}`, {
-        method: 'DELETE',
+        method: "DELETE",
         headers: {
-          'Content-Type': 'application/json'
-        }
-      });
+          "Content-Type": "application/json",
+        },
+      })
 
-      const result = await response.json();
+      const result = await response.json()
 
       if (!response.ok || !result.success) {
-        throw new Error(result.error || 'Failed to delete credential');
+        throw new Error(result.error || "Failed to delete credential")
       }
 
       // Update the UI by removing the deleted credential
-      setCredentials(prev => prev.filter(cred => cred._id !== credentialId));
+      setCredentials((prev) => prev.filter((cred) => cred._id !== credentialId))
 
       toast({
         title: "Success",
         description: "Credential deleted successfully",
-      });
+      })
     } catch (error) {
-      console.error('Error deleting credential:', error);
+      console.error("Error deleting credential:", error)
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to delete credential",
-        variant: "destructive"
-      });
+        variant: "destructive",
+      })
     }
+  }
+
+  const handleOpenDeleteDialog = (cred: Credential) => {
+    setCredentialToDelete(cred)
+    setDeleteDialogOpen(true)
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!credentialToDelete?._id) return
+    await performDeleteCredential(credentialToDelete._id)
+    setDeleteDialogOpen(false)
+    setCredentialToDelete(null)
   }
 
   const handleDownload = (documentData: string, fileName: string) => {
     try {
       // Create a link element
-      const link = document.createElement('a')
-      
+      const link = document.createElement("a")
+
       // If the document is a base64 string
-      if (documentData.startsWith('data:')) {
+      if (documentData.startsWith("data:")) {
         link.href = documentData
       } else {
         // If it's a URL, use it directly
         link.href = documentData
       }
-      
+
       // Set the file name
-      link.download = fileName || 'document'
-      
+      link.download = fileName || "document"
+
       // Append to body, click, and remove
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)
     } catch (error) {
-      console.error('Error downloading file:', error)
+      console.error("Error downloading file:", error)
       toast({
         title: "Error",
         description: "Failed to download document",
-        variant: "destructive"
+        variant: "destructive",
       })
     }
   }
 
   const handlePreview = (documentData: string) => {
-    const type = documentData.split(';')[0].split(':')[1];
-    setPreviewDoc({ url: documentData, type });
-  };
+    const type = documentData.split(";")[0].split(":")[1]
+    setPreviewDoc({ url: documentData, type })
+  }
 
   const getFileExtension = (documentData: string) => {
-    if (documentData.startsWith('data:')) {
-      const mimeType = documentData.split(';')[0].split(':')[1];
-      return mimeType.split('/')[1];
+    if (documentData.startsWith("data:")) {
+      const mimeType = documentData.split(";")[0].split(":")[1]
+      return mimeType.split("/")[1]
     }
-    return 'unknown';
-  };
+    return "unknown"
+  }
 
   // Add load more function
   const loadMore = () => {
-    setPage(prev => prev + 1);
-  };
+    setPage((prev) => prev + 1)
+  }
 
   return (
     <div className="flex h-screen overflow-hidden">
@@ -316,7 +351,7 @@ export default function Credentials() {
           {/* Header section */}
           <div className="flex justify-between items-center sticky top-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-20 py-4">
             <h1 className="text-3xl font-bold">My Credentials</h1>
-            <Dialog>
+            <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
               <DialogTrigger asChild>
                 <Button disabled={isLoading}>Add Credential</Button>
               </DialogTrigger>
@@ -359,14 +394,10 @@ export default function Credentials() {
                       onChange={handleFileChange}
                     />
                   </div>
-                  <Button 
-                    onClick={handleAddCredential} 
-                    disabled={isAddingCredential}
-                    className="w-full"
-                  >
+                  <Button onClick={handleAddCredential} disabled={isAddingCredential} className="w-full">
                     {isAddingCredential ? (
                       <span className="flex items-center justify-center gap-2">
-                        <LoadingSpinner />
+                        <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
                         Adding...
                       </span>
                     ) : (
@@ -379,11 +410,7 @@ export default function Credentials() {
           </div>
 
           {/* Error message display */}
-          {error && (
-            <div className="text-center text-red-500 p-4">
-              {error}
-            </div>
-          )}
+          {error && <div className="text-center text-red-500 p-4">{error}</div>}
 
           {/* Loading state */}
           {isLoading && credentials.length === 0 ? (
@@ -400,11 +427,7 @@ export default function Credentials() {
                     <CardHeader>
                       <CardTitle className="flex justify-between items-start">
                         <span>{credential.title}</span>
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          onClick={() => handleDeleteCredential(credential._id)}
-                        >
+                        <Button variant="destructive" size="sm" onClick={() => handleOpenDeleteDialog(credential)}>
                           Delete
                         </Button>
                       </CardTitle>
@@ -419,8 +442,8 @@ export default function Credentials() {
                         </p>
                         {credential.document && (
                           <div className="mt-4 flex gap-2">
-                            <Button 
-                              variant="outline" 
+                            <Button
+                              variant="outline"
                               size="sm"
                               onClick={() => handlePreview(credential.document!)}
                               className="flex items-center gap-2"
@@ -428,13 +451,15 @@ export default function Credentials() {
                               <Eye className="h-4 w-4" />
                               Preview
                             </Button>
-                            <Button 
-                              variant="outline" 
+                            <Button
+                              variant="outline"
                               size="sm"
-                              onClick={() => handleDownload(
-                                credential.document!, 
-                                `${credential.title}-${credential.issuer}.${getFileExtension(credential.document!)}`
-                              )}
+                              onClick={() =>
+                                handleDownload(
+                                  credential.document!,
+                                  `${credential.title}-${credential.issuer}.${getFileExtension(credential.document!)}`,
+                                )
+                              }
                               className="flex items-center gap-2"
                             >
                               <Download className="h-4 w-4" />
@@ -455,7 +480,7 @@ export default function Credentials() {
                     onClick={loadMore}
                     disabled={isLoading}
                     variant="outline"
-                    className="min-w-[120px]"
+                    className="min-w-[120px] bg-transparent"
                   >
                     {isLoading && credentials.length > 0 ? (
                       <span className="flex items-center justify-center gap-2">
@@ -480,18 +505,10 @@ export default function Credentials() {
             <DialogTitle>Document Preview</DialogTitle>
           </DialogHeader>
           <div className="relative w-full h-[70vh] overflow-auto">
-            {previewDoc?.type.startsWith('image/') ? (
-              <img
-                src={previewDoc.url}
-                alt="Document preview"
-                className="max-w-full h-auto"
-              />
-            ) : previewDoc?.type === 'application/pdf' ? (
-              <iframe
-                src={previewDoc.url}
-                className="w-full h-full"
-                title="PDF preview"
-              />
+            {previewDoc?.type.startsWith("image/") ? (
+              <img src={previewDoc.url || "/placeholder.svg"} alt="Document preview" className="max-w-full h-auto" />
+            ) : previewDoc?.type === "application/pdf" ? (
+              <iframe src={previewDoc.url} className="w-full h-full" title="PDF preview" />
             ) : (
               <div className="flex items-center justify-center h-full">
                 <p>Preview not available for this file type. Please download to view.</p>
@@ -500,7 +517,59 @@ export default function Credentials() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog
+        open={fileTooLargeOpen}
+        onOpenChange={(open) => {
+          // allow closing by clicking outside/ESC
+          setFileTooLargeOpen(open)
+          if (!open) {
+            setFileTooLargeName(null)
+            setFileTooLargeSizeMB(null)
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>File too large</AlertDialogTitle>
+            <AlertDialogDescription>
+              {fileTooLargeName
+                ? `The selected file "${fileTooLargeName}" is ${fileTooLargeSizeMB ?? "-"} MB.`
+                : "The selected file exceeds the maximum allowed size."}{" "}
+              The maximum allowed size is 1 MB for uploads. Please choose a smaller file.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setFileTooLargeOpen(false)}>OK</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={deleteDialogOpen}
+        onOpenChange={(open) => {
+          setDeleteDialogOpen(open)
+          if (!open) setCredentialToDelete(null)
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete “{credentialToDelete?.title || "this credential"}”?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. The credential and its data will be permanently deleted.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
-

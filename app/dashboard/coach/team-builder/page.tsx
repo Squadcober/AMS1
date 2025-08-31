@@ -1,6 +1,8 @@
 "use client"
 
-import { useState, useEffect, useMemo, useRef, useCallback } from "react"
+import type React from "react"
+
+import { useState, useEffect, useMemo, useRef } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/components/ui/use-toast"
@@ -9,51 +11,59 @@ import { Textarea } from "@/components/ui/textarea"
 import { Separator } from "@/components/ui/separator"
 import { usePlayers } from "@/contexts/PlayerContext"
 import { CustomTooltip } from "@/components/custom-tooltip"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Table as TableIconLucide, X, ChevronLeft, ChevronRight, Plus } from "lucide-react"
+import { X, ChevronLeft, ChevronRight } from "lucide-react"
 import ComparePlayers from "@/components/ComparePlayers"
 import { useBatches } from "@/contexts/BatchContext"
 import { Radar, Line } from "react-chartjs-2"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Chart as ChartJS, RadialLinearScale, PointElement, LineElement, Filler, Tooltip, Legend, CategoryScale, LinearScale } from "chart.js"
+import {
+  Chart as ChartJS,
+  RadialLinearScale,
+  PointElement,
+  LineElement,
+  Filler,
+  Tooltip,
+  Legend,
+  CategoryScale,
+  LinearScale,
+} from "chart.js"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import Slider from "@/components/Slider"
-import { Switch } from "@/components/ui/switch"
 import { useAuth } from "@/contexts/AuthContext"
 import Sidebar from "@/components/Sidebar"
-import { exportToDoc, exportMultipleToDoc } from '@/lib/doc-export';
-import html2canvas from 'html2canvas';
+import { exportToDoc, exportMultipleToDoc } from "@/lib/doc-export"
+import html2canvas from "html2canvas"
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
-import jsPDF from 'jspdf';
+import jsPDF from "jspdf"
 interface Player {
-  id: string | number;
-  name: string;
-  position?: string;  // Add position property
-  photoUrl?: string;
-  academyId: string;
-  attributes: PlayerAttributes;
+  id: string | number
+  name: string
+  position?: string // Add position property
+  photoUrl?: string
+  academyId: string
+  attributes: PlayerAttributes
   performanceHistory?: {
-    date: string;
-    attributes: PlayerAttributes;
-  }[];
+    date: string
+    attributes: PlayerAttributes
+  }[]
 }
 
 ChartJS.register(RadialLinearScale, PointElement, LineElement, Filler, Tooltip, Legend, CategoryScale, LinearScale)
 
 const PLAYER_COLORS = [
-  "rgba(255,99,132,0.5)",   // Red
-  "rgba(54,162,235,0.5)",   // Blue
-  "rgba(255,206,86,0.5)",   // Yellow
-  "rgba(75,192,192,0.5)",   // Teal
-  "rgba(153,102,255,0.5)",  // Purple
-  "rgba(255,159,64,0.5)",   // Orange
-  "rgba(199,199,199,0.5)",  // Grey
-  "rgba(255,99,255,0.5)",   // Pink
-  "rgba(99,255,132,0.5)",   // Green
-  "rgba(99,132,255,0.5)",   // Light Blue
-  "rgba(255,222,99,0.5)",   // Light Yellow
-];
+  "rgba(255,99,132,0.5)", // Red
+  "rgba(54,162,235,0.5)", // Blue
+  "rgba(255,206,86,0.5)", // Yellow
+  "rgba(75,192,192,0.5)", // Teal
+  "rgba(153,102,255,0.5)", // Purple
+  "rgba(255,159,64,0.5)", // Orange
+  "rgba(199,199,199,0.5)", // Grey
+  "rgba(255,99,255,0.5)", // Pink
+  "rgba(99,255,132,0.5)", // Green
+  "rgba(99,132,255,0.5)", // Light Blue
+  "rgba(255,222,99,0.5)", // Light Yellow
+]
 const PLAYER_BORDER_COLORS = [
   "rgb(255,99,132)",
   "rgb(54,162,235)",
@@ -66,7 +76,7 @@ const PLAYER_BORDER_COLORS = [
   "rgb(99,255,132)",
   "rgb(99,132,255)",
   "rgb(255,222,99)",
-];
+]
 
 interface Position {
   id: string
@@ -86,7 +96,7 @@ export interface PlayerAttributes {
 
 interface GamePlan {
   id: string
-  _id?: string  // Add MongoDB's _id field
+  _id?: string // Add MongoDB's _id field
   name: string
   size: string
   gk: boolean
@@ -96,10 +106,12 @@ interface GamePlan {
   strategy: string
   coachId: string
   substitutes: {
-    playerId: string;
-    position: string;
-  }[];
-  academyId: string;
+    playerId: string
+    position: string
+  }[]
+  academyId: string
+  formationPositions?: Position[] // Add this new property
+  teamSize?: number // Add this new property
 }
 
 const positions: Position[] = [
@@ -119,8 +131,8 @@ const positions: Position[] = [
 const LOCAL_STORAGE_KEY = "team-builder-gameplans"
 
 interface AvailablePosition {
-  value: string;
-  label: string;
+  value: string
+  label: string
 }
 
 // Add these position types at the top with other interfaces
@@ -133,7 +145,7 @@ const POSITION_TYPES = [
   { id: "rw", name: "Right Winger", shortName: "RW" },
   { id: "fwd", name: "Forward", shortName: "FWD" },
   { id: "any", name: "Any Position", shortName: "ANY" },
-] as const;
+] as const
 
 const AVAILABLE_POSITIONS: AvailablePosition[] = [
   { value: "any", label: "Any Position" },
@@ -154,8 +166,8 @@ const AVAILABLE_POSITIONS: AvailablePosition[] = [
   { value: "leftwinger", label: "Left Winger" },
   { value: "rightwinger", label: "Right Winger" },
   { value: "striker", label: "Striker" },
-  { value: "forward", label: "Forward" }
-];
+  { value: "forward", label: "Forward" },
+]
 
 export default function TeamBuilder() {
   const { toast } = useToast()
@@ -177,51 +189,75 @@ export default function TeamBuilder() {
   const [selectedAttribute, setSelectedAttribute] = useState<string>("shooting")
   const [activeTab, setActiveTab] = useState<number>(0)
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
-  const fieldRef = useRef<HTMLDivElement>(null); // Add this ref
-  const [customPositions, setCustomPositions] = useState<Position[]>([]);
-  const [showCustomizeMenu, setShowCustomizeMenu] = useState(false);
-  const [selectedPositionType, setSelectedPositionType] = useState<string>("any");
-  const [deletedPositions, setDeletedPositions] = useState<string[]>([]);
-  const [showSubstitutesModal, setShowSubstitutesModal] = useState(false);
-  const [showExportDialog, setShowExportDialog] = useState(false);
-  const [positionPlayers, setPositionPlayers] = useState<{[key: string]: any[]}>({});
-  const [substitutePlayers, setSubstitutePlayers] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [selectedFormation, setSelectedFormation] = useState<string>("4-4-2"); // Default formation
+  const fieldRef = useRef<HTMLDivElement>(null) // Add this ref
+  const [customPositions, setCustomPositions] = useState<Position[]>([])
+  const [showCustomizeMenu, setShowCustomizeMenu] = useState(false)
+  const [selectedPositionType, setSelectedPositionType] = useState<string>("any")
+  const [deletedPositions, setDeletedPositions] = useState<string[]>([])
+  const [showSubstitutesModal, setShowSubstitutesModal] = useState(false)
+  const [showExportDialog, setShowExportDialog] = useState(false)
+  const [positionPlayers, setPositionPlayers] = useState<{ [key: string]: any[] }>({})
+  const [substitutePlayers, setSubstitutePlayers] = useState<any[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [selectedFormation, setSelectedFormation] = useState<string>("4-4-2") // Default formation
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [gameplanToDelete, setGameplanToDelete] = useState<string | null>(null)
+  const [attributeFilter, setAttributeFilter] = useState<"latest" | "overall">("latest")
+  const [attributeFilterState, setAttributeFilterState] = useState<"latest" | "overall">("latest")
+  const [isSaving, setIsSaving] = useState(false)
+  const [showSaved, setShowSaved] = useState(false)
 
   // Replace localStorage useEffect with MongoDB fetch
   useEffect(() => {
-    const fetchGameplans = async () => {
-      try {
-        if (!user?.academyId || !user?.id) return;
-        
-        // Fetch all gameplans for the academy
-        const response = await fetch(`/api/db/ams-gameplan?academyId=${user.academyId}`);
-        if (!response.ok) throw new Error('Failed to fetch gameplans');
-        
-        const result = await response.json();
-        if (result.success) {
-          // Filter gameplans to only those created by the current coach
-          const coachGamePlans = result.data.filter((plan: any) => plan.coachId === user.id);
-          setGamePlans(coachGamePlans);
-          if (coachGamePlans.length > 0) {
-            setSelectedGamePlan(coachGamePlans[0]);
-          } else {
-            setSelectedGamePlan(null);
-          }
-        }
-      } catch (error) {
-        console.error('Error loading gameplans:', error);
-        toast({
-          title: "Error",
-          description: "Failed to load gameplans",
-          variant: "destructive",
-        });
-      }
-    };
+  const fetchGameplans = async () => {
+    try {
+      if (!user?.academyId || !user?.id) return
 
-    fetchGameplans();
-  }, [user?.academyId, user?.id]);
+      // Fetch gameplans for the academy filtered by coach on the backend
+      // If your API doesn't support coachId filtering, you'll need to modify the API
+      // For now, we'll filter on the frontend but ensure we're very explicit about it
+      const response = await fetch(`/api/db/ams-gameplan?academyId=${user.academyId}`)
+      if (!response.ok) throw new Error("Failed to fetch gameplans")
+
+      const result = await response.json()
+      if (result.success) {
+        // CRITICAL: Filter gameplans to only those created by the current coach
+        // This prevents other coaches' gameplans from appearing
+        const coachGamePlans = result.data.filter((plan: any) => {
+          console.log('Filtering gameplan:', {
+            planId: plan._id,
+            planCoachId: plan.coachId,
+            currentCoachId: user.id,
+            matches: plan.coachId === user.id
+          });
+          return plan.coachId === user.id;
+        });
+        
+        console.log('Filtered gameplans for coach:', {
+          totalPlans: result.data.length,
+          coachPlans: coachGamePlans.length,
+          coachId: user.id
+        });
+        
+        setGamePlans(coachGamePlans)
+        if (coachGamePlans.length > 0) {
+          setSelectedGamePlan(coachGamePlans[0])
+        } else {
+          setSelectedGamePlan(null)
+        }
+      }
+    } catch (error) {
+      console.error("Error loading gameplans:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load gameplans",
+        variant: "destructive",
+      })
+    }
+  }
+
+  fetchGameplans()
+}, [user?.academyId, user?.id, toast])
 
   useEffect(() => {
     if (gamePlans.length > 0 && !selectedGamePlan) {
@@ -232,9 +268,9 @@ export default function TeamBuilder() {
   // Add useEffect to sync strategy when selected game plan changes
   useEffect(() => {
     if (selectedGamePlan) {
-      setNewGamePlanStrategy(selectedGamePlan.strategy || "");
+      setNewGamePlanStrategy(selectedGamePlan.strategy || "")
     }
-  }, [selectedGamePlan]);
+  }, [selectedGamePlan])
 
   // Replace createGamePlan handler
   const handleCreateGamePlan = async () => {
@@ -243,392 +279,447 @@ export default function TeamBuilder() {
         title: "Error",
         description: "User information missing",
         variant: "destructive",
-      });
-      return;
+      })
+      return
     }
 
-    if (!newGamePlanName) return;
+    if (!newGamePlanName) {
+      toast({
+        title: "Error",
+        description: "Game plan name is required",
+        variant: "destructive",
+      })
+      return
+    }
+
+    const teamSize = Number.parseInt(newGamePlanSize)
+
+    // Validate team size (minimum 2, maximum 11)
+    if (teamSize < 2 || teamSize > 11) {
+      toast({
+        title: "Error",
+        description: "Team size must be between 2 and 11 players",
+        variant: "destructive",
+      })
+      return
+    }
 
     try {
+      // Get positions for the specified team size
+      const formationPositions = getPositionsBySize(teamSize)
+
+      // Create positions object using your existing getDefaultPositionStyle function
+      const positions = formationPositions.reduce((acc, pos) => {
+        const coordinates = getDefaultPositionStyle(pos.id, teamSize)
+        return {
+          ...acc,
+          [pos.id]: {
+            playerId: "",
+            top: coordinates.top,
+            left: coordinates.left,
+          },
+        }
+      }, {})
+
       const newGamePlan = {
         name: newGamePlanName,
         size: newGamePlanSize,
-        positions: positions.reduce((acc, pos) => ({ ...acc, [pos.id]: null }), {}),
+        positions: positions,
         strategy: newGamePlanStrategy,
         coachId: user.id,
         academyId: user.academyId,
         substitutes: [],
-        formation: selectedFormation
-      };
+        formation: selectedFormation,
+        teamSize: teamSize, // Store the original team size
+        formationPositions: formationPositions, // Store which positions are active
+      }
 
-      const response = await fetch('/api/db/ams-gameplan', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newGamePlan)
-      });
+      const response = await fetch("/api/db/ams-gameplan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newGamePlan),
+      })
 
-      if (!response.ok) throw new Error('Failed to create gameplan');
-      
-      const result = await response.json();
-      
+      if (!response.ok) throw new Error("Failed to create gameplan")
+
+      const result = await response.json()
+
       if (result.success) {
-        setGamePlans(prev => [...prev, result.data]);
-        setSelectedGamePlan(result.data);
-        
-        setNewGamePlanName("");
-        setNewGamePlanSize("11");
-        setNewGamePlanStrategy("");
-        setIsCreateDialogOpen(false);
+        setGamePlans((prev) => [...prev, result.data])
+        setSelectedGamePlan(result.data)
+
+        setNewGamePlanName("")
+        setNewGamePlanSize("11")
+        setNewGamePlanStrategy("")
+        setIsCreateDialogOpen(false)
 
         toast({
           title: "Success",
-          description: "Game plan created successfully",
-        });
+          description: `Game plan created with ${teamSize} player formation`,
+        })
       }
     } catch (error) {
-      console.error('Error creating gameplan:', error);
+      console.error("Error creating gameplan:", error)
       toast({
         title: "Error",
         description: "Failed to create gameplan",
         variant: "destructive",
-      });
+      })
     }
-  };
+  }
 
   // Replace saveGamePlan handler
-  const handleSaveGamePlan = async () => {
-    try {
-      if (!selectedGamePlan || !user?.academyId) {
-        toast({
-          title: "Error",
-          description: "No game plan selected or academy ID missing",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      const response = await fetch(`/api/db/ams-gameplan/${selectedGamePlan.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          positions: selectedGamePlan.positions,
-          formation: selectedFormation,
-          strategy: newGamePlanStrategy,
-          substitutes: selectedGamePlan.substitutes || [],
-          updatedAt: new Date().toISOString(),
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to save game plan');
-      }
-
-      const updatedGamePlan = await response.json();
-
-      // Update the local state with the updated game plan
-      setGamePlans((prevGamePlans) =>
-        prevGamePlans.map((gp) =>
-          gp.id === updatedGamePlan.id ? updatedGamePlan : gp
-        )
-      );
-
-      setSelectedGamePlan(updatedGamePlan);
-
-      toast({
-        title: "Success",
-        description: "Game plan updated successfully",
-      });
-    } catch (error) {
-      console.error('Error saving game plan:', error);
+  const handleSaveGamePlans = async () => {
+  try {
+    if (!user?.academyId || !selectedGamePlan) {
       toast({
         title: "Error",
-        description: "Failed to save game plan",
+        description: "No academy ID or game plan found to save",
         variant: "destructive",
-      });
+      })
+      return
     }
-  };
 
-  const handleSaveGamePlans = async () => {
-    try {
-      if (!user?.academyId || !selectedGamePlan) {
-        toast({
-          title: "Error",
-          description: "No academy ID or game plan found to save",
-          variant: "destructive",
-        });
-        return;
-      }
+    setIsSaving(true)
+    setTimeout(() => setShowSaved(false), 2000)
 
-      // Save the current game plan to the database
-      const response = await fetch(`/api/db/ams-gameplan/${selectedGamePlan._id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          positions: selectedGamePlan.positions,
-          formation: selectedFormation,
-          strategy: newGamePlanStrategy,
-          substitutes: selectedGamePlan.substitutes || [],
-          updatedAt: new Date().toISOString()
-        })
-      });
+    // Save the current game plan to the database
+    const response = await fetch(`/api/db/ams-gameplan/${selectedGamePlan._id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        positions: selectedGamePlan.positions,
+        formation: selectedFormation,
+        strategy: newGamePlanStrategy,
+        substitutes: selectedGamePlan.substitutes || [],
+        updatedAt: new Date().toISOString(),
+      }),
+    })
 
-      if (!response.ok) {
-        throw new Error('Failed to save game plan');
-      }
+    if (!response.ok) {
+      throw new Error("Failed to save game plan")
+    }
 
-      // Refresh game plans after saving
-      const refreshResponse = await fetch(`/api/db/ams-gameplan?academyId=${user.academyId}`);
-      if (refreshResponse.ok) {
-        const result = await refreshResponse.json();
-        if (result.success) {
-          setGamePlans(result.data);
-          
-          // Find and set the current game plan
-          const updatedCurrentPlan = result.data.find(
-            (plan: any) => plan._id === selectedGamePlan._id
-          );
-          if (updatedCurrentPlan) {
-            setSelectedGamePlan(updatedCurrentPlan);
-          }
-        }
-      }
+    const result = await response.json()
+
+    if (result.success) {
+      // Update the specific gameplan in the local state without refetching all
+      setGamePlans((prev) => 
+        prev.map((gp) => 
+          gp._id === selectedGamePlan._id 
+            ? { ...gp, ...result.data, updatedAt: new Date().toISOString() }
+            : gp
+        )
+      )
+
+      // Update the selected game plan
+      setSelectedGamePlan(prev => prev ? { ...prev, ...result.data, updatedAt: new Date().toISOString() } : null)
 
       toast({
         title: "Success",
         description: "Game plan saved successfully",
-      });
-    } catch (error) {
-      console.error('Error saving game plan:', error);
-      toast({
-        title: "Error",
-        description: "Failed to save game plan",
-        variant: "destructive",
-      });
+      })
     }
-  };
+  } catch (error) {
+    console.error("Error saving game plan:", error)
+    toast({
+      title: "Error",
+      description: "Failed to save game plan",
+      variant: "destructive",
+    })
+  } finally {
+    setIsSaving(false)
+  }
+}
 
   // Replace deleteGamePlan handler
-  const handleDeleteGamePlan = async (gameplanId: string) => {
+  const handleDeleteGamePlan = async () => {
     try {
-      if (!user?.academyId) return;
-
-      const response = await fetch(`/api/db/ams-gameplan?id=${gameplanId}&academyId=${user.academyId}`, {
-        method: 'DELETE'
-      });
-
-      if (!response.ok) throw new Error('Failed to delete gameplan');
-
-      setGamePlans(prev => prev.filter(gp => gp._id !== gameplanId));
-      
-      if (selectedGamePlan?._id === gameplanId) {
-        setSelectedGamePlan(gamePlans[0] || null);
+      if (!user?.academyId || !gameplanToDelete) {
+        toast({
+          title: "Error",
+          description: "Academy ID or gameplan ID is missing",
+          variant: "destructive",
+        })
+        return
       }
+
+      // Use _id instead of id since MongoDB uses _id
+      const response = await fetch(`/api/db/ams-gameplan?id=${gameplanToDelete}&academyId=${user.academyId}`, {
+        method: "DELETE",
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`Failed to delete gameplan: ${response.status} - ${errorText}`)
+      }
+
+      const result = await response.json()
+
+      if (!result.success) {
+        throw new Error(result.error || "Failed to delete gameplan")
+      }
+
+      // Remove from local state using _id
+      setGamePlans((prev) => prev.filter((gp) => gp._id !== gameplanToDelete))
+
+      // Update selected gameplan if it was the one being deleted
+      if (selectedGamePlan?._id === gameplanToDelete) {
+        const remainingGamePlans = gamePlans.filter((gp) => gp._id !== gameplanToDelete)
+        setSelectedGamePlan(remainingGamePlans[0] || null)
+        setActiveTab(0) // Reset to first tab
+      }
+
+      // Close dialog and reset state
+      setShowDeleteDialog(false)
+      setGameplanToDelete(null)
 
       toast({
         title: "Success",
         description: "Game plan deleted successfully",
-      });
-
+      })
     } catch (error) {
-      console.error('Error deleting gameplan:', error);
+      console.error("Error deleting gameplan:", error)
       toast({
         title: "Error",
-        description: "Failed to delete gameplan",
+        description: error instanceof Error ? error.message : "Failed to delete gameplan",
         variant: "destructive",
-      });
+      })
     }
-  };
+  }
+
+  const DeleteConfirmationDialog = () => (
+    <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Delete Game Plan</DialogTitle>
+        </DialogHeader>
+        <div className="py-4">
+          <p className="text-muted-foreground">
+            Are you sure you want to delete this game plan? This action cannot be undone.
+          </p>
+          {gameplanToDelete && (
+            <p className="mt-2 font-medium">Game Plan: {gamePlans.find((gp) => gp._id === gameplanToDelete)?.name}</p>
+          )}
+        </div>
+        <DialogFooter>
+          <Button
+            variant="outline"
+            onClick={() => {
+              setShowDeleteDialog(false)
+              setGameplanToDelete(null)
+            }}
+          >
+            Cancel
+          </Button>
+          <Button variant="destructive" onClick={handleDeleteGamePlan}>
+            Delete Game Plan
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
 
   const handleExportGamePlan = () => {
-    if (!selectedGamePlan) return;
-    
-    exportToDoc(selectedGamePlan, players.map(p => ({ ...p, id: p.id.toString() })));
+    if (!selectedGamePlan) return
+
+    exportToDoc(
+      selectedGamePlan,
+      players.map((p) => ({ ...p, id: p.id.toString() })),
+    )
     toast({
       title: "Game Plan Exported",
       description: "Your game plan has been exported as a DOC file",
-    });
-  };
+    })
+  }
 
   const handleExportAllGamePlans = () => {
-    exportMultipleToDoc(gamePlans, players.map(p => ({ ...p, id: p.id.toString() })));
+    exportMultipleToDoc(
+      gamePlans,
+      players.map((p) => ({ ...p, id: p.id.toString() })),
+    )
     toast({
       title: "Game Plans Exported",
       description: `${gamePlans.length} game plans have been exported as a DOC file`,
-    });
-  };
+    })
+  }
 
   const exportToPDF = async (
     formationRef: React.RefObject<HTMLDivElement>,
     gamePlan: GamePlan,
     players: Player[],
-    batches: any[]
+    batches: any[],
   ) => {
     try {
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      
+      const pdf = new jsPDF("p", "mm", "a4")
+
       // Page 1: Formation Map
       // Add title
-      pdf.setFontSize(24);
-      pdf.text(gamePlan.name, 105, 20, { align: 'center' });
-      pdf.setFontSize(16);
-      pdf.text('Formation', 105, 30, { align: 'center' });
-      
+      pdf.setFontSize(24)
+      pdf.text(gamePlan.name, 105, 20, { align: "center" })
+      pdf.setFontSize(16)
+      pdf.text("Formation", 105, 30, { align: "center" })
+
       // Add formation image with maximum size while maintaining aspect ratio
       if (formationRef.current) {
         const canvas = await html2canvas(formationRef.current, {
           backgroundColor: null,
           scale: 2,
-        });
-        const formationImage = canvas.toDataURL('image/png');
-        
+        })
+        const formationImage = canvas.toDataURL("image/png")
+
         // Calculate dimensions to fill most of the page while maintaining aspect ratio
-        const pageWidth = 210; // A4 width in mm
-        const pageHeight = 297; // A4 height in mm
-        const maxWidth = 190; // Leave margins
-        const maxHeight = 230; // Leave space for title and margins
-        
-        const imgRatio = canvas.width / canvas.height;
-        let finalWidth = maxWidth;
-        let finalHeight = maxWidth / imgRatio;
-        
+        const pageWidth = 210 // A4 width in mm
+        const pageHeight = 297 // A4 height in mm
+        const maxWidth = 190 // Leave margins
+        const maxHeight = 230 // Leave space for title and margins
+
+        const imgRatio = canvas.width / canvas.height
+        let finalWidth = maxWidth
+        let finalHeight = maxWidth / imgRatio
+
         if (finalHeight > maxHeight) {
-          finalHeight = maxHeight;
-          finalWidth = maxHeight * imgRatio;
+          finalHeight = maxHeight
+          finalWidth = maxHeight * imgRatio
         }
-        
+
         // Center the image horizontally
-        const leftMargin = (pageWidth - finalWidth) / 2;
+        const leftMargin = (pageWidth - finalWidth) / 2
         // Position below title with some spacing
-        const topMargin = 40;
-        
-        pdf.addImage(formationImage, 'PNG', leftMargin, topMargin, finalWidth, finalHeight);
+        const topMargin = 40
+
+        pdf.addImage(formationImage, "PNG", leftMargin, topMargin, finalWidth, finalHeight)
       }
-      
+
       // Page 2: Details
-      pdf.addPage();
-      
+      pdf.addPage()
+
       // Add Strategy section with adjusted spacing
-      pdf.setFontSize(18);
-      pdf.text('Strategy', 20, 20);
-      pdf.setFontSize(12);
-      const splitStrategy = pdf.splitTextToSize(gamePlan.strategy || 'No strategy defined', 170);
-      pdf.text(splitStrategy, 20, 30);
+      pdf.setFontSize(18)
+      pdf.text("Strategy", 20, 20)
+      pdf.setFontSize(12)
+      const splitStrategy = pdf.splitTextToSize(gamePlan.strategy || "No strategy defined", 170)
+      pdf.text(splitStrategy, 20, 30)
 
       // Add Team Composition section with more spacing
-      let yPosition = 60;
+      let yPosition = 60
 
       // Add Starting lineup header
-      pdf.setFontSize(16);
-      pdf.text('Starting Lineup', 20, yPosition);
-      yPosition += 15; // Increased from 10
-      pdf.setFontSize(12);
+      pdf.setFontSize(16)
+      pdf.text("Starting Lineup", 20, yPosition)
+      yPosition += 15 // Increased from 10
+      pdf.setFontSize(12)
 
       // Draw lineup table headers with more space
-      pdf.setFont('helvetica', 'bold');
-      pdf.text('Position', 20, yPosition);
-      pdf.text('Player', 80, yPosition);
-      pdf.setFont('helvetica', 'normal');
-      yPosition += 10; // Increased from 8
+      pdf.setFont("helvetica", "bold")
+      pdf.text("Position", 20, yPosition)
+      pdf.text("Player", 80, yPosition)
+      pdf.setFont("helvetica", "normal")
+      yPosition += 10 // Increased from 8
 
       // Group and sort positions (unchanged)
       const positionOrder = {
-        "GK": 1,
-        "LB": 2, "CB": 3, "RB": 4,
-        "LM": 5, "CM": 6, "RM": 7,
-        "ST": 8
-      };
+        GK: 1,
+        LB: 2,
+        CB: 3,
+        RB: 4,
+        LM: 5,
+        CM: 6,
+        RM: 7,
+        ST: 8,
+      }
 
-      const allPositions = [...positions, ...customPositions];
+      const allPositions = [...positions, ...customPositions]
       const orderedEntries = Object.entries(gamePlan.positions)
         .filter(([_, data]) => data?.playerId)
         .map(([positionId, data]) => {
-          const position = allPositions.find(p => p.id === positionId);
-          const player = players.find(p => p.id.toString() === data?.playerId);
-          return { 
-            position, 
-            player, 
-            order: position?.shortName && (position.shortName in positionOrder)
-              ? positionOrder[position.shortName as keyof typeof positionOrder]
-              : 99 
-          };
+          const position = allPositions.find((p) => p.id === positionId)
+          const player = players.find((p) => p.id.toString() === data?.playerId)
+          return {
+            position,
+            player,
+            order:
+              position?.shortName && position.shortName in positionOrder
+                ? positionOrder[position.shortName as keyof typeof positionOrder]
+                : 99,
+          }
         })
-        .sort((a, b) => a.order - b.order);
+        .sort((a, b) => a.order - b.order)
 
       // Add lineup entries with increased spacing
       orderedEntries.forEach(({ position, player }) => {
         if (position && player) {
           // Check if we need to add a new page
           if (yPosition > 250) {
-            pdf.addPage();
-            yPosition = 20;
+            pdf.addPage()
+            yPosition = 20
           }
-          pdf.text(position.name, 20, yPosition);
-          pdf.text(player.name, 80, yPosition);
-          yPosition += 12; // Increased from 6
+          pdf.text(position.name, 20, yPosition)
+          pdf.text(player.name, 80, yPosition)
+          yPosition += 12 // Increased from 6
         }
-      });
+      })
 
       // Add Substitutes section with proper spacing
-      yPosition += 15; // Increased spacing before substitutes section
-      pdf.setFontSize(16);
-      pdf.text('Substitutes', 20, yPosition);
-      yPosition += 15; // Increased from 10
-      pdf.setFontSize(12);
+      yPosition += 15 // Increased spacing before substitutes section
+      pdf.setFontSize(16)
+      pdf.text("Substitutes", 20, yPosition)
+      yPosition += 15 // Increased from 10
+      pdf.setFontSize(12)
 
       // Draw substitutes table headers
-      pdf.setFont('helvetica', 'bold');
-      pdf.text('Position', 20, yPosition);
-      pdf.text('Player', 80, yPosition);
-      pdf.setFont('helvetica', 'normal');
-      yPosition += 20; // Increased from 8
+      pdf.setFont("helvetica", "bold")
+      pdf.text("Position", 20, yPosition)
+      pdf.text("Player", 80, yPosition)
+      pdf.setFont("helvetica", "normal")
+      yPosition += 20 // Increased from 8
 
       // Add substitute entries with increased spacing
-      (gamePlan.substitutes || []).forEach(sub => {
-        const player = players.find(p => p.id.toString() === sub.playerId);
+      ;(gamePlan.substitutes || []).forEach((sub) => {
+        const player = players.find((p) => p.id.toString() === sub.playerId)
         if (player) {
           // Check if we need to add a new page
           if (yPosition > 250) {
-            pdf.addPage();
-            yPosition = 20;
+            pdf.addPage()
+            yPosition = 20
           }
-          pdf.text(sub.position, 20, yPosition);
-          pdf.text(player.name, 80, yPosition);
-          yPosition += 12; // Increased from 6
+          pdf.text(sub.position, 20, yPosition)
+          pdf.text(player.name, 80, yPosition)
+          yPosition += 12 // Increased from 6
         }
-      });
+      })
 
       // Save the PDF
-      pdf.save(`${gamePlan.name}_formation.pdf`);
+      pdf.save(`${gamePlan.name}_formation.pdf`)
 
       toast({
         title: "Export Successful",
         description: "Formation and team details have been exported as PDF",
-      });
-
+      })
     } catch (error) {
-      console.error('Error exporting to PDF:', error);
+      console.error("Error exporting to PDF:", error)
       toast({
         title: "Export Failed",
         description: "Failed to export formation and team details",
         variant: "destructive",
-      });
+      })
     }
-  };
+  }
 
   const handleExportField = async () => {
-    if (!fieldRef.current || !selectedGamePlan) return;
-  
+    if (!fieldRef.current || !selectedGamePlan) return
+
     try {
       // Show export options dialog
-      setShowExportDialog(true);
+      setShowExportDialog(true)
     } catch (error) {
       toast({
         title: "Export Failed",
         description: "Failed to export formation",
         variant: "destructive",
-      });
+      })
     }
-  };
+  }
 
   const isValidPosition = (player: Player, positionName: string) => {
     const playerPosition = player.position?.toLowerCase() || ""
@@ -670,7 +761,7 @@ export default function TeamBuilder() {
     })
 
     setGamePlans(
-      gamePlans.map((gp) => (gp.id === selectedGamePlan.id ? { ...gp, positions: selectedGamePlan.positions } : gp)),
+      gamePlans.map((gp) => (gp.id === selectedGamePlan._id ? { ...gp, positions: selectedGamePlan.positions } : gp)),
     )
 
     setDraggedPosition(null)
@@ -683,29 +774,28 @@ export default function TeamBuilder() {
         title: "Error",
         description: "No game plan or position selected",
         variant: "destructive",
-      });
-      return;
+      })
+      return
     }
 
     // Check if player is already assigned
-    const isPlayerAssigned = Object.values(selectedGamePlan.positions).some(
-      (pos) => pos && pos.playerId === playerId
-    );
+    const isPlayerAssigned = Object.values(selectedGamePlan.positions).some((pos) => pos && pos.playerId === playerId)
 
     if (isPlayerAssigned) {
       toast({
         title: "Error",
         description: "Player is already assigned to another position",
         variant: "destructive",
-      });
-      return;
+      })
+      return
     }
 
     // Get position coordinates - use existing coordinates if available, otherwise use default
-    const currentPositionData = selectedGamePlan.positions[selectedPosition.id];
-    const coordinates = currentPositionData && typeof currentPositionData === 'object' 
-      ? { top: currentPositionData.top, left: currentPositionData.left }
-      : getDefaultPositionStyle(selectedPosition.id);
+    const currentPositionData = selectedGamePlan.positions[selectedPosition.id]
+    const coordinates =
+      currentPositionData && typeof currentPositionData === "object"
+        ? { top: currentPositionData.top, left: currentPositionData.left }
+        : getDefaultPositionStyle(selectedPosition.id)
 
     // Create a copy of the current positions
     const updatedPositions = {
@@ -715,74 +805,70 @@ export default function TeamBuilder() {
         top: coordinates.top,
         left: coordinates.left,
       },
-    };
+    }
 
     // Create updated game plan
     const updatedGamePlan = {
       ...selectedGamePlan,
       positions: updatedPositions,
-    };
+    }
 
     // Update both states
-    setSelectedGamePlan(updatedGamePlan);
-    setGamePlans(prevGamePlans =>
-      prevGamePlans.map(gp =>
-        gp.id === selectedGamePlan.id ? updatedGamePlan : gp
-      )
-    );
+    setSelectedGamePlan(updatedGamePlan)
+    setGamePlans((prevGamePlans) => prevGamePlans.map((gp) => (gp.id === selectedGamePlan._id ? updatedGamePlan : gp)))
 
     // Save to localStorage immediately
     try {
-      const allGamePlans = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || '[]');
-      const otherGamePlans = allGamePlans.filter((plan: GamePlan) => 
-        plan.id !== selectedGamePlan.id
-      );
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify([...otherGamePlans, updatedGamePlan]));
-      
+      const allGamePlans = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || "[]")
+      const otherGamePlans = allGamePlans.filter((plan: GamePlan) => plan.id !== selectedGamePlan._id)
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify([...otherGamePlans, updatedGamePlan]))
+
       toast({
         title: "Success",
         description: "Player assigned successfully",
-      });
+      })
     } catch (error) {
       toast({
         title: "Error",
         description: "Failed to save changes",
         variant: "destructive",
-      });
+      })
     }
-    
+
     // Close the modal
-    setIsModalOpen(false);
-    setSelectedPosition(null);
-  };
+    setIsModalOpen(false)
+    setSelectedPosition(null)
+  }
 
   const handlePlayerDragStart = (e: React.DragEvent<HTMLDivElement>, playerId: string) => {
     e.dataTransfer.setData("playerId", playerId)
   }
 
   const handlePositionDrop = async (e: React.DragEvent<HTMLDivElement>, positionId: string) => {
-    e.preventDefault();
-    const playerId = e.dataTransfer.getData("playerId");
-    
+    e.preventDefault()
+    const playerId = e.dataTransfer.getData("playerId")
+
     if (playerId && selectedGamePlan) {
-      const isPlayerAssigned = Object.values(selectedGamePlan.positions).some(
-        (pos) => pos && pos.playerId === playerId
-      );
-      
+      const isPlayerAssigned = Object.values(selectedGamePlan.positions).some((pos) => pos && pos.playerId === playerId)
+
       if (isPlayerAssigned) {
         toast({
           title: "Error",
           description: "Player is already assigned to another position",
           variant: "destructive",
-        });
-        return;
+        })
+        return
       }
 
       // Get position coordinates - use existing coordinates if available, otherwise use default
-      const currentPositionData = selectedGamePlan.positions[positionId];
-      const coordinates = currentPositionData && typeof currentPositionData === 'object' && currentPositionData.top && currentPositionData.left
-        ? { top: currentPositionData.top, left: currentPositionData.left }
-        : getDefaultPositionStyle(positionId);
+      const currentPositionData = selectedGamePlan.positions[positionId]
+      const coordinates =
+        currentPositionData &&
+        typeof currentPositionData === "object" &&
+        currentPositionData.top &&
+        currentPositionData.left
+          ? { top: currentPositionData.top, left: currentPositionData.left }
+          : getDefaultPositionStyle(positionId)
 
       const updatedPositions = {
         ...selectedGamePlan.positions,
@@ -791,74 +877,72 @@ export default function TeamBuilder() {
           top: coordinates.top,
           left: coordinates.left,
         },
-      };
+      }
 
       // Update local state
       const updatedGamePlan = {
         ...selectedGamePlan,
         positions: updatedPositions,
-      };
+      }
 
-      setSelectedGamePlan(updatedGamePlan);
-      setGamePlans(prevGamePlans => 
-        prevGamePlans.map(gp =>
-          gp._id === selectedGamePlan._id ? updatedGamePlan : gp
-        )
-      );
+      setSelectedGamePlan(updatedGamePlan)
+      setGamePlans((prevGamePlans) =>
+        prevGamePlans.map((gp) => (gp._id === selectedGamePlan._id ? updatedGamePlan : gp)),
+      )
 
       // Save to database immediately
       try {
         const response = await fetch(`/api/db/ams-gameplan/${selectedGamePlan._id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             positions: updatedPositions,
-            updatedAt: new Date().toISOString()
-          })
-        });
+            updatedAt: new Date().toISOString(),
+          }),
+        })
 
         if (!response.ok) {
-          throw new Error('Failed to save position update');
+          throw new Error("Failed to save position update")
         }
 
         toast({
           title: "Success",
           description: "Player position saved",
-        });
+        })
       } catch (error) {
-        console.error('Error saving position:', error);
+        console.error("Error saving position:", error)
         toast({
           title: "Error",
           description: "Failed to save player position",
           variant: "destructive",
-        });
+        })
       }
     }
-  };
+  }
 
   const handlePositionDragStart = (e: React.DragEvent<HTMLDivElement>, positionId: string) => {
     // Explicitly set drag data type
-    e.dataTransfer.setData("application/my-app-position", positionId);
-    e.dataTransfer.effectAllowed = "move";
-    setDraggedPosition(positionId); // Set dragged position state
+    e.dataTransfer.setData("application/my-app-position", positionId)
+    e.dataTransfer.effectAllowed = "move"
+    setDraggedPosition(positionId) // Set dragged position state
   }
 
   const handlePositionDropOnMap = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    if (!showCustomizeMenu || !selectedGamePlan) return;
+    e.preventDefault()
+    if (!showCustomizeMenu || !selectedGamePlan) return
 
-    const positionId = e.dataTransfer.getData("application/my-app-position");
-    if (!positionId) return;
+    const positionId = e.dataTransfer.getData("application/my-app-position")
+    if (!positionId) return
 
-    const rect = e.currentTarget.getBoundingClientRect();
-    let top = ((e.clientY - rect.top) / rect.height) * 100;
-    let left = ((e.clientX - rect.left) / rect.width) * 100;
+    const rect = e.currentTarget.getBoundingClientRect()
+    let top = ((e.clientY - rect.top) / rect.height) * 100
+    let left = ((e.clientX - rect.left) / rect.width) * 100
 
     // Clamp values between 0 and 100 to avoid overflow
-    top = Math.min(100, Math.max(0, top));
-    left = Math.min(100, Math.max(0, left));
+    top = Math.min(100, Math.max(0, top))
+    left = Math.min(100, Math.max(0, left))
 
-    const currentPosition = selectedGamePlan.positions[positionId];
+    const currentPosition = selectedGamePlan.positions[positionId]
 
     const updatedPosition = {
       ...(typeof currentPosition === "object" && currentPosition !== null
@@ -866,49 +950,43 @@ export default function TeamBuilder() {
         : { playerId: currentPosition || "" }),
       top: `${top}%`,
       left: `${left}%`,
-    };
+    }
 
     const updatedPositions = {
       ...selectedGamePlan.positions,
       [positionId]: updatedPosition,
-    };
+    }
 
     // Update selectedGamePlan
     const updatedGamePlan = {
       ...selectedGamePlan,
       positions: updatedPositions,
-    };
+    }
 
-    setSelectedGamePlan(updatedGamePlan);
+    setSelectedGamePlan(updatedGamePlan)
 
     // Update gamePlans and save immediately
     setGamePlans((prevGamePlans) => {
-      const newGamePlans = prevGamePlans.map((gp) =>
-        gp.id === selectedGamePlan.id ? updatedGamePlan : gp
-      );
+      const newGamePlans = prevGamePlans.map((gp) => (gp.id === selectedGamePlan._id ? updatedGamePlan : gp))
 
       try {
-        const allGamePlans = JSON.parse(
-          localStorage.getItem(LOCAL_STORAGE_KEY) || "[]"
-        );
+        const allGamePlans = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || "[]")
         const otherGamePlans = allGamePlans.filter(
-          (plan: GamePlan) =>
-            plan.academyId !== updatedGamePlan.academyId ||
-            plan.coachId !== updatedGamePlan.coachId
-        );
-        const finalGamePlans = [...otherGamePlans, ...newGamePlans];
-        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(finalGamePlans));
+          (plan: GamePlan) => plan.academyId !== updatedGamePlan.academyId || plan.coachId !== updatedGamePlan.coachId,
+        )
+        const finalGamePlans = [...otherGamePlans, ...newGamePlans]
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(finalGamePlans))
       } catch (error) {
         toast({
           title: "Error",
           description: "Failed to save changes",
           variant: "destructive",
-        });
+        })
       }
 
-      return newGamePlans;
-    });
-  };
+      return newGamePlans
+    })
+  }
 
   const handlePositionClick = (position: Position) => {
     if (!showCustomizeMenu) {
@@ -918,255 +996,232 @@ export default function TeamBuilder() {
   }
 
   const PlayerSelectionModal = () => {
-  const [showAllPositions, setShowAllPositions] = useState(false)
-  
-  const positionPlayers = useMemo(() => {
-    if (!selectedPosition) return [];
-    
-    return availablePlayers.filter((player) => {
-      if (showAllPositions) return true;
-      
-      const playerPosition = player.position?.toLowerCase() || "";
-      const positionName = selectedPosition.name.toLowerCase();
-      
-      switch (positionName) {
-        case "goalkeeper":
-          return ["goalkeeper", "gk"].includes(playerPosition);
-        case "left back":
-        case "center back 1":
-        case "center back 2":
-        case "right back":
-          return ["defender", "back", "lb", "rb", "cb"].includes(playerPosition);
-        case "left midfielder":
-        case "center midfielder 1":
-        case "center midfielder 2":
-        case "right midfielder":
-          return ["midfielder", "mid", "lm", "rm", "cm"].includes(playerPosition);
-        case "striker 1":
-        case "striker 2":
-          return ["forward", "striker", "attacker", "st"].includes(playerPosition);
-        default:
-          if (selectedPosition.type) {
-            return (player.position || '').toLowerCase().includes(selectedPosition.type.toLowerCase());
-          }
-          return false;
-      }
-    });
-  }, [selectedPosition, availablePlayers, showAllPositions]);
+    const [showAllPositions, setShowAllPositions] = useState(false)
 
-  const remainingPlayers = useMemo(() => {
-    return availablePlayers.filter(player => !positionPlayers.includes(player));
-  }, [availablePlayers, positionPlayers]);
+    const positionPlayers = useMemo(() => {
+      if (!selectedPosition) return []
 
-  return (
-    <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-      <DialogContent className="max-w-md">
-        <DialogHeader className="space-y-4">
-          <DialogTitle>Select Player for {selectedPosition?.name}</DialogTitle>
-          {selectedBatch && (
-            <div className="text-sm text-blue-400">
-              Showing players from: {filteredBatches.find(b => b.id === selectedBatch)?.name}
-            </div>
-          )}
-          {showAllPositions && (
-            <div className="text-sm text-muted-foreground">
-              Showing players from all positions
-            </div>
-          )}
-        </DialogHeader>
+      return availablePlayers.filter((player) => {
+        if (showAllPositions) return true
 
-        {positionPlayers.length === 0 ? (
-          <div className="text-center py-8">
-            <h3 className="text-lg font-semibold mb-2">No Players Available</h3>
-            <p className="text-muted-foreground mb-4">
-              {selectedBatch 
-                ? `There are no players available for the ${selectedPosition?.name} position in the selected batch`
-                : `There are no players available for the ${selectedPosition?.name} position`
-              }
-            </p>
-            {!showAllPositions && (
-              <Button 
-                onClick={() => setShowAllPositions(true)}
-                className="w-full"
-              >
-                View Players from Other Positions ({remainingPlayers.length})
-              </Button>
+        const playerPosition = player.position?.toLowerCase() || ""
+        const positionName = selectedPosition.name.toLowerCase()
+
+        switch (positionName) {
+          case "goalkeeper":
+            return ["goalkeeper", "gk"].includes(playerPosition)
+          case "left back":
+          case "center back 1":
+          case "center back 2":
+          case "right back":
+            return ["defender", "back", "lb", "rb", "cb"].includes(playerPosition)
+          case "left midfielder":
+          case "center midfielder 1":
+          case "center midfielder 2":
+          case "right midfielder":
+            return ["midfielder", "mid", "lm", "rm", "cm"].includes(playerPosition)
+          case "striker 1":
+          case "striker 2":
+            return ["forward", "striker", "attacker", "st"].includes(playerPosition)
+          default:
+            if (selectedPosition.type) {
+              return (player.position || "").toLowerCase().includes(selectedPosition.type.toLowerCase())
+            }
+            return false
+        }
+      })
+    }, [selectedPosition, availablePlayers, showAllPositions])
+
+    const remainingPlayers = useMemo(() => {
+      return availablePlayers.filter((player) => !positionPlayers.includes(player))
+    }, [availablePlayers, positionPlayers])
+
+    return (
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader className="space-y-4">
+            <DialogTitle>Select Player for {selectedPosition?.name}</DialogTitle>
+            {selectedBatch && (
+              <div className="text-sm text-blue-400">
+                Showing players from: {filteredBatches.find((b) => b.id === selectedBatch)?.name}
+              </div>
             )}
-          </div>
-        ) : (
-          <ScrollArea className="h-[400px] pr-4">
-            <div className="space-y-2">
-              {(showAllPositions ? availablePlayers : positionPlayers).map((player) => (
-                <div
-                  key={player.id}
-                  onClick={() => handlePlayerSelect(player.id.toString())}
-                  className="flex items-center justify-between p-3 hover:bg-accent rounded-lg cursor-pointer group"
-                >
-                  <div className="flex items-center gap-3">
-                    <Avatar className="h-10 w-10">
-                      <AvatarImage src={player.photoUrl} alt={player.name} />
-                      <AvatarFallback className="text-lg bg-gray-900 w-full h-full flex items-center justify-center rounded-full">
-                        {player.name?.charAt(0)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <p className="font-medium group-hover:text-primary">{player.name}</p>
-                      <p className="text-sm text-muted-foreground">{player.position}</p>
-                    </div>
-                  </div>
-                  {showAllPositions && (
-                    <span className="text-xs px-2 py-1 rounded-full bg-secondary">
-                      {player.position}
-                    </span>
-                  )}
-                </div>
-              ))}
+            {showAllPositions && (
+              <div className="text-sm text-muted-foreground">Showing players from all positions</div>
+            )}
+          </DialogHeader>
+
+          {positionPlayers.length === 0 ? (
+            <div className="text-center py-8">
+              <h3 className="text-lg font-semibold mb-2">No Players Available</h3>
+              <p className="text-muted-foreground mb-4">
+                {selectedBatch
+                  ? `There are no players available for the ${selectedPosition?.name} position in the selected batch`
+                  : `There are no players available for the ${selectedPosition?.name} position`}
+              </p>
+              {!showAllPositions && (
+                <Button onClick={() => setShowAllPositions(true)} className="w-full">
+                  View Players from Other Positions ({remainingPlayers.length})
+                </Button>
+              )}
             </div>
-          </ScrollArea>
-        )}
-        
-        {positionPlayers.length > 0 && !showAllPositions && remainingPlayers.length > 0 && (
-          <div className="mt-4 pt-4 border-t">
-            <Button 
-              variant="outline" 
-              onClick={() => setShowAllPositions(true)}
-              className="w-full"
-            >
-              Show {remainingPlayers.length} More Players from Other Positions
-            </Button>
-          </div>
-        )}
+          ) : (
+            <ScrollArea className="h-[400px] pr-4">
+              <div className="space-y-2">
+                {(showAllPositions ? availablePlayers : positionPlayers).map((player) => (
+                  <div
+                    key={player.id}
+                    onClick={() => handlePlayerSelect(player.id.toString())}
+                    className="flex items-center justify-between p-3 hover:bg-accent rounded-lg cursor-pointer group"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Avatar className="h-10 w-10">
+                        <AvatarImage src={player.photoUrl || "/placeholder.svg"} alt={player.name} />
+                        <AvatarFallback className="text-lg bg-gray-900 w-full h-full flex items-center justify-center rounded-full">
+                          {player.name?.charAt(0)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <p className="font-medium group-hover:text-primary">{player.name}</p>
+                        <p className="text-sm text-muted-foreground">{player.position}</p>
+                      </div>
+                    </div>
+                    {showAllPositions && (
+                      <span className="text-xs px-2 py-1 rounded-full bg-secondary">{player.position}</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          )}
 
-        {showAllPositions && (
-          <div className="mt-4 pt-4 border-t">
-            <Button 
-              variant="outline" 
-              onClick={() => setShowAllPositions(false)}
-              className="w-full"
-            >
-              Show Only {selectedPosition?.name} Players
-            </Button>
-          </div>
-        )}
-      </DialogContent>
-    </Dialog>
-  );
-};
+          {positionPlayers.length > 0 && !showAllPositions && remainingPlayers.length > 0 && (
+            <div className="mt-4 pt-4 border-t">
+              <Button variant="outline" onClick={() => setShowAllPositions(true)} className="w-full">
+                Show {remainingPlayers.length} More Players from Other Positions
+              </Button>
+            </div>
+          )}
 
-const filteredBatches = useMemo(() => {
-  console.log("=== FILTER BATCHES DEBUG ===");
-  console.log("All batches from context:", batches);
-  console.log("Batches length:", batches?.length);
-  console.log("Batches type:", typeof batches);
-  console.log("Is batches an array?", Array.isArray(batches));
-  
-  if (!batches || !Array.isArray(batches)) {
-    console.log("❌ Batches is not an array or is null/undefined");
-    return [];
+          {showAllPositions && (
+            <div className="mt-4 pt-4 border-t">
+              <Button variant="outline" onClick={() => setShowAllPositions(false)} className="w-full">
+                Show Only {selectedPosition?.name} Players
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    )
   }
 
-  console.log("User for filtering:", { 
-    id: user?.id, 
-    academyId: user?.academyId 
-  });
-  
-  if (!user?.academyId) {
-    console.log("❌ No academy ID available for filtering");
-    return [];
-  }
-  
-  const filtered = batches.filter(batch => {
-    console.log("Filtering batch:", {
-      batchId: batch.id, // Using id as per your interface
-      batchName: batch.name,
-      batchCoachId: batch.coachId,
-      batchCoachName: batch.coachName,
-      batchAcademyId: batch.academyId,
-      userAcademyId: user.academyId,
-      userCoachId: user.id,
-      sameAcademy: batch.academyId === user.academyId,
-      sameCoach: batch.coachId === user.id
-    });
-    
-    // Filter by academy ID first
-    const isSameAcademy = batch.academyId === user.academyId;
-    
-    // You can choose to filter by coach as well if needed:
-    // const isSameCoach = batch.coachId === user.id;
-    // return isSameAcademy && isSameCoach;
-    
-    // For now, just filter by academy
-    return isSameAcademy;
-  });
-  
-  console.log("✅ Filtered batches result:", filtered);
-  console.log("Filtered batches length:", filtered.length);
-  return filtered;
-}, [batches, user?.academyId, user?.id]);
+  const filteredBatches = useMemo(() => {
+    console.log("=== FILTER BATCHES DEBUG ===")
+    console.log("All batches from context:", batches)
+    console.log("Batches length:", batches?.length)
+    console.log("Batches type:", typeof batches)
+    console.log("Is batches an array?", Array.isArray(batches))
+
+    if (!batches || !Array.isArray(batches)) {
+      console.log("❌ Batches is not an array or is null/undefined")
+      return []
+    }
+
+    console.log("User for filtering:", {
+      id: user?.id,
+      academyId: user?.academyId,
+    })
+
+    if (!user?.academyId) {
+      console.log("❌ No academy ID available for filtering")
+      return []
+    }
+
+    const filtered = batches.filter((batch) => {
+      console.log("Filtering batch:", {
+        batchId: batch.id, // Using id as per your interface
+        batchName: batch.name,
+        batchCoachId: batch.coachId,
+        batchCoachName: batch.coachName,
+        batchAcademyId: batch.academyId,
+        userAcademyId: user.academyId,
+        userCoachId: user.id,
+        sameAcademy: batch.academyId === user.academyId,
+        sameCoach: batch.coachId === user.id,
+      })
+
+      // Filter by academy ID first
+      const isSameAcademy = batch.academyId === user.academyId
+
+      // You can choose to filter by coach as well if needed:
+      // const isSameCoach = batch.coachId === user.id;
+      // return isSameAcademy && isSameCoach;
+
+      // For now, just filter by academy
+      return isSameAcademy
+    })
+
+    console.log("✅ Filtered batches result:", filtered)
+    console.log("Filtered batches length:", filtered.length)
+    return filtered
+  }, [batches, user?.academyId, user?.id])
 
   // Update the availablePlayers memo to exclude both assigned and substitute players
   const availablePlayers = useMemo(() => {
-  if (!selectedGamePlan || !user?.academyId || !selectedGamePlan.positions) return [];
-  
-  // Get IDs of players assigned to positions
-  const assignedPlayerIds = Object.values(selectedGamePlan.positions || {})
-    .filter((pos): pos is { playerId: string; top: string; left: string } => pos !== null)
-    .map(pos => pos.playerId);
-  
-  // Get IDs of substitute players
-  const substitutePlayerIds = (selectedGamePlan.substitutes || [])
-    .map(sub => sub.playerId);
+    if (!selectedGamePlan || !user?.academyId || !selectedGamePlan.positions) return []
 
-  // Combine both arrays to get all used player IDs
-  const usedPlayerIds = [...assignedPlayerIds, ...substitutePlayerIds];
+    // Get IDs of players assigned to positions
+    const assignedPlayerIds = Object.values(selectedGamePlan.positions || {})
+      .filter((pos): pos is { playerId: string; top: string; left: string } => pos !== null)
+      .map((pos) => pos.playerId)
 
-  // Filter players by academy and exclude both assigned and substitute players
-  let filteredPlayers = players.filter((player) => 
-    player.academyId === user.academyId && 
-    !usedPlayerIds.includes(player.id.toString())
-  );
+    // Get IDs of substitute players
+    const substitutePlayerIds = (selectedGamePlan.substitutes || []).map((sub) => sub.playerId)
 
-  // If a batch is selected, further filter by batch
-  if (selectedBatch) {
-    // Find the selected batch object
-    const batch = filteredBatches.find(b => b.id === selectedBatch);
-    
-    if (batch && batch.players && Array.isArray(batch.players)) {
-      // Filter players to only include those in the selected batch
-      const batchPlayerIds = batch.players.map(p => p.toString());
-      filteredPlayers = filteredPlayers.filter(player => 
-        batchPlayerIds.includes(player.id.toString())
-      );
+    // Combine both arrays to get all used player IDs
+    const usedPlayerIds = [...assignedPlayerIds, ...substitutePlayerIds]
+
+    // Filter players by academy and exclude both assigned and substitute players
+    let filteredPlayers = players.filter(
+      (player) => player.academyId === user.academyId && !usedPlayerIds.includes(player.id.toString()),
+    )
+
+    // If a batch is selected, further filter by batch
+    if (selectedBatch) {
+      // Find the selected batch object
+      const batch = filteredBatches.find((b) => b.id === selectedBatch)
+
+      if (batch && batch.players && Array.isArray(batch.players)) {
+        // Filter players to only include those in the selected batch
+        const batchPlayerIds = batch.players.map((p) => p.toString())
+        filteredPlayers = filteredPlayers.filter((player) => batchPlayerIds.includes(player.id.toString()))
+      }
     }
-  }
 
-  return filteredPlayers;
-}, [players, selectedGamePlan, user?.academyId, selectedBatch, filteredBatches]);
-
+    return filteredPlayers
+  }, [players, selectedGamePlan, user?.academyId, selectedBatch, filteredBatches])
 
   // Update groupedPlayers memo to work with filtered players
   const groupedPlayers = useMemo(() => {
     return availablePlayers.reduce(
       (groups, player) => {
-        const position = player.position || "Unassigned";
+        const position = player.position || "Unassigned"
         return {
           ...groups,
           [position]: [...(groups[position] || []), player],
-        };
+        }
       },
       {} as Record<string, typeof players>,
-    );
-  }, [availablePlayers]);
+    )
+  }, [availablePlayers])
 
   const positionGroups = Object.entries(groupedPlayers)
 
   const filteredPlayers = useMemo(() => {
-    return players
-      .filter(player => 
-        player.academyId === user?.academyId && 
-        player.name.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-  }, [players, searchTerm, user?.academyId]);
+    return players.filter(
+      (player) => player.academyId === user?.academyId && player.name.toLowerCase().includes(searchTerm.toLowerCase()),
+    )
+  }, [players, searchTerm, user?.academyId])
 
   const handleRemovePlayer = (positionId: string) => {
     if (!selectedGamePlan) return
@@ -1179,7 +1234,7 @@ const filteredBatches = useMemo(() => {
       },
     })
     setGamePlans(
-      gamePlans.map((gp) => (gp.id === selectedGamePlan.id ? { ...gp, positions: selectedGamePlan.positions } : gp)),
+      gamePlans.map((gp) => (gp.id === selectedGamePlan._id ? { ...gp, positions: selectedGamePlan.positions } : gp)),
     )
   }
 
@@ -1200,99 +1255,176 @@ const filteredBatches = useMemo(() => {
   }
 
   // Add this helper function to get the latest attribute value for a player
-  const getLatestAttributeValue = (player: any, attribute: string): number => {
-    if (!player) return 0;
-    
-    // First check current attributes
-    if (player.attributes && player.attributes[attribute] !== undefined) {
-      return player.attributes[attribute];
-    }
+  
 
-    // If no current attributes, check performance history
-    if (player.performanceHistory && player.performanceHistory.length > 0) {
-      // Sort history by date in descending order
-      const sortedHistory = [...player.performanceHistory].sort((a, b) => 
-        new Date(b.date).getTime() - new Date(a.date).getTime()
-      );
+  // Replace your existing calculateAverageAttributes function
+const calculateAverageAttributes = (player: any) => {
+  if (!player) return {}
+  
+  // Filter performance history to only include entries with attributes object
+  const entriesWithAttributes = (player.performanceHistory || []).filter(
+    (entry: any) => entry.attributes && typeof entry.attributes === 'object'
+  )
+  
+  console.log('Player:', player.name, 'Entries with attributes:', entriesWithAttributes.length)
+  
+  // If no history with attributes, fall back to current attributes
+  if (entriesWithAttributes.length === 0) {
+    console.log('No performance history with attributes, using current attributes')
+    return player.attributes || {}
+  }
 
-      // Find the most recent entry with this attribute
-      const latestEntry = sortedHistory.find(entry => 
-        entry.attributes && entry.attributes[attribute] !== undefined
-      );
+  const attributeKeys = ["shooting", "pace", "positioning", "passing", "ballControl", "crossing"] as const
+  const averages: Record<string, number> = {}
 
-      if (latestEntry) {
-        return latestEntry.attributes[attribute];
+  attributeKeys.forEach((key) => {
+    let total = 0
+    let count = 0
+
+    // Calculate average from all performance history entries with attributes
+    entriesWithAttributes.forEach((entry: any) => {
+      const val = entry.attributes?.[key]
+      if (typeof val === 'number' && val > 0) {
+        total += val
+        count += 1
+        console.log(`${player.name} - ${key}: adding ${val} (total: ${total}, count: ${count})`)
       }
+    })
+
+    // Include current attributes if they exist and are valid
+    const currentVal = player.attributes?.[key]
+    if (typeof currentVal === 'number' && currentVal > 0) {
+      total += currentVal
+      count += 1
+      console.log(`${player.name} - ${key}: adding current ${currentVal} (total: ${total}, count: ${count})`)
     }
 
-    return 0; // Return 0 only if no history exists at all
-  };
+    averages[key] = count > 0 ? Math.round((total / count) * 10) / 10 : 0
+    console.log(`${player.name} - ${key} final average: ${averages[key]}`)
+  })
 
-  // Update radar data to use the latest attribute values
-  const radarData = {
-    labels: ["Shooting", "Pace", "Positioning", "Passing", "Ball Control", "Crossing"],
-    datasets: selectedPlayers.map((playerId, index) => {
-      const player = players.find((p) => p.id.toString() === playerId);
-      return {
-        label: player?.name || `Player ${index + 1}`,
-        data: [
-          getLatestAttributeValue(player, 'shooting'),
-          getLatestAttributeValue(player, 'pace'),
-          getLatestAttributeValue(player, 'positioning'),
-          getLatestAttributeValue(player, 'passing'),
-          getLatestAttributeValue(player, 'ballControl'),
-          getLatestAttributeValue(player, 'crossing'),
-        ],
-        backgroundColor: PLAYER_COLORS[index % PLAYER_COLORS.length],
-        borderColor: PLAYER_BORDER_COLORS[index % PLAYER_BORDER_COLORS.length],
-        borderWidth: 2,
-        fill: true,
-      };
-    }),
-  };
+  console.log('Final averages for', player.name, ':', averages)
+  return averages
+}
+
+// Replace your existing getLatestAttributeValue function
+const getLatestAttributeValue = (player: any, attribute: string): number => {
+  if (!player) return 0
+
+  // First check current attributes
+  if (player.attributes && typeof player.attributes[attribute] === 'number') {
+    console.log(`${player.name} - ${attribute} from current attributes: ${player.attributes[attribute]}`)
+    return player.attributes[attribute]
+  }
+
+  // If no current attributes, check performance history
+  if (player.performanceHistory && player.performanceHistory.length > 0) {
+    // Filter entries that have attributes object and sort by date descending
+    const entriesWithAttributes = player.performanceHistory
+      .filter((entry: any) => entry.attributes && typeof entry.attributes === 'object')
+      .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
+
+    // Find the most recent entry with this attribute
+    const latestEntry = entriesWithAttributes.find(
+      (entry: any) => typeof entry.attributes[attribute] === 'number'
+    )
+
+    if (latestEntry) {
+      console.log(`${player.name} - ${attribute} from latest entry: ${latestEntry.attributes[attribute]}`)
+      return latestEntry.attributes[attribute]
+    }
+  }
+
+  console.log(`${player.name} - ${attribute} not found, returning 0`)
+  return 0
+}
+
+// Replace your existing getAttributeValue function
+const getAttributeValue = (player: any, attribute: string, mode: "latest" | "overall" = "latest") => {
+  if (!player) return 0
+  
+  console.log(`Getting ${attribute} for ${player.name} in ${mode} mode`)
+  
+  if (mode === "overall") {
+    const averages = calculateAverageAttributes(player)
+    const value = averages[attribute] ?? 0
+    console.log(`Overall ${attribute} for ${player.name}: ${value}`)
+    return value
+  }
+  
+  // Latest mode
+  const value = getLatestAttributeValue(player, attribute)
+  console.log(`Latest ${attribute} for ${player.name}: ${value}`)
+  return value
+}
+
+// Also update how you use getAttributeValue in your radar chart data
+const radarData = {
+  labels: ["Shooting", "Pace", "Positioning", "Passing", "Ball Control", "Crossing"],
+  datasets: selectedPlayers.map((playerId, index) => {
+    const player = players.find((p) => p.id.toString() === playerId)
+    console.log('Creating radar data for player:', player?.name, 'with filter:', attributeFilter)
+    
+    return {
+      label: player?.name || `Player ${index + 1}`,
+      data: [
+        getAttributeValue(player, "shooting", attributeFilter),
+        getAttributeValue(player, "pace", attributeFilter),
+        getAttributeValue(player, "positioning", attributeFilter),
+        getAttributeValue(player, "passing", attributeFilter),
+        getAttributeValue(player, "ballControl", attributeFilter),
+        getAttributeValue(player, "crossing", attributeFilter),
+      ],
+      backgroundColor: PLAYER_COLORS[index % PLAYER_COLORS.length],
+      borderColor: PLAYER_BORDER_COLORS[index % PLAYER_BORDER_COLORS.length],
+      borderWidth: 2,
+      fill: true,
+    }
+  }),
+}
 
   // Update the line data generator function
   const lineData = (attribute: string) => {
     // Get all dates from all players' histories
-    const allDates = new Set<string>();
-    selectedPlayers.forEach(playerId => {
-      const player = players.find(p => p.id.toString() === playerId);
+    const allDates = new Set<string>()
+    selectedPlayers.forEach((playerId) => {
+      const player = players.find((p) => p.id.toString() === playerId)
       player?.performanceHistory?.forEach((entry: any) => {
-        allDates.add(new Date(entry.date).toISOString().split('T')[0]);
-      });
-    });
+        allDates.add(new Date(entry.date).toISOString().split("T")[0])
+      })
+    })
 
     // Sort dates chronologically
-    const sortedDates = Array.from(allDates).sort();
+    const sortedDates = Array.from(allDates).sort()
 
     // If no dates exist, create a date range from earliest record to today
     if (sortedDates.length === 0 && selectedPlayers.length > 0) {
-      const today = new Date();
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(today.getDate() - 30);
-      
+      const today = new Date()
+      const thirtyDaysAgo = new Date()
+      thirtyDaysAgo.setDate(today.getDate() - 30)
+
       for (let d = new Date(thirtyDaysAgo); d <= today; d.setDate(d.getDate() + 1)) {
-        sortedDates.push(d.toISOString().split('T')[0]);
+        sortedDates.push(d.toISOString().split("T")[0])
       }
     }
 
     return {
-      labels: sortedDates.map(date => new Date(date).toLocaleDateString()),
+      labels: sortedDates.map((date) => new Date(date).toLocaleDateString()),
       datasets: selectedPlayers.map((playerId, index) => {
-        const player = players.find((p) => p.id.toString() === playerId);
-        let lastValue = getLatestAttributeValue(player, attribute);
+        const player = players.find((p) => p.id.toString() === playerId)
+        let lastValue = getLatestAttributeValue(player, attribute)
 
-        const data = sortedDates.map(date => {
-          const entry = player?.performanceHistory?.find((e: any) => 
-            new Date(e.date).toISOString().split('T')[0] === date
-          );
+        const data = sortedDates.map((date) => {
+          const entry = player?.performanceHistory?.find(
+            (e: any) => new Date(e.date).toISOString().split("T")[0] === date,
+          )
 
           if (entry?.attributes?.[attribute] !== undefined) {
-            lastValue = entry.attributes[attribute];
+            lastValue = entry.attributes[attribute]
           }
 
-          return lastValue;
-        });
+          return lastValue
+        })
 
         return {
           label: player?.name || `Player ${index + 1}`,
@@ -1302,89 +1434,160 @@ const filteredBatches = useMemo(() => {
           backgroundColor: PLAYER_COLORS[index % PLAYER_COLORS.length],
           tension: 0.3, // Makes the line smoother
           pointRadius: 3,
-        };
+        }
       }),
-    };
-  };
+    }
+  }
 
   const radarOptions = {
-    scales: {
-      r: {
-        beginAtZero: true,
-        max: 10,
-        min: 0,
-        ticks: {
-          stepSize: 1,
-          display: false,
-        },
-        grid: {
-          color: "rgba(255, 255, 255, 0.1)",
-        },
-        pointLabels: {
-          color: "rgb(255, 255, 255)",
-          font: {
-            size: 12,
-          },
-        },
-        angleLines: {
-          color: "rgba(255, 255, 255, 0.1)",
+  scales: {
+    r: {
+      beginAtZero: true,
+      max: 10,
+      min: 0,
+      ticks: {
+        stepSize: 1,
+        display: false,
+        color: "rgb(255, 255, 255)",
+        font: {
+          size: 12,
+          weight: "bold" as const, // TypeScript fix
+        }
+      },
+      grid: {
+        color: "rgba(255, 255, 255, 0.3)",
+      },
+      pointLabels: {
+        color: "rgb(255, 255, 255)",
+        font: {
+          size: 14,
+          weight: "bold" as const, // TypeScript fix
         },
       },
-    },
-    plugins: {
-      legend: {
-        display: true,
+      angleLines: {
+        color: "rgba(255, 255, 255, 0.3)",
       },
     },
-    maintainAspectRatio: false,
-  }
+  },
+  plugins: {
+    legend: {
+      display: true,
+      labels: {
+        color: "rgb(255, 255, 255)",
+        font: {
+          size: 14,
+          weight: "bold" as const, // TypeScript fix
+        },
+        usePointStyle: true,
+        pointStyle: 'circle' as const,
+      },
+    },
+    tooltip: {
+      titleColor: "rgb(255, 255, 255)",
+      bodyColor: "rgb(255, 255, 255)",
+      backgroundColor: "rgba(0, 0, 0, 0.8)",
+    }
+  },
+  maintainAspectRatio: false,
+  responsive: true,
+}
 
-  const lineOptions = {
-    scales: {
-      x: {
-        beginAtZero: true,
-        grid: {
-          color: "rgba(255, 255, 255, 0.1)",
-        },
-        ticks: {
-          color: "rgb(255, 255, 255)",
-        },
+// Fixed lineOptions - replace your existing one
+const lineOptions = {
+  scales: {
+    x: {
+      beginAtZero: true,
+      grid: {
+        color: "rgba(255, 255, 255, 0.2)",
       },
-      y: {
-        beginAtZero: true,
-        grid: {
-          color: "rgba(255, 255, 255, 0.1)",
+      ticks: {
+        color: "rgb(255, 255, 255)",
+        font: {
+          size: 12,
+          weight: "bold" as const, // TypeScript fix
+        }
+      },
+      title: {
+        display: true,
+        text: 'Date',
+        color: "rgb(255, 255, 255)",
+        font: {
+          size: 14,
+          weight: "bold" as const, // TypeScript fix
+        }
+      }
+    },
+    y: {
+      beginAtZero: true,
+      grid: {
+        color: "rgba(255, 255, 255, 0.2)",
+      },
+      ticks: {
+        color: "rgb(255, 255, 255)",
+        font: {
+          size: 12,
+          weight: "bold" as const, // TypeScript fix
+        }
+      },
+      title: {
+        display: true,
+        text: 'Rating',
+        color: "rgb(255, 255, 255)",
+        font: {
+          size: 14,
+          weight: "bold" as const, // TypeScript fix
+        }
+      }
+    },
+  },
+  plugins: {
+    legend: {
+      labels: {
+        color: "rgb(255, 255, 255)",
+        font: {
+          size: 14,
+          weight: "bold" as const, // TypeScript fix
         },
-        ticks: {
-          color: "rgb(255, 255, 255)",
-        },
+        usePointStyle: true,
+        pointStyle: 'circle' as const,
       },
     },
-    plugins: {
-      legend: {
-        labels: {
-          color: "rgb(255, 255, 255)",
-        },
-      },
+    tooltip: {
+      titleColor: "rgb(255, 255, 255)",
+      bodyColor: "rgb(255, 255, 255)",
+      backgroundColor: "rgba(0, 0, 0, 0.8)",
+    }
+  },
+  elements: {
+    line: {
+      tension: 0.3,
     },
-    elements: {
-      line: {
-        tension: 0.3, // Makes lines smoother
-      },
-      point: {
-        radius: 3, // Smaller points
-        hoverRadius: 5,
-      },
+    point: {
+      radius: 4,
+      hoverRadius: 6,
+      backgroundColor: "rgba(255, 255, 255, 0.8)",
+      borderColor: "rgb(255, 255, 255)",
+      borderWidth: 2,
     },
-    maintainAspectRatio: false,
-  }
+  },
+  maintainAspectRatio: false,
+  responsive: true,
+}
+
+
+  
 
   const getColorForAttribute = (attribute: string, value: number) => {
-    const values = selectedPlayers.map(playerId => players.find(p => p.id.toString() === playerId)?.attributes[attribute as keyof PlayerAttributes] || 0)
+    const values = selectedPlayers.map((playerId) => {
+      const player = players.find((p) => p.id.toString() === playerId)
+      return getAttributeValue(player, attribute, attributeFilter)
+    })
+    if (values.length === 0) return ""
     const max = Math.max(...values)
     const min = Math.min(...values)
-    if (value === max) return "text-green-500"
-    if (value === min) return "text-red-500"
+    if (max === min) return ""
+    if (value === max) return "text-green-500 font-bold"
+    if (value === min) return "text-red-500 font-bold"
     return ""
   }
 
@@ -1407,26 +1610,26 @@ const filteredBatches = useMemo(() => {
   }
 
   const getPositionColor = (positionName: string): string => {
-    if (positionName.includes("Goalkeeper")) return "text-cyan-600"; // Gold color for GK
-    if (positionName.includes("Back")) return "text-lime-200"; // Deep red for defenders
-    if (positionName.includes("Midfielder")) return "text-yellow-200"; // Deep purple for midfielders
-    if (positionName.includes("Striker")) return "text-rose-500"; // Deep orange for strikers
-    return "text-white";
-  };
+    if (positionName.includes("Goalkeeper")) return "text-cyan-600" // Gold color for GK
+    if (positionName.includes("Back")) return "text-lime-200" // Deep red for defenders
+    if (positionName.includes("Midfielder")) return "text-yellow-200" // Deep purple for midfielders
+    if (positionName.includes("Striker")) return "text-rose-500" // Deep orange for strikers
+    return "text-white"
+  }
 
   const renderPositionContent = (position: any, selectedGamePlan: GamePlan) => {
-    if (!selectedGamePlan || !selectedGamePlan.positions) return null;
+    if (!selectedGamePlan || !selectedGamePlan.positions) return null
 
-    const playerId = selectedGamePlan.positions[position.id]?.playerId;
-    const player = players.find((p) => p.id.toString() === playerId);
-    const positionColor = getPositionColor(position.name);
-    
+    const playerId = selectedGamePlan.positions[position.id]?.playerId
+    const player = players.find((p) => p.id.toString() === playerId)
+    const positionColor = getPositionColor(position.name)
+
     if (player) {
       return (
         <div className="text-white text-center w-full h-full relative flex flex-col items-center justify-center gap-1">
-          <Avatar className={`w-[70px] h-[70px] border-100 ${positionColor.replace('text-', 'border-')}`}>
-            <AvatarImage 
-              src={player.photoUrl} 
+          <Avatar className={`w-[70px] h-[70px] border-100 ${positionColor.replace("text-", "border-")}`}>
+            <AvatarImage
+              src={player.photoUrl || "/placeholder.svg"}
               alt={player.name.toUpperCase()}
               className="object-cover w-full h-full"
             />
@@ -1435,7 +1638,7 @@ const filteredBatches = useMemo(() => {
             </AvatarFallback>
           </Avatar>
           {/* Added padding bottom to ensure text has enough space */}
-          <div className="absolute w-[120px] text-center" style={{ bottom: '-24px' }}>
+          <div className="absolute w-[120px] text-center" style={{ bottom: "-24px" }}>
             <span className={`text-sm font-semibold whitespace-nowrap px-1 rounded ${positionColor}`}>
               {player.name.toUpperCase()}
             </span>
@@ -1445,43 +1648,34 @@ const filteredBatches = useMemo(() => {
             size="icon"
             className="absolute -top-2 -right-2 h-4 w-4 rounded-full bg-red-500 text-white opacity-0 group-hover:opacity-100 transition-opacity"
             onClick={(e) => {
-              e.stopPropagation();
-              handleRemovePlayer(position.id);
+              e.stopPropagation()
+              handleRemovePlayer(position.id)
             }}
           >
             <X className="h-3 w-3" />
           </Button>
         </div>
-      );
+      )
     }
 
-    return (
-      <div className={`text-base font-medium ${positionColor}`}>
-        {position.shortName}
-      </div>
-    );
-  };
+    return <div className={`text-base font-medium ${positionColor}`}>{position.shortName}</div>
+  }
 
   // Add this helper function to count positions and goalkeepers
   const countPositions = (currentPositions: Position[]) => {
-    const totalCount = currentPositions.length;
-    const goalkeeperCount = currentPositions.filter(pos => 
-      pos.type === 'gk' || pos.shortName === 'GK'
-    ).length;
-    return { totalCount, goalkeeperCount };
-  };
+    const totalCount = currentPositions.length
+    const goalkeeperCount = currentPositions.filter((pos) => pos.type === "gk" || pos.shortName === "GK").length
+    return { totalCount, goalkeeperCount }
+  }
 
   // Modify handleAddCustomPosition to include position validation
   const handleAddCustomPosition = () => {
-    if (!selectedGamePlan) return;
+    if (!selectedGamePlan) return
 
     // Get current positions
-    const currentPositions = [
-      ...positions.filter(p => !deletedPositions.includes(p.id)), 
-      ...customPositions
-    ];
+    const currentPositions = [...positions.filter((p) => !deletedPositions.includes(p.id)), ...customPositions]
 
-    const { totalCount, goalkeeperCount } = countPositions(currentPositions);
+    const { totalCount, goalkeeperCount } = countPositions(currentPositions)
 
     // Check total positions
     if (totalCount >= 11) {
@@ -1489,34 +1683,34 @@ const filteredBatches = useMemo(() => {
         title: "Maximum players reached",
         description: "Delete an existing position before adding a new one",
         variant: "destructive",
-      });
-      return;
+      })
+      return
     }
 
     // Check goalkeeper position
-    if (selectedPositionType === 'gk' && goalkeeperCount > 0) {
+    if (selectedPositionType === "gk" && goalkeeperCount > 0) {
       toast({
         title: "Goalkeeper already exists",
         description: "Only one goalkeeper is allowed in the formation",
         variant: "destructive",
-      });
-      return;
+      })
+      return
     }
 
-    const type = POSITION_TYPES.find(t => t.id === selectedPositionType) || POSITION_TYPES[4];
+    const type = POSITION_TYPES.find((t) => t.id === selectedPositionType) || POSITION_TYPES[4]
     const newPosition: Position = {
       id: `custom${Date.now()}`,
       name: `Custom ${type.name}`,
       shortName: type.shortName,
-      type: type.id
-    };
+      type: type.id,
+    }
 
     // Add the new position to customPositions state
-    setCustomPositions(prev => [...prev, newPosition]);
+    setCustomPositions((prev) => [...prev, newPosition])
 
     // Also add it to the selected game plan's positions
     if (selectedGamePlan) {
-      const defaultCoordinates = getDefaultPositionStyle(type.id);
+      const defaultCoordinates = getDefaultPositionStyle(type.id)
       setSelectedGamePlan({
         ...selectedGamePlan,
         positions: {
@@ -1524,156 +1718,156 @@ const filteredBatches = useMemo(() => {
             playerId: "",
             top: defaultCoordinates.top,
             left: defaultCoordinates.left,
-          }
-        }
-      });
+          },
+        },
+      })
 
       // Update gamePlans state
-      setGamePlans(prev =>
-        prev.map(gp =>
-          gp.id === selectedGamePlan.id ? {
+      setGamePlans((prev) =>
+        prev.map((gp) =>
+          gp.id === selectedGamePlan._id
+            ? {
                 ...gp,
                 positions: {
                   [newPosition.id]: {
                     playerId: "",
                     top: defaultCoordinates.top,
                     left: defaultCoordinates.left,
-                  }
-                }
+                  },
+                },
               }
-            : gp
-        )
-      );
+            : gp,
+        ),
+      )
     }
 
     // Show success toast
     toast({
       title: "Position Added",
       description: `Added new ${type.name} position`,
-    });
-  };
+    })
+  }
 
   const handleRemoveCustomPosition = (positionId: string) => {
-    setCustomPositions(customPositions.filter(pos => pos.id !== positionId));
-    
+    setCustomPositions(customPositions.filter((pos) => pos.id !== positionId))
+
     if (selectedGamePlan) {
-      const updatedPositions = { ...selectedGamePlan.positions };
-      delete updatedPositions[positionId];
-      
+      const updatedPositions = { ...selectedGamePlan.positions }
+      delete updatedPositions[positionId]
+
       setSelectedGamePlan({
         ...selectedGamePlan,
-        positions: updatedPositions
-      });
+        positions: updatedPositions,
+      })
     }
-  };
+  }
 
   const handleRemovePosition = (positionId: string) => {
-    if (!selectedGamePlan) return;
+    if (!selectedGamePlan) return
 
     // Add to deleted positions if it's a default position
-    if (!positionId.startsWith('custom')) {
-      setDeletedPositions(prev => [...prev, positionId]);
+    if (!positionId.startsWith("custom")) {
+      setDeletedPositions((prev) => [...prev, positionId])
     }
 
     // Remove position from both custom positions and game plan
-    setCustomPositions(prev => prev.filter(pos => pos.id !== positionId));
-    
-    const updatedPositions = { ...selectedGamePlan.positions };
-    delete updatedPositions[positionId];
-    
+    setCustomPositions((prev) => prev.filter((pos) => pos.id !== positionId))
+
+    const updatedPositions = { ...selectedGamePlan.positions }
+    delete updatedPositions[positionId]
+
     setSelectedGamePlan({
       ...selectedGamePlan,
-      positions: updatedPositions
-    });
+      positions: updatedPositions,
+    })
 
-    setGamePlans(prev =>
-      prev.map(gp =>
-        gp.id === selectedGamePlan.id
-          ? { ...gp, positions: updatedPositions }
-          : gp
-      )
-    );
+    setGamePlans((prev) =>
+      prev.map((gp) => (gp.id === selectedGamePlan._id ? { ...gp, positions: updatedPositions } : gp)),
+    )
 
     // Show remaining slots after removal
-    const currentPositions = [
-      ...positions.filter(p => !deletedPositions.includes(p.id)),
-      ...customPositions
-    ].filter(p => p.id !== positionId);
+    const currentPositions = [...positions.filter((p) => !deletedPositions.includes(p.id)), ...customPositions].filter(
+      (p) => p.id !== positionId,
+    )
 
-    const { totalCount } = countPositions(currentPositions);
-    
+    const { totalCount } = countPositions(currentPositions)
+
     toast({
       title: "Position removed",
       description: `${11 - totalCount} position slots available`,
-    });
-  };
+    })
+  }
 
   const handleResetFormation = () => {
-    if (!selectedGamePlan) return;
+    if (!selectedGamePlan) return
 
-    setDeletedPositions([]); // Clear deleted positions
-    setCustomPositions([]); // Clear custom positions
-    
+    setDeletedPositions([]) // Clear deleted positions
+    setCustomPositions([]) // Clear custom positions
+
     // Reset to empty positions object
     setSelectedGamePlan({
       ...selectedGamePlan,
-      positions: positions.reduce((acc, pos) => ({ ...acc, [pos.id]: null }), {})
-    });
-  };
+      positions: positions.reduce((acc, pos) => ({ ...acc, [pos.id]: null }), {}),
+    })
+  }
 
   const handleAddSubstitute = (playerId: string, position: string) => {
-    if (!selectedGamePlan) return;
+    if (!selectedGamePlan) return
 
-    const isAlreadyAssigned = Object.values(selectedGamePlan.positions).some(
-      (pos) => pos && pos.playerId === playerId
-    ) || (selectedGamePlan.substitutes || []).some(sub => sub.playerId === playerId);
+    const isAlreadyAssigned =
+      Object.values(selectedGamePlan.positions).some((pos) => pos && pos.playerId === playerId) ||
+      (selectedGamePlan.substitutes || []).some((sub) => sub.playerId === playerId)
 
     if (isAlreadyAssigned) {
       toast({
         title: "Player already assigned",
         description: "This player is already in the team or substitutes",
         variant: "destructive",
-      });
-      return;
+      })
+      return
     }
 
     // Initialize substitutes array if it doesn't exist
-    const currentSubstitutes = selectedGamePlan.substitutes || [];
+    const currentSubstitutes = selectedGamePlan.substitutes || []
 
     setSelectedGamePlan({
       ...selectedGamePlan,
-      substitutes: [...currentSubstitutes, { playerId, position }]
-    });
-
-    setGamePlans(
-      gamePlans.map((gp) => 
-        gp.id === selectedGamePlan.id ? {
-          ...gp,
-          substitutes: [...(gp.substitutes || []), { playerId, position }]
-        } : gp
-      )
-    );
-  };
-
-  const handleRemoveSubstitute = (playerId: string) => {
-    if (!selectedGamePlan) return;
-
-    const currentSubstitutes = selectedGamePlan.substitutes || [];
-
-    setSelectedGamePlan({
-      ...selectedGamePlan,
-      substitutes: currentSubstitutes.filter(sub => sub.playerId !== playerId)
-    });
+      substitutes: [...currentSubstitutes, { playerId, position }],
+    })
 
     setGamePlans(
       gamePlans.map((gp) =>
-        gp.id === selectedGamePlan.id ? {
-          ...gp,
-          substitutes: (gp.substitutes || []).filter(sub => sub.playerId !== playerId)
-        } : gp
-      )
-    );
-  };
+        gp.id === selectedGamePlan._id
+          ? {
+              ...gp,
+              substitutes: [...(gp.substitutes || []), { playerId, position }],
+            }
+          : gp,
+      ),
+    )
+  }
+
+  const handleRemoveSubstitute = (playerId: string) => {
+    if (!selectedGamePlan) return
+
+    const currentSubstitutes = selectedGamePlan.substitutes || []
+
+    setSelectedGamePlan({
+      ...selectedGamePlan,
+      substitutes: currentSubstitutes.filter((sub) => sub.playerId !== playerId),
+    })
+
+    setGamePlans(
+      gamePlans.map((gp) =>
+        gp.id === selectedGamePlan._id
+          ? {
+              ...gp,
+              substitutes: (gp.substitutes || []).filter((sub) => sub.playerId !== playerId),
+            }
+          : gp,
+      ),
+    )
+  }
 
   const SubstituteModal = () => (
     <Dialog open={showSubstitutesModal} onOpenChange={setShowSubstitutesModal}>
@@ -1686,13 +1880,10 @@ const filteredBatches = useMemo(() => {
             <div key={position} className="mb-4">
               <h3 className="text-sm font-semibold mb-2">{position}</h3>
               {players.map((player) => (
-                <div
-                  key={player.id}
-                  className="flex items-center justify-between p-2 hover:bg-accent rounded-md"
-                >
+                <div key={player.id} className="flex items-center justify-between p-2 hover:bg-accent rounded-md">
                   <div className="flex items-center gap-2">
                     <Avatar className="h-8 w-8">
-                      <AvatarImage src={player.photoUrl} alt={player.name} />
+                      <AvatarImage src={player.photoUrl || "/placeholder.svg"} alt={player.name} />
                       <AvatarFallback>{player.name?.[0]}</AvatarFallback>
                     </Avatar>
                     <span>{player.name}</span>
@@ -1700,8 +1891,8 @@ const filteredBatches = useMemo(() => {
                   <Button
                     size="sm"
                     onClick={() => {
-                      handleAddSubstitute(player.id.toString(), position);
-                      setShowSubstitutesModal(false);
+                      handleAddSubstitute(player.id.toString(), position)
+                      setShowSubstitutesModal(false)
                     }}
                   >
                     Add
@@ -1713,10 +1904,9 @@ const filteredBatches = useMemo(() => {
         </div>
       </DialogContent>
     </Dialog>
-  );
+  )
 
   // Update selected batch section to filter batches
-  
 
   const ExportDialog = () => (
     <Dialog open={showExportDialog} onOpenChange={setShowExportDialog}>
@@ -1725,33 +1915,33 @@ const filteredBatches = useMemo(() => {
           <DialogTitle>Export Options</DialogTitle>
         </DialogHeader>
         <div className="space-y-4 pt-4">
-          <Button 
-            className="w-full" 
+          <Button
+            className="w-full"
             onClick={async () => {
-              if (!fieldRef.current || !selectedGamePlan) return;
-              
+              if (!fieldRef.current || !selectedGamePlan) return
+
               const canvas = await html2canvas(fieldRef.current, {
                 backgroundColor: null,
                 scale: 2,
-              });
-              
-              const image = canvas.toDataURL('image/png');
-              const link = document.createElement('a');
-              link.href = image;
-              link.download = `${selectedGamePlan.name}_formation.png`;
-              link.click();
-              
-              setShowExportDialog(false);
+              })
+
+              const image = canvas.toDataURL("image/png")
+              const link = document.createElement("a")
+              link.href = image
+              link.download = `${selectedGamePlan.name}_formation.png`
+              link.click()
+
+              setShowExportDialog(false)
             }}
           >
             Export as Image (PNG)
           </Button>
-          <Button 
-            className="w-full" 
+          <Button
+            className="w-full"
             onClick={() => {
-              if (!fieldRef.current || !selectedGamePlan) return;
-              exportToPDF(fieldRef, selectedGamePlan, players, batches);
-              setShowExportDialog(false);
+              if (!fieldRef.current || !selectedGamePlan) return
+              exportToPDF(fieldRef, selectedGamePlan, players, batches)
+              setShowExportDialog(false)
             }}
           >
             Export as PDF (Formation + Details)
@@ -1759,228 +1949,218 @@ const filteredBatches = useMemo(() => {
         </div>
       </DialogContent>
     </Dialog>
-  );
+  )
 
   const handleSaveCustomization = () => {
     // Save the current state
-    handleSaveGamePlans();
-    
+    handleSaveGamePlans()
+
     // Exit customize mode
-    setShowCustomizeMenu(false);
-    
+    setShowCustomizeMenu(false)
+
     toast({
       title: "Formation Saved",
       description: "Your customized formation has been saved",
-    });
-  };
+    })
+  }
 
   // Add a component to show position count in customize menu
   const PositionCounter = () => {
-    const currentPositions = [
-      ...positions.filter(p => !deletedPositions.includes(p.id)),
-      ...customPositions
-    ];
-    const { totalCount, goalkeeperCount } = countPositions(currentPositions);
+    const currentPositions = [...positions.filter((p) => !deletedPositions.includes(p.id)), ...customPositions]
+    const { totalCount, goalkeeperCount } = countPositions(currentPositions)
 
     return (
       <div className="flex justify-between items-center text-sm text-muted-foreground">
         <span>Players: {totalCount}/11</span>
         <span>Goalkeeper: {goalkeeperCount}/1</span>
       </div>
-    );
-  };
+    )
+  }
 
   // Add this useEffect to fetch players when component mounts
   useEffect(() => {
     const fetchPlayers = async () => {
       try {
         if (!user) {
-          console.error("Error: User is not initialized.");
-          return;
+          console.error("Error: User is not initialized.")
+          return
         }
 
         if (!user.academyId) {
-          console.error("Error: Academy ID is missing.");
-          return;
+          console.error("Error: Academy ID is missing.")
+          return
         }
 
-        setIsLoading(true);
+        setIsLoading(true)
 
-        const response = await fetch(`/api/db/ams-player-data?academyId=${user.academyId}`);
+        const response = await fetch(`/api/db/ams-player-data?academyId=${user.academyId}`)
         if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`Failed to fetch players: ${response.status} - ${errorText}`);
+          const errorText = await response.text()
+          throw new Error(`Failed to fetch players: ${response.status} - ${errorText}`)
         }
 
-        const result = await response.json();
+        const result = await response.json()
         if (!result.success) {
-          throw new Error(result.error || "Unknown error occurred while fetching players.");
+          throw new Error(result.error || "Unknown error occurred while fetching players.")
         }
 
-        setPlayers(result.data);
+        setPlayers(result.data)
       } catch (error) {
-        console.error("Error fetching players:", error);
+        console.error("Error fetching players:", error)
         toast({
           title: "Error",
           description: "Failed to load players. Please try again later.",
           variant: "destructive",
-        });
+        })
       } finally {
-        setIsLoading(false);
+        setIsLoading(false)
       }
-    };
+    }
 
     if (user?.academyId) {
-      fetchPlayers();
+      fetchPlayers()
     }
-  }, [user?.academyId]);
+  }, [user?.academyId, user, setPlayers, toast])
   // Add this useEffect to fetch batches when component mounts
-useEffect(() => {
-  const fetchBatches = async () => {
-    try {
-      if (!user?.academyId || !user?.id) {
-        console.log("User or academy ID not available yet");
-        return;
-      }
+  useEffect(() => {
+    const fetchBatches = async () => {
+      try {
+        if (!user?.academyId || !user?.id) {
+          console.log("User or academy ID not available yet")
+          return
+        }
 
-      const response = await fetch(`/api/db/ams-batches?academyId=${user.academyId}`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch batches');
-      }
+        const response = await fetch(`/api/db/ams-batches?academyId=${user.academyId}`)
+        if (!response.ok) {
+          throw new Error("Failed to fetch batches")
+        }
 
-      const result = await response.json();
-      if (result.success) {
-        setBatches(result.data);
-        console.log("Batches fetched:", result.data);
+        const result = await response.json()
+        if (result.success) {
+          setBatches(result.data)
+          console.log("Batches fetched:", result.data)
+        }
+      } catch (error) {
+        console.error("Error fetching batches:", error)
+        toast({
+          title: "Error",
+          description: "Failed to load batches",
+          variant: "destructive",
+        })
       }
-    } catch (error) {
-      console.error('Error fetching batches:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load batches",
-        variant: "destructive",
-      });
     }
-  };
 
-  fetchBatches();
-}, [user?.academyId, user?.id, setBatches, toast]);
+    fetchBatches()
+  }, [user?.academyId, user?.id, setBatches, toast])
 
+  // Updated batch selection section with better debugging
+  ;<div className="space-y-4 overflow-x-auto">
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <label htmlFor="batch" className="text-white">
+          Select Batch ({filteredBatches.length} available)
+        </label>
+        {selectedBatch && (
+          <Button variant="ghost" size="sm" onClick={() => setSelectedBatch(null)}>
+            Clear Selection
+          </Button>
+        )}
+      </div>
+      <select
+        id="batch"
+        value={selectedBatch || ""}
+        onChange={(e) => {
+          console.log("Batch selected:", e.target.value)
+          setSelectedBatch(e.target.value)
+        }}
+        className="w-full p-2 border rounded-md bg-gray-800 text-white"
+      >
+        <option value="">
+          {filteredBatches.length === 0
+            ? "No batches available"
+            : `Select a batch (${filteredBatches.length} available)`}
+        </option>
+        {filteredBatches.map((batch) => (
+          <option key={batch.id} value={batch.id}>
+            {batch.name} {batch.coachId && `(Coach: ${batch.coachId})`}
+          </option>
+        ))}
+      </select>
 
-// Updated batch selection section with better debugging
-<div className="space-y-4 overflow-x-auto">
-  <div className="space-y-4">
-    <div className="flex justify-between items-center">
-      <label htmlFor="batch" className="text-white">
-        Select Batch ({filteredBatches.length} available)
-      </label>
-      {selectedBatch && (
-        <Button 
-          variant="ghost" 
-          size="sm" 
-          onClick={() => setSelectedBatch(null)}
-        >
-          Clear Selection
-        </Button>
+      {/* Debug information - remove this in production */}
+      {process.env.NODE_ENV === "development" && (
+        <div className="text-xs text-gray-400 p-2 bg-gray-900 rounded">
+          <p>Debug Info:</p>
+          <p>Total batches: {batches.length}</p>
+          <p>Filtered batches: {filteredBatches.length}</p>
+          <p>User Academy ID: {user?.academyId}</p>
+          <p>User ID: {user?.id}</p>
+        </div>
       )}
     </div>
-    <select
-      id="batch"
-      value={selectedBatch || ""}
-      onChange={(e) => {
-        console.log("Batch selected:", e.target.value);
-        setSelectedBatch(e.target.value);
-      }}
-      className="w-full p-2 border rounded-md bg-gray-800 text-white"
-    >
-      <option value="">
-        {filteredBatches.length === 0 
-          ? "No batches available" 
-          : `Select a batch (${filteredBatches.length} available)`
-        }
-      </option>
-      {filteredBatches.map((batch) => (
-        <option key={batch.id} value={batch.id}>
-          {batch.name} {batch.coachId && `(Coach: ${batch.coachId})`}
-        </option>
-      ))}
-    </select>
-    
-    {/* Debug information - remove this in production */}
-    {process.env.NODE_ENV === 'development' && (
-      <div className="text-xs text-gray-400 p-2 bg-gray-900 rounded">
-        <p>Debug Info:</p>
-        <p>Total batches: {batches.length}</p>
-        <p>Filtered batches: {filteredBatches.length}</p>
-        <p>User Academy ID: {user?.academyId}</p>
-        <p>User ID: {user?.id}</p>
-      </div>
-    )}
+    {selectedBatch && <ComparePlayers batchId={selectedBatch} />}
   </div>
-  {selectedBatch && <ComparePlayers batchId={selectedBatch} />}
-</div>
   // Update handlePositionChange function to properly handle the position value
   const handlePositionChange = async (playerId: string, newPosition: string) => {
     try {
       // Find the position object from AVAILABLE_POSITIONS
-      const positionObj = AVAILABLE_POSITIONS.find(pos => pos.value === newPosition);
-      const positionLabel = positionObj ? positionObj.label : "Any Position";
-      
+      const positionObj = AVAILABLE_POSITIONS.find((pos) => pos.value === newPosition)
+      const positionLabel = positionObj ? positionObj.label : "Any Position"
+
       // Use the label for display but store the value
-      const normalizedPosition = newPosition === "any" ? undefined : newPosition;
+      const normalizedPosition = newPosition === "any" ? undefined : newPosition
 
       const response = await fetch(`/api/db/ams-player-data/${playerId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           position: normalizedPosition,
           positionLabel: positionLabel, // Optional: store both value and label
-        })
-      });
+        }),
+      })
 
       if (!response.ok) {
-        throw new Error('Failed to update position');
+        throw new Error("Failed to update position")
       }
 
-      const result = await response.json();
-      
+      const result = await response.json()
+
       if (!result.success) {
-        throw new Error(result.error || 'Failed to update position');
+        throw new Error(result.error || "Failed to update position")
       }
 
       // Update local state with the normalized position
-      setPlayers(players.map(player => 
-        player.id.toString() === playerId 
-          ? { ...player, position: normalizedPosition }
-          : player
-      ));
+      setPlayers(
+        players.map((player) =>
+          player.id.toString() === playerId ? { ...player, position: normalizedPosition } : player,
+        ),
+      )
 
       toast({
         title: "Success",
         description: "Player position updated successfully",
-      });
-
+      })
     } catch (error) {
-      console.error('Error updating position:', error);
+      console.error("Error updating position:", error)
       toast({
         title: "Error",
         description: "Failed to update player position",
         variant: "destructive",
-      });
+      })
     }
-  };
+  }
 
   // Update the renderPlayersByPosition function
   const renderPlayersByPosition = (position: string) => {
-    const players = positionPlayers[position] || [];
-    
+    const players = positionPlayers[position] || []
+
     return (
       <div className="space-y-2">
         <h3 className="font-semibold">{position}</h3>
         {players.length > 0 ? (
           <div className="grid grid-cols-2 gap-2">
             {players.map((player) => (
-              <div 
+              <div
                 key={player._id}
                 className="flex items-center p-2 bg-gray-800 rounded-lg cursor-pointer hover:bg-gray-700"
                 onClick={() => handlePlayerSelect(player)}
@@ -1988,14 +2168,12 @@ useEffect(() => {
                 <div className="w-8 h-8 rounded-full bg-gray-600 mr-2">
                   {player.photoUrl ? (
                     <img
-                      src={player.photoUrl}
+                      src={player.photoUrl || "/placeholder.svg"}
                       alt={player.name}
                       className="w-full h-full rounded-full object-cover"
                     />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center text-white">
-                      {player.name[0]}
-                    </div>
+                    <div className="w-full h-full flex items-center justify-center text-white">{player.name[0]}</div>
                   )}
                 </div>
                 <div>
@@ -2009,8 +2187,8 @@ useEffect(() => {
           <div className="text-sm text-gray-400">No players available</div>
         )}
       </div>
-    );
-  };
+    )
+  }
 
   // Update substitute players section
   const renderSubstitutes = () => {
@@ -2020,7 +2198,7 @@ useEffect(() => {
         {substitutePlayers.length > 0 ? (
           <div className="grid grid-cols-2 gap-2">
             {substitutePlayers.map((player) => (
-              <div 
+              <div
                 key={player._id}
                 className="flex items-center p-2 bg-gray-800 rounded-lg cursor-pointer hover:bg-gray-700"
                 onClick={() => handlePlayerSelect(player)}
@@ -2028,14 +2206,12 @@ useEffect(() => {
                 <div className="w-8 h-8 rounded-full bg-gray-600 mr-2">
                   {player.photoUrl ? (
                     <img
-                      src={player.photoUrl}
+                      src={player.photoUrl || "/placeholder.svg"}
                       alt={player.name}
                       className="w-full h-full rounded-full object-cover"
                     />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center text-white">
-                      {player.name[0]}
-                    </div>
+                    <div className="w-full h-full flex items-center justify-center text-white">{player.name[0]}</div>
                   )}
                 </div>
                 <div>
@@ -2049,8 +2225,8 @@ useEffect(() => {
           <div className="text-sm text-gray-400">No substitute players available</div>
         )}
       </div>
-    );
-  };
+    )
+  }
 
   const handleSaveStrategy = async () => {
     try {
@@ -2059,37 +2235,87 @@ useEffect(() => {
           title: "Error",
           description: "No academy ID or selected game plan found",
           variant: "destructive",
-        });
-        return;
+        })
+        return
       }
 
       // Save the strategy for the selected game plan to MongoDB
       const response = await fetch(`/api/db/ams-gameplan/${selectedGamePlan._id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           strategy: selectedGamePlan.strategy,
           updatedAt: new Date().toISOString(),
         }),
-      });
+      })
 
       if (!response.ok) {
-        throw new Error('Failed to save strategy');
+        throw new Error("Failed to save strategy")
       }
 
       toast({
         title: "Success",
         description: "Strategy saved successfully",
-      });
+      })
     } catch (error) {
-      console.error('Error saving strategy:', error);
+      console.error("Error saving strategy:", error)
       toast({
         title: "Error",
         description: "Failed to save strategy",
         variant: "destructive",
-      });
+      })
     }
-  };
+  }
+
+  const teamSizeForLineup = useMemo(() => {
+    // Prefer a numeric teamSize stored in the game plan, fallback to string size, then to the "newGamePlanSize" setting.
+    if (selectedGamePlan?.teamSize && typeof selectedGamePlan.teamSize === "number") {
+      return selectedGamePlan.teamSize
+    }
+    if (selectedGamePlan?.size) {
+      const parsed = Number.parseInt(String(selectedGamePlan.size))
+      return Number.isNaN(parsed) ? 11 : parsed
+    }
+    const parsedNew = Number.parseInt(newGamePlanSize)
+    return Number.isNaN(parsedNew) ? 11 : parsedNew
+  }, [selectedGamePlan?.teamSize, selectedGamePlan?.size, newGamePlanSize])
+
+  const lineupPositionsBySize = useMemo(() => {
+    try {
+      return getPositionsBySize(teamSizeForLineup)
+    } catch {
+      return getPositionsBySize(11)
+    }
+  }, [teamSizeForLineup])
+
+  const displayedStartingPositions = useMemo(() => {
+  if (!selectedGamePlan) return [];
+
+  // Get all positions that should be displayed
+  const allCurrentPositions = [
+    // Include default positions that haven't been deleted
+    ...positions.filter((p) => !deletedPositions.includes(p.id)),
+    // Include all custom positions
+    ...customPositions,
+    // Include formation-specific positions if they exist and aren't duplicates
+    ...(selectedGamePlan?.formationPositions || []).filter(
+      (fp) => !positions.some(p => p.id === fp.id) && !customPositions.some(cp => cp.id === fp.id)
+    )
+  ];
+
+  // Remove any duplicates based on ID
+  const uniquePositions = allCurrentPositions.filter(
+    (position, index, self) => self.findIndex(p => p.id === position.id) === index
+  );
+
+  // Filter to only show positions that actually exist in the game plan's positions object
+  // This ensures the table only shows positions that are currently active on the field
+  const activePositions = uniquePositions.filter(
+    (position) => selectedGamePlan?.positions?.[position.id] !== undefined
+  );
+
+  return activePositions;
+}, [selectedGamePlan, customPositions, deletedPositions, positions]);
 
   return (
     <div className="flex min-h-screen bg-background">
@@ -2104,10 +2330,12 @@ useEffect(() => {
           {/* Wrap buttons in a scrollable container */}
           <div className="overflow-x-auto">
             <div className="flex space-x-4 min-w-max pb-2">
-              <Button onClick={() => setIsCreateDialogOpen(true)} disabled={gamePlans.length >= 3}>
+              <Button onClick={() =>{setNewGamePlanStrategy(""); setIsCreateDialogOpen(true)}} disabled={gamePlans.length >= 3}>
                 Create Game Plan
               </Button>
-              <Button onClick={handleSaveGamePlans}>Save Game Plans</Button>
+              <Button onClick={handleSaveGamePlans} disabled={isSaving}>
+                {isSaving ? "Saving..." : "Save Game Plans"}
+              </Button>
               <Button onClick={handleExportField}>Export Formation</Button>
             </div>
           </div>
@@ -2124,9 +2352,19 @@ useEffect(() => {
                 onChange={(e) => setNewGamePlanName(e.target.value)}
               />
               <Input
-                placeholder="Size"
+                placeholder="Team Size (2-11)"
+                type="number"
+                min="2"
+                max="11"
                 value={newGamePlanSize}
-                onChange={(e) => setNewGamePlanSize(e.target.value)}
+                onChange={(e) => {
+                  const size = Number.parseInt(e.target.value)
+                  if (size >= 2 && size <= 11) {
+                    setNewGamePlanSize(e.target.value)
+                  } else if (e.target.value === "") {
+                    setNewGamePlanSize("")
+                  }
+                }}
               />
               <Textarea
                 placeholder="Notes/Strategies"
@@ -2134,11 +2372,7 @@ useEffect(() => {
                 onChange={(e) => setNewGamePlanStrategy(e.target.value)}
               />
               <DialogFooter>
-                <Button
-                  onClick={handleCreateGamePlan}
-                >
-                  Create
-                </Button>
+                <Button onClick={handleCreateGamePlan}>Create</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
@@ -2152,9 +2386,16 @@ useEffect(() => {
               <Button variant="outline" onClick={handleNext} disabled={activeTab === gamePlans.length - 1}>
                 <ChevronRight />
               </Button>
-              <Button variant="destructive" onClick={() => handleDeleteGamePlan(gamePlans[activeTab].id)}>
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  setGameplanToDelete(gamePlans[activeTab]?._id || null)
+                  setShowDeleteDialog(true)
+                }}
+              >
                 Delete Game Plan
               </Button>
+              <DeleteConfirmationDialog />
             </div>
           )}
 
@@ -2168,7 +2409,7 @@ useEffect(() => {
                     <span>Players by Position</span>
                     {selectedBatch && (
                       <span className="text-sm text-blue-400 font-normal">
-                        Batch: {filteredBatches.find(b => b.id === selectedBatch)?.name}
+                        Batch: {filteredBatches.find((b) => b.id === selectedBatch)?.name}
                       </span>
                     )}
                   </CardTitle>
@@ -2182,10 +2423,7 @@ useEffect(() => {
                   <div className="space-y-4">
                     {positionGroups.length === 0 ? (
                       <div className="text-center py-8 text-muted-foreground">
-                        {selectedBatch
-                          ? "No available players in the selected batch"
-                          : "No available players"
-                        }
+                        {selectedBatch ? "No available players in the selected batch" : "No available players"}
                       </div>
                     ) : (
                       positionGroups.map(([position, positionPlayers]) => (
@@ -2204,13 +2442,8 @@ useEffect(() => {
                                     onDragStart={(e) => handlePlayerDragStart(e, player.id.toString())}
                                   >
                                     <Avatar className="h-8 w-8">
-                                      <AvatarImage
-                                        src={player.photoUrl}
-                                        alt={player.name}
-                                      />
-                                      <AvatarFallback>
-                                        {player.name?.charAt(0)}
-                                      </AvatarFallback>
+                                      <AvatarImage src={player.photoUrl || "/placeholder.svg"} alt={player.name} />
+                                      <AvatarFallback>{player.name?.charAt(0)}</AvatarFallback>
                                     </Avatar>
                                   </div>
                                   <div className="flex flex-col">
@@ -2223,10 +2456,7 @@ useEffect(() => {
                                         onClick={(e) => e.stopPropagation()}
                                       >
                                         {AVAILABLE_POSITIONS.map((pos) => (
-                                          <option
-                                            key={pos.value}
-                                            value={pos.value}
-                                          >
+                                          <option key={pos.value} value={pos.value}>
                                             {pos.label}
                                           </option>
                                         ))}
@@ -2257,18 +2487,14 @@ useEffect(() => {
                           <div className="h-2 w-2 rounded-full bg-yellow-500 animate-pulse" />
                         </div>
                         <p className="text-sm text-muted-foreground">
-                          Player assignment is disabled while in formation customize mode.
-                          Exit customize mode to assign players to positions.
+                          Player assignment is disabled while in formation customize mode. Exit customize mode to assign
+                          players to positions.
                         </p>
                       </>
                     )}
                   </div>
                   <div className="flex gap-2">
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => setShowCustomizeMenu(!showCustomizeMenu)}
-                    >
+                    <Button variant="outline" size="sm" onClick={() => setShowCustomizeMenu(!showCustomizeMenu)}>
                       {showCustomizeMenu ? "Exit Customize" : "Customize Formation"}
                     </Button>
                   </div>
@@ -2278,7 +2504,7 @@ useEffect(() => {
                     <div
                       ref={fieldRef}
                       className={`relative w-full max-w-[500px] aspect-[0.68] bg-green-700 rounded-md mb-4 mx-auto ${
-                        showCustomizeMenu ? 'border-4 border-dashed border-yellow-500/50' : ''
+                        showCustomizeMenu ? "border-4 border-dashed border-yellow-500/50" : ""
                       }`}
                       style={{ minWidth: "300px" }}
                       onDragOver={handleDragOver}
@@ -2286,9 +2512,11 @@ useEffect(() => {
                     >
                       {/* Field markings - update the outer border to not conflict with dashed border */}
                       <div className="absolute inset-0">
-                        <div className={`absolute inset-2 border-2 border-white/50 ${
-                          showCustomizeMenu ? 'border-white/30' : ''
-                        }`} />
+                        <div
+                          className={`absolute inset-2 border-2 border-white/50 ${
+                            showCustomizeMenu ? "border-white/30" : ""
+                          }`}
+                        />
                         <div className="absolute left-0 right-0 top-1/2 h-0.5 bg-white/50" />
                         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[30%] h-[15%] rounded-full border-2 border-white/50" />
                         <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[60%] h-[15%] border-2 border-b-0 border-white/50" />
@@ -2296,34 +2524,36 @@ useEffect(() => {
                       </div>
 
                       {/* Player positions */}
-                      {[...positions.filter(p => !deletedPositions.includes(p.id)), ...customPositions].map((position) => (
-                        <div
-                          key={position.id}
-                          className="absolute w-16 h-16 bg-white/30 hover:bg-white/40 transition-colors rounded-full flex items-center justify-center border-2 border-white/50 cursor-move group"
-                          style={getPositionStyle(position.id, selectedGamePlan)}
-                          draggable={showCustomizeMenu} // Only draggable when customize menu is open
-                          onDragStart={(e) => handlePositionDragStart(e, position.id)}
-                          onDragOver={handleDragOver}
-                          onDrop={(e) => handlePositionDrop(e, position.id)}
-                          onClick={() => handlePositionClick(position)}
-                        >
-                          {renderPositionContent(position, selectedGamePlan)}
-                          {/* Only show delete button when customize menu is open */}
-                          {showCustomizeMenu && (
-                            <Button
-                              variant="destructive"
-                              size="icon"
-                              className="absolute -top-2 -right-2 h-4 w-4 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleRemovePosition(position.id);
-                              }}
-                            >
-                              <X className="h-3 w-3" />
-                            </Button>
-                          )}
-                        </div>
-                      ))}
+                      {(selectedGamePlan?.formationPositions || positions)
+                        .filter((p: Position) => !deletedPositions.includes(p.id))
+                        .concat(customPositions)
+                        .map((position: Position) => (
+                          <div
+                            key={position.id}
+                            className="absolute w-16 h-16 bg-white/30 hover:bg-white/40 transition-colors rounded-full flex items-center justify-center border-2 border-white/50 cursor-move group"
+                            style={getPositionStyle(position.id, selectedGamePlan)}
+                            draggable={showCustomizeMenu}
+                            onDragStart={(e) => handlePositionDragStart(e, position.id)}
+                            onDragOver={handleDragOver}
+                            onDrop={(e) => handlePositionDrop(e, position.id)}
+                            onClick={() => handlePositionClick(position)}
+                          >
+                            {renderPositionContent(position, selectedGamePlan)}
+                            {showCustomizeMenu && (
+                              <Button
+                                variant="destructive"
+                                size="icon"
+                                className="absolute -top-2 -right-2 h-4 w-4 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleRemovePosition(position.id)
+                                }}
+                              >
+                                <X className="h-3 w-3" />
+                              </Button>
+                            )}
+                          </div>
+                        ))}
                     </div>
                   </ScrollArea>
 
@@ -2334,20 +2564,13 @@ useEffect(() => {
                         <h3 className="text-lg font-semibold">Formation Customization</h3>
                         <PositionCounter />
                         <div className="flex gap-2">
-                          <Button 
-                            variant="outline" 
-                            onClick={() => setShowCustomizeMenu(false)}
-                          >
+                          <Button variant="outline" onClick={() => setShowCustomizeMenu(false)}>
                             Cancel
                           </Button>
-                          <Button 
-                            onClick={handleSaveCustomization}
-                          >
-                            Save Changes
-                          </Button>
+                          <Button onClick={handleSaveCustomization}>Save Changes</Button>
                         </div>
                       </div>
-                      
+
                       <div className="flex flex-col gap-4">
                         <div>
                           <h4 className="text-sm font-medium mb-2">Add New Position</h4>
@@ -2363,28 +2586,20 @@ useEffect(() => {
                                 </option>
                               ))}
                             </select>
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              onClick={handleAddCustomPosition}
-                            >
+                            <Button variant="outline" size="sm" onClick={handleAddCustomPosition}>
                               Add
                             </Button>
                           </div>
                         </div>
-                        
-                        <Button 
-                          variant="destructive" 
-                          onClick={handleResetFormation}
-                          className="mt-2"
-                        >
+
+                        <Button variant="destructive" onClick={handleResetFormation} className="mt-2">
                           Reset Formation
                         </Button>
                         <div className="text-sm text-muted-foreground">
-                          Drag positions to move them on the field.
-                          All positions can be deleted by hovering and clicking the X.
-                          </div>
+                          Drag positions to move them on the field. All positions can be deleted by hovering and
+                          clicking the X.
                         </div>
+                      </div>
                     </div>
                   )}
                 </CardContent>
@@ -2396,13 +2611,11 @@ useEffect(() => {
           <div className="space-y-4 overflow-x-auto">
             <div className="space-y-4">
               <div className="flex justify-between items-center">
-                <label htmlFor="batch" className="text-white">Select Batch</label>
+                <label htmlFor="batch" className="text-white">
+                  Select Batch
+                </label>
                 {selectedBatch && (
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={() => setSelectedBatch(null)}
-                  >
+                  <Button variant="ghost" size="sm" onClick={() => setSelectedBatch(null)}>
                     Clear Selection
                   </Button>
                 )}
@@ -2423,113 +2636,150 @@ useEffect(() => {
             </div>
             {selectedBatch && <ComparePlayers batchId={selectedBatch} />}
             <div className="space-y-4">
-              <Button onClick={() => setIsDialogOpen(true)}>Compare Players</Button>
-              <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                <DialogContent className="max-h-[80vh] max-w-[80vw] overflow-y-auto">
-                  <DialogHeader>
-                    <DialogTitle>Compare Players</DialogTitle>
-                  </DialogHeader>
-                  <CardContent>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="outline">Select Players</Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent className="w-64">
-                        <Input
-                          placeholder="Search players"
-                          value={searchTerm}
-                          onChange={(e) => setSearchTerm(e.target.value)}
-                          className="mb-2"
-                        />
-                        {/* Use filteredPlayers here which now includes academyId filter */}
-                        {filteredPlayers.map((player) => (
-                          <DropdownMenuItem 
-                            key={player.id} 
-                            onSelect={() => handlePlayerSelection(player.id.toString())}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={selectedPlayers.includes(player.id.toString())}
-                              onChange={() => handlePlayerSelection(player.id.toString())}
-                              className="mr-2"
-                            />
-                            <span>{player.name}</span>
-                          </DropdownMenuItem>
-                        ))}
-                        <DropdownMenuItem onSelect={handleDeselectAll}>
-                          <Button variant="outline" className="w-full">
-                            Deselect All
-                          </Button>
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                    <div className="mt-6">
-                      <div className="w-full h-[500px]">
-                        <Radar data={radarData} options={radarOptions} />
-                      </div>
-                    </div>
-                    <div className="mt-6">
-                      <Card>
-                        <CardHeader>
-                          <CardTitle>Attribute Comparison</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <Table>
-                            <TableHeader>
-                              <TableRow>
-                                <TableHead>Attribute</TableHead>
-                                {selectedPlayers.map((playerId) => (
-                                  <TableHead key={playerId}>{players.find((p) => p.id.toString() === playerId)?.name}</TableHead>
-                                ))}
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {["shooting", "pace", "positioning", "passing", "ballControl", "crossing"].map((attr) => (
-                                <TableRow key={attr}>
-                                  <TableCell>{attr.charAt(0).toUpperCase() + attr.slice(1)}</TableCell>
-                                  {selectedPlayers.map((playerId) => {
-                                    const player = players.find((p) => p.id.toString() === playerId)
-                                    const value = player?.attributes[attr as keyof PlayerAttributes] || 0
-                                    return (
-                                      <TableCell key={playerId} className={getColorForAttribute(attr, value)}>
-                                        {value}
-                                      </TableCell>
-                                    )
-                                  })}
-                                </TableRow>
-                              ))}
-                            </TableBody>
-                          </Table>
-                        </CardContent>
-                      </Card>
-                    </div>
-                    <div className="mt-6">
-                      <Card>
-                        <CardHeader>
-                          <CardTitle>Performance Graph</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="flex space-x-4 mb-4">
-                            {["shooting", "pace", "positioning", "passing", "ballControl", "crossing"].map((attr) => (
-                              <Button
-                                key={attr}
-                                variant={selectedAttribute === attr ? "default" : "outline"}
-                                onClick={() => setSelectedAttribute(attr)}
-                              >
-                                {attr.charAt(0).toUpperCase() + attr.slice(1)}
-                              </Button>
-                            ))}
-                          </div>
-                          <div className="h-[400px]">
-                            <Line data={lineData(selectedAttribute)} options={lineOptions} />
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </div>
-                  </CardContent>
-                </DialogContent>
-              </Dialog>
+  <Button onClick={() => setIsDialogOpen(true)}>Compare Players</Button>
+  <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+    <DialogContent className="max-h-[80vh] max-w-[80vw] overflow-y-auto bg-gray-900 text-white border-gray-700">
+      <DialogHeader className="border-b border-gray-700 pb-4">
+        <DialogTitle className="text-white text-xl font-bold">Compare Players</DialogTitle>
+      </DialogHeader>
+      <CardContent className="pt-6">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" className="bg-gray-800 text-white border-gray-600 hover:bg-gray-700">
+              Select Players
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent className="w-64 bg-gray-800 border-gray-600">
+            <Input
+              placeholder="Search players"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="mb-2 bg-gray-700 text-white border-gray-600"
+            />
+            {/* Use filteredPlayers here which now includes academyId filter */}
+            {filteredPlayers.map((player) => (
+              <DropdownMenuItem
+                key={player.id}
+                onSelect={() => handlePlayerSelection(player.id.toString())}
+                className="text-white hover:bg-gray-700"
+              >
+                <input
+                  type="checkbox"
+                  checked={selectedPlayers.includes(player.id.toString())}
+                  onChange={() => handlePlayerSelection(player.id.toString())}
+                  className="mr-2"
+                />
+                <span className="text-white font-medium">{player.name}</span>
+              </DropdownMenuItem>
+            ))}
+            <DropdownMenuItem onSelect={handleDeselectAll} className="hover:bg-gray-700">
+              <Button variant="outline" className="w-full bg-gray-700 text-white border-gray-600 hover:bg-gray-600">
+                Deselect All
+              </Button>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+        <div className="mt-4">
+          <div className="flex justify-center mb-4">
+            <div className="flex items-center space-x-2 bg-gray-800 p-3 rounded-lg border border-gray-600">
+              <span className="text-sm font-bold text-white">View:</span>
+              <div className="flex space-x-2">
+                <Button
+                  variant={attributeFilter === "latest" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setAttributeFilter("latest")}
+                  className={attributeFilter === "latest" ? "bg-blue-600 text-white" : "bg-gray-700 text-white border-gray-600 hover:bg-gray-600"}
+                >
+                  Latest
+                </Button>
+                <Button
+                  variant={attributeFilter === "overall" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setAttributeFilter("overall")}
+                  className={attributeFilter === "overall" ? "bg-blue-600 text-white" : "bg-gray-700 text-white border-gray-600 hover:bg-gray-600"}
+                >
+                  Overall
+                </Button>
+              </div>
             </div>
+          </div>
+          <div className="w-full h-[500px] bg-gray-800 p-4 rounded-lg">
+            <Radar data={radarData} options={radarOptions} />
+          </div>
+        </div>
+        <div className="mt-6">
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader className="border-b border-gray-700">
+              <CardTitle className="text-white text-lg font-bold">Attribute Comparison</CardTitle>
+            </CardHeader>
+            <CardContent className="pt-4">
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-b border-gray-700">
+                    <TableHead className="text-white font-bold text-base">Attribute</TableHead>
+                    {selectedPlayers.map((playerId) => (
+                      <TableHead key={playerId} className="text-white font-bold text-base">
+                        {players.find((p) => p.id.toString() === playerId)?.name}
+                      </TableHead>
+                    ))}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {["shooting", "pace", "positioning", "passing", "ballControl", "crossing"].map((attr) => (
+                    <TableRow key={attr} className="border-b border-gray-700">
+                      <TableCell className="text-white font-semibold text-base">
+                        {attr.charAt(0).toUpperCase() + attr.slice(1)}
+                      </TableCell>
+                      {selectedPlayers.map((playerId) => {
+                        const player = players.find((p) => p.id.toString() === playerId)
+                        const value = getAttributeValue(player, attr, attributeFilter)
+                        return (
+                          <TableCell 
+                            key={playerId} 
+                            className={`text-white font-bold text-base ${getColorForAttribute(attr, value)}`}
+                          >
+                            {typeof value === "number" ? value.toFixed(1) : "0.0"}
+                          </TableCell>
+                        )
+                      })}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </div>
+        <div className="mt-6">
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader className="border-b border-gray-700">
+              <CardTitle className="text-white text-lg font-bold">Performance Graph</CardTitle>
+            </CardHeader>
+            <CardContent className="pt-4">
+              <div className="flex flex-wrap gap-2 mb-4">
+                {["shooting", "pace", "positioning", "passing", "ballControl", "crossing"].map((attr) => (
+                  <Button
+                    key={attr}
+                    variant={selectedAttribute === attr ? "default" : "outline"}
+                    onClick={() => setSelectedAttribute(attr)}
+                    className={selectedAttribute === attr 
+                      ? "bg-blue-600 text-white font-semibold" 
+                      : "bg-gray-700 text-white border-gray-600 hover:bg-gray-600 font-semibold"
+                    }
+                  >
+                    {attr.charAt(0).toUpperCase() + attr.slice(1)}
+                  </Button>
+                ))}
+              </div>
+              <div className="h-[400px] bg-gray-900 p-4 rounded-lg">
+                <Line data={lineData(selectedAttribute)} options={lineOptions} />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </CardContent>
+    </DialogContent>
+  </Dialog>
+</div>
             <div className="space-y-4">
               <Textarea
                 placeholder="Game Strategy"
@@ -2537,126 +2787,141 @@ useEffect(() => {
                 onChange={(e) => setNewGamePlanStrategy(e.target.value)}
                 className="max-w-[1000px]"
               />
-              <Button onClick={handleSaveStrategy}>Save Strategy</Button>
+              
             </div>
           </div>
 
           {/* Update team table container */}
           {selectedGamePlan && (
-            <div className="space-y-4 overflow-x-auto">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Team</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="min-w-[600px]">
-                    {/* Starting lineup table */}
-                    <div className="mb-6">
-                      <h3 className="text-lg font-semibold mb-4">Starting Lineup</h3>
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Position</TableHead>
-                            <TableHead>Player</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {/* Combine default and custom positions */}
-                          {[
-                            ...positions.filter(p => !deletedPositions.includes(p.id)),
-                            ...customPositions
-                          ].map((position) => {
-                            if (!selectedGamePlan || !selectedGamePlan.positions) return null;
+  <div className="space-y-4 overflow-x-auto">
+    <Card>
+      <CardHeader>
+        <CardTitle>Team</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="min-w-[600px]">
+          {/* Starting lineup table */}
+          <div className="mb-6">
+            <h3 className="text-lg font-semibold mb-4">Starting Lineup</h3>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Position</TableHead>
+                  <TableHead>Player</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {/* Get all current active positions including custom ones and excluding deleted ones */}
+                {(() => {
+                  // Get all positions that should be displayed
+                  const allCurrentPositions = [
+                    // Include default positions that haven't been deleted
+                    ...positions.filter((p) => !deletedPositions.includes(p.id)),
+                    // Include all custom positions
+                    ...customPositions,
+                    // Include formation-specific positions if they exist and aren't duplicates
+                    ...(selectedGamePlan?.formationPositions || []).filter(
+                      (fp) => !positions.some(p => p.id === fp.id) && !customPositions.some(cp => cp.id === fp.id)
+                    )
+                  ];
 
-                            const positionData = selectedGamePlan.positions[position.id];
-                            const player = players.find((p) => p.id.toString() === positionData?.playerId);
-                            return (
-                              <TableRow key={position.id}>
-                                <TableCell>{position.name}</TableCell>
-                                <TableCell>
-                                  {player ? (
-                                    <div className="flex items-center gap-2">
-                                      <Avatar className="h-8 w-8">
-                                        <AvatarImage 
-                                          src={player.photoUrl} 
-                                          alt={player.name}
-                                        />
-                                        <AvatarFallback className="text-lg bg-gray-900 w-full h-full flex items-center justify-center rounded-full">
-                                          {player.name?.charAt(0)}
-                                        </AvatarFallback>
-                                      </Avatar>
-                                      <div className="flex flex-col">
-                                        <span className="font-medium">{player.name}</span>
-                                        <span className="text-sm text-muted-foreground">{player.position}</span>
-                                      </div>
-                                    </div>
-                                  ) : (
-                                    <span className="text-muted-foreground">Unassigned</span>
-                                  )}
-                                </TableCell>
-                              </TableRow>
-                            );
-                          })}
-                        </TableBody>
-                      </Table>
-                    </div>
+                  // Remove any duplicates based on ID
+                  const uniquePositions = allCurrentPositions.filter(
+                    (position, index, self) => self.findIndex(p => p.id === position.id) === index
+                  );
 
-                    {/* Substitutes section */}
-                    <div className="mt-8">
-                      <div className="flex justify-between items-center mb-4">
-                        <h3 className="text-lg font-semibold">Substitutes</h3>
-                        <Button variant="outline" onClick={() => setShowSubstitutesModal(true)}>
-                          Add Substitute
-                        </Button>
-                      </div>
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Position</TableHead>
-                            <TableHead>Player</TableHead>
-                            <TableHead>Actions</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {(selectedGamePlan?.substitutes || []).map((sub) => {
-                            const player = players.find((p) => p.id.toString() === sub.playerId);
-                            return (
-                              <TableRow key={sub.playerId}>
-                                <TableCell>{sub.position}</TableCell>
-                                <TableCell>
-                                  <div className="flex items-center gap-2">
-                                    <Avatar className="h-8 w-8">
-                                      <AvatarImage src={player?.photoUrl} alt={player?.name} />
-                                      <AvatarFallback>{player?.name?.[0]}</AvatarFallback>
-                                    </Avatar>
-                                    <div className="flex flex-col">
-                                      <span className="font-medium">{player?.name}</span>
-                                      <span className="text-sm text-muted-foreground">
-                                        {player?.position}
-                                      </span>
-                                    </div>
-                                  </div>
-                                </TableCell>
-                                <TableCell>
-                                  <Button
-                                    variant="destructive"
-                                    size="sm"
-                                    onClick={() => handleRemoveSubstitute(sub.playerId)}
-                                  >
-                                    Remove
-                                  </Button>
-                                </TableCell>
-                              </TableRow>
-                            )
-                          })}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+                  // Filter to only show positions that exist in the game plan's positions object
+                  const activePositions = uniquePositions.filter(
+                    (position) => selectedGamePlan?.positions?.[position.id] !== undefined
+                  );
+
+                  return activePositions.map((position) => {
+                    if (!selectedGamePlan || !selectedGamePlan.positions) return null;
+
+                    const positionData = selectedGamePlan.positions[position.id];
+                    const player = players.find((p) => p.id.toString() === positionData?.playerId);
+                    
+                    return (
+                      <TableRow key={position.id}>
+                        <TableCell>{position.name}</TableCell>
+                        <TableCell>
+                          {player ? (
+                            <div className="flex items-center gap-2">
+                              <Avatar className="h-8 w-8">
+                                <AvatarImage src={player?.photoUrl || "/placeholder.svg"} alt={player?.name} />
+                                <AvatarFallback>{player?.name?.[0]}</AvatarFallback>
+                              </Avatar>
+                              <div className="flex flex-col">
+                                <span className="font-medium">{player?.name}</span>
+                                <span className="text-sm text-muted-foreground">{player?.position}</span>
+                              </div>
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground">Unassigned</span>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  });
+                })()}
+              </TableBody>
+            </Table>
+          </div>
+
+          {/* Substitutes section */}
+          <div className="mt-8">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold">Substitutes</h3>
+              <Button variant="outline" onClick={() => setShowSubstitutesModal(true)}>
+                Add Substitute
+              </Button>
             </div>
-          )}
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Position</TableHead>
+                  <TableHead>Player</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {(selectedGamePlan?.substitutes || []).map((sub) => {
+                  const player = players.find((p) => p.id.toString() === sub.playerId);
+                  return (
+                    <TableRow key={sub.playerId}>
+                      <TableCell>{sub.position}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Avatar className="h-8 w-8">
+                            <AvatarImage src={player?.photoUrl || "/placeholder.svg"} alt={player?.name} />
+                            <AvatarFallback>{player?.name?.[0]}</AvatarFallback>
+                          </Avatar>
+                          <div className="flex flex-col">
+                            <span className="font-medium">{player?.name}</span>
+                            <span className="text-sm text-muted-foreground">{player?.position}</span>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => handleRemoveSubstitute(sub.playerId)}
+                        >
+                          Remove
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  </div>
+)}
         </div>
       </div>
       <SubstituteModal />
@@ -2668,63 +2933,217 @@ useEffect(() => {
 
 function getPositionStyle(positionId: string, selectedGamePlan: GamePlan | null): React.CSSProperties {
   if (!selectedGamePlan || !selectedGamePlan.positions) {
-    const defaultCoordinates = getDefaultPositionStyle(positionId);
+    const defaultCoordinates = getDefaultPositionStyle(positionId)
     return {
       top: defaultCoordinates.top,
       left: defaultCoordinates.left,
       transform: "translate(-50%, -50%)",
-    };
+    }
   }
 
-  const position = selectedGamePlan.positions[positionId];
-  const defaultCoordinates = getDefaultPositionStyle(positionId);
+  const position = selectedGamePlan.positions[positionId]
+  const defaultCoordinates = getDefaultPositionStyle(positionId)
   return {
     top: position?.top || defaultCoordinates.top,
     left: position?.left || defaultCoordinates.left,
     transform: "translate(-50%, -50%)",
-  };
+  }
 }
 
 // Helper function to map player.position to the corresponding value in AVAILABLE_POSITIONS
 function getPositionValue(position: string | undefined): string {
-  if (!position) return "any";
+  if (!position) return "any"
   // Try to find a matching value in AVAILABLE_POSITIONS
-  const found = AVAILABLE_POSITIONS.find(
-    (pos) => pos.value.toLowerCase() === position.toLowerCase()
-  );
-  if (found) return found.value;
+  const found = AVAILABLE_POSITIONS.find((pos) => pos.value.toLowerCase() === position.toLowerCase())
+  if (found) return found.value
   // Try to match by label as fallback
-  const foundByLabel = AVAILABLE_POSITIONS.find(
-    (pos) => pos.label.toLowerCase() === position.toLowerCase()
-  );
-  if (foundByLabel) return foundByLabel.value;
-  return "any";
+  const foundByLabel = AVAILABLE_POSITIONS.find((pos) => pos.label.toLowerCase() === position.toLowerCase())
+  if (foundByLabel) return foundByLabel.value
+  return "any"
 }
 
-const getDefaultPositionStyle = (positionId: string): { top: string; left: string } => {
-  const defaultPositions: { [key: string]: { top: string; left: string } } = {
-    // Existing positions
-    gk: { top: "90%", left: "50%" },
-    lb: { top: "75%", left: "20%" },
-    cb1: { top: "75%", left: "40%" },
-    cb2: { top: "75%", left: "60%" },
-    rb: { top: "75%", left: "80%" },
-    lm: { top: "45%", left: "20%" },
-    cm1: { top: "45%", left: "40%" },
-    cm2: { top: "45%", left: "60%" },
-    rm: { top: "45%", left: "80%" },
-    st1: { top: "15%", left: "35%" },
-    st2: { top: "15%", left: "65%" },
-    
-    // New position default coordinates
-    cam: { top: "30%", left: "50%" },  // Attacking mid in center
-    lw: { top: "25%", left: "20%" },   // Left winger forward
-    rw: { top: "25%", left: "80%" },   // Right winger forward
-    
-    // Default for custom positions remains the same
-    default: { top: "50%", left: "50%" }
-  };
-  
-  return defaultPositions[positionId] || defaultPositions.default;
-};
+const getDefaultPositionStyle = (positionId: string, teamSize = 11): { top: string; left: string } => {
+  // Formation templates based on team size
+  const formationCoordinates: { [key: number]: { [key: string]: { top: string; left: string } } } = {
+    2: {
+      gk: { top: "85%", left: "50%" },
+      st1: { top: "15%", left: "50%" },
+    },
+    3: {
+      gk: { top: "85%", left: "50%" },
+      cb1: { top: "65%", left: "50%" },
+      st1: { top: "15%", left: "50%" },
+    },
+    4: {
+      gk: { top: "85%", left: "50%" },
+      cb1: { top: "65%", left: "50%" },
+      cm1: { top: "45%", left: "50%" },
+      st1: { top: "15%", left: "50%" },
+    },
+    5: {
+      gk: { top: "85%", left: "50%" },
+      cb1: { top: "65%", left: "50%" },
+      cm1: { top: "45%", left: "50%" },
+      st1: { top: "15%", left: "35%" },
+      st2: { top: "15%", left: "65%" },
+    },
+    6: {
+      gk: { top: "85%", left: "50%" },
+      cb1: { top: "65%", left: "35%" },
+      cb2: { top: "65%", left: "65%" },
+      cm1: { top: "45%", left: "50%" },
+      st1: { top: "15%", left: "35%" },
+      st2: { top: "15%", left: "65%" },
+    },
+    7: {
+      gk: { top: "85%", left: "50%" },
+      cb1: { top: "65%", left: "35%" },
+      cb2: { top: "65%", left: "65%" },
+      cm1: { top: "45%", left: "35%" },
+      cm2: { top: "45%", left: "65%" },
+      st1: { top: "15%", left: "35%" },
+      st2: { top: "15%", left: "65%" },
+    },
+    8: {
+      gk: { top: "85%", left: "50%" },
+      lb: { top: "65%", left: "20%" },
+      cb1: { top: "65%", left: "45%" },
+      rb: { top: "65%", left: "80%" },
+      cm1: { top: "45%", left: "35%" },
+      cm2: { top: "45%", left: "65%" },
+      st1: { top: "15%", left: "35%" },
+      st2: { top: "15%", left: "65%" },
+    },
+    9: {
+      gk: { top: "85%", left: "50%" },
+      lb: { top: "65%", left: "20%" },
+      cb1: { top: "65%", left: "40%" },
+      cb2: { top: "65%", left: "60%" },
+      rb: { top: "65%", left: "80%" },
+      cm1: { top: "45%", left: "35%" },
+      cm2: { top: "45%", left: "65%" },
+      st1: { top: "15%", left: "35%" },
+      st2: { top: "15%", left: "65%" },
+    },
+    10: {
+      gk: { top: "85%", left: "50%" },
+      lb: { top: "65%", left: "20%" },
+      cb1: { top: "65%", left: "40%" },
+      cb2: { top: "65%", left: "60%" },
+      rb: { top: "65%", left: "80%" },
+      lm: { top: "45%", left: "20%" },
+      cm1: { top: "45%", left: "50%" },
+      rm: { top: "45%", left: "80%" },
+      st1: { top: "15%", left: "35%" },
+      st2: { top: "15%", left: "65%" },
+    },
+    11: {
+      gk: { top: "90%", left: "50%" },
+      lb: { top: "75%", left: "20%" },
+      cb1: { top: "75%", left: "40%" },
+      cb2: { top: "75%", left: "60%" },
+      rb: { top: "75%", left: "80%" },
+      lm: { top: "45%", left: "20%" },
+      cm1: { top: "45%", left: "40%" },
+      cm2: { top: "45%", left: "60%" },
+      rm: { top: "45%", left: "80%" },
+      st1: { top: "15%", left: "35%" },
+      st2: { top: "15%", left: "65%" },
+    },
+  }
 
+  return formationCoordinates[teamSize]?.[positionId] || { top: "50%", left: "50%" }
+}
+
+// Add a function to get positions based on team size
+const getPositionsBySize = (size: number): Position[] => {
+  const formationTemplates: { [key: number]: Position[] } = {
+    2: [
+      { id: "gk", name: "Goalkeeper", shortName: "GK", type: "gk" },
+      { id: "st1", name: "Striker", shortName: "ST", type: "fwd" },
+    ],
+    3: [
+      { id: "gk", name: "Goalkeeper", shortName: "GK", type: "gk" },
+      { id: "cb1", name: "Center Back", shortName: "CB", type: "def" },
+      { id: "st1", name: "Striker", shortName: "ST", type: "fwd" },
+    ],
+    4: [
+      { id: "gk", name: "Goalkeeper", shortName: "GK", type: "gk" },
+      { id: "cb1", name: "Center Back", shortName: "CB", type: "def" },
+      { id: "cm1", name: "Center Midfielder", shortName: "CM", type: "mid" },
+      { id: "st1", name: "Striker", shortName: "ST", type: "fwd" },
+    ],
+    5: [
+      { id: "gk", name: "Goalkeeper", shortName: "GK", type: "gk" },
+      { id: "cb1", name: "Center Back", shortName: "CB", type: "def" },
+      { id: "cm1", name: "Center Midfielder", shortName: "CM", type: "mid" },
+      { id: "st1", name: "Striker 1", shortName: "ST", type: "fwd" },
+      { id: "st2", name: "Striker 2", shortName: "ST", type: "fwd" },
+    ],
+    6: [
+      { id: "gk", name: "Goalkeeper", shortName: "GK", type: "gk" },
+      { id: "cb1", name: "Center Back 1", shortName: "CB", type: "def" },
+      { id: "cb2", name: "Center Back 2", shortName: "CB", type: "def" },
+      { id: "cm1", name: "Center Midfielder", shortName: "CM", type: "mid" },
+      { id: "st1", name: "Striker 1", shortName: "ST", type: "fwd" },
+      { id: "st2", name: "Striker 2", shortName: "ST", type: "fwd" },
+    ],
+    7: [
+      { id: "gk", name: "Goalkeeper", shortName: "GK", type: "gk" },
+      { id: "cb1", name: "Center Back 1", shortName: "CB", type: "def" },
+      { id: "cb2", name: "Center Back 2", shortName: "CB", type: "def" },
+      { id: "cm1", name: "Center Midfielder 1", shortName: "CM", type: "mid" },
+      { id: "cm2", name: "Center Midfielder 2", shortName: "CM", type: "mid" },
+      { id: "st1", name: "Striker 1", shortName: "ST", type: "fwd" },
+      { id: "st2", name: "Striker 2", shortName: "ST", type: "fwd" },
+    ],
+    8: [
+      { id: "gk", name: "Goalkeeper", shortName: "GK", type: "gk" },
+      { id: "lb", name: "Left Back", shortName: "LB", type: "def" },
+      { id: "cb1", name: "Center Back", shortName: "CB", type: "def" },
+      { id: "rb", name: "Right Back", shortName: "RB", type: "def" },
+      { id: "cm1", name: "Center Midfielder 1", shortName: "CM", type: "mid" },
+      { id: "cm2", name: "Center Midfielder 2", shortName: "CM", type: "mid" },
+      { id: "st1", name: "Striker 1", shortName: "ST", type: "fwd" },
+      { id: "st2", name: "Striker 2", shortName: "ST", type: "fwd" },
+    ],
+    9: [
+      { id: "gk", name: "Goalkeeper", shortName: "GK", type: "gk" },
+      { id: "lb", name: "Left Back", shortName: "LB", type: "def" },
+      { id: "cb1", name: "Center Back 1", shortName: "CB", type: "def" },
+      { id: "cb2", name: "Center Back 2", shortName: "CB", type: "def" },
+      { id: "rb", name: "Right Back", shortName: "RB", type: "def" },
+      { id: "cm1", name: "Center Midfielder 1", shortName: "CM", type: "mid" },
+      { id: "cm2", name: "Center Midfielder 2", shortName: "CM", type: "mid" },
+      { id: "st1", name: "Striker 1", shortName: "ST", type: "fwd" },
+      { id: "st2", name: "Striker 2", shortName: "ST", type: "fwd" },
+    ],
+    10: [
+      { id: "gk", name: "Goalkeeper", shortName: "GK", type: "gk" },
+      { id: "lb", name: "Left Back", shortName: "LB", type: "def" },
+      { id: "cb1", name: "Center Back 1", shortName: "CB", type: "def" },
+      { id: "cb2", name: "Center Back 2", shortName: "CB", type: "def" },
+      { id: "rb", name: "Right Back", shortName: "RB", type: "def" },
+      { id: "lm", name: "Left Midfielder", shortName: "LM", type: "mid" },
+      { id: "cm1", name: "Center Midfielder", shortName: "CM", type: "mid" },
+      { id: "rm", name: "Right Midfielder", shortName: "RM", type: "mid" },
+      { id: "st1", name: "Striker 1", shortName: "ST", type: "fwd" },
+      { id: "st2", name: "Striker 2", shortName: "ST", type: "fwd" },
+    ],
+    11: [
+      { id: "gk", name: "Goalkeeper", shortName: "GK", type: "gk" },
+      { id: "lb", name: "Left Back", shortName: "LB", type: "def" },
+      { id: "cb1", name: "Center Back 1", shortName: "CB", type: "def" },
+      { id: "cb2", name: "Center Back 2", shortName: "CB", type: "def" },
+      { id: "rb", name: "Right Back", shortName: "RB", type: "def" },
+      { id: "lm", name: "Left Midfielder", shortName: "LM", type: "mid" },
+      { id: "cm1", name: "Center Midfielder 1", shortName: "CM", type: "mid" },
+      { id: "cm2", name: "Center Midfielder 2", shortName: "CM", type: "mid" },
+      { id: "rm", name: "Right Midfielder", shortName: "RM", type: "mid" },
+      { id: "st1", name: "Striker 1", shortName: "ST", type: "fwd" },
+      { id: "st2", name: "Striker 2", shortName: "ST", type: "fwd" },
+    ],
+  }
+
+  return formationTemplates[size] || formationTemplates[11]
+}
