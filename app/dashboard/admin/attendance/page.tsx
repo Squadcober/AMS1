@@ -46,8 +46,10 @@ interface PlayerAttendanceSummary {
   totalSessions: number
   present: number
   absent: number
+  unmarked: number
   presentDates: string[]
   absentDates: string[]
+  unmarkedDates: string[]
 }
 
 const updateSessionStatus = (sessions: Session[]): Session[] => {
@@ -55,35 +57,32 @@ const updateSessionStatus = (sessions: Session[]): Session[] => {
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
 
   return sessions.map(session => {
-    if (session.isOccurrence) {
-      const occurrenceDateTime = new Date(session.date)
-      const [startHour, startMinute] = session.startTime.split(":").map(Number)
-      const [endHour, endMinute] = session.endTime.split(":").map(Number)
+    const occurrenceDateTime = new Date(session.date)
+    const [startHour, startMinute] = session.startTime.split(":").map(Number)
+    const [endHour, endMinute] = session.endTime.split(":").map(Number)
 
-      const sessionStart = new Date(occurrenceDateTime)
-      sessionStart.setHours(startHour, startMinute, 0)
+    const sessionStart = new Date(occurrenceDateTime)
+    sessionStart.setHours(startHour, startMinute, 0)
 
-      const sessionEnd = new Date(occurrenceDateTime)
-      sessionEnd.setHours(endHour, endMinute, 0)
+    const sessionEnd = new Date(occurrenceDateTime)
+    sessionEnd.setHours(endHour, endMinute, 0)
 
-      let status: Session["status"]
-      if (occurrenceDateTime < today) {
+    let status: Session["status"]
+    if (occurrenceDateTime < today) {
+      status = "Finished"
+    } else if (occurrenceDateTime.getTime() === today.getTime()) {
+      if (now >= sessionEnd) {
         status = "Finished"
-      } else if (occurrenceDateTime.getTime() === today.getTime()) {
-        if (now >= sessionEnd) {
-          status = "Finished"
-        } else if (now >= sessionStart && now <= sessionEnd) {
-          status = "On-going"
-        } else {
-          status = "Upcoming"
-        }
+      } else if (now >= sessionStart && now <= sessionEnd) {
+        status = "On-going"
       } else {
         status = "Upcoming"
       }
-
-      return { ...session, status }
+    } else {
+      status = "Upcoming"
     }
-    return session
+
+    return { ...session, status }
   })
 }
 
@@ -141,9 +140,7 @@ export default function AttendancePage() {
   }
 
   const calculatePlayerAttendance = (sessions: Session[]): Record<string, PlayerAttendanceSummary> => {
-    const finishedSessions = sessions.filter(
-      s => s.status === "Finished" && s.isOccurrence
-    )
+    const finishedSessions = sessions.filter(s => s.status === "Finished")
 
     const summary: Record<string, PlayerAttendanceSummary> = {}
 
@@ -155,8 +152,10 @@ export default function AttendancePage() {
             totalSessions: 0,
             present: 0,
             absent: 0,
+            unmarked: 0,
             presentDates: [],
-            absentDates: []
+            absentDates: [],
+            unmarkedDates: []
           }
         }
 
@@ -166,9 +165,13 @@ export default function AttendancePage() {
         if (attendanceRecord?.status === "Present") {
           summary[playerId].present++
           summary[playerId].presentDates.push(session.date)
-        } else {
+        } else if (attendanceRecord?.status === "Absent") {
           summary[playerId].absent++
           summary[playerId].absentDates.push(session.date)
+        } else {
+          // No attendance record means unmarked
+          summary[playerId].unmarked++
+          summary[playerId].unmarkedDates.push(session.date)
         }
       }
     }
@@ -182,18 +185,32 @@ export default function AttendancePage() {
       const stats = report[u.id] || {
         totalSessions: 0,
         present: 0,
-        absent: 0
+        absent: 0,
+        unmarked: 0
       }
       return {
         id: u.id,
         name: u.name,
-        attendance: `${stats.present}/${stats.totalSessions}`
+        total: stats.totalSessions,
+        present: stats.present,
+        absent: stats.absent,
+        unmarked: stats.unmarked,
+        attendance: stats.totalSessions > 0 ? 
+          `${Math.round((stats.present / stats.totalSessions) * 100)}%` : "0%"
       }
     })
 
     const csvContent = [
-      ["Player ID", "Player Name", "Attendance (Present/Total)"].join(","),
-      ...exportData.map(row => [row.id, row.name, row.attendance].join(","))
+      ["Player ID", "Player Name", "Total Sessions", "Present", "Absent", "Unmarked", "Attendance %"].join(","),
+      ...exportData.map(row => [
+        row.id, 
+        row.name, 
+        row.total, 
+        row.present, 
+        row.absent, 
+        row.unmarked, 
+        row.attendance
+      ].join(","))
     ].join("\n")
 
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" })
@@ -272,7 +289,20 @@ export default function AttendancePage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Attendance Statistics</CardTitle>
+            <div className="flex justify-between items-center">
+              <CardTitle>Attendance Statistics</CardTitle>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                <Input
+                  placeholder="Search players..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onFocus={() => setIsSearchFocused(true)}
+                  onBlur={() => setIsSearchFocused(false)}
+                  className="pl-10 w-64"
+                />
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
             <Table>
@@ -282,6 +312,7 @@ export default function AttendancePage() {
                   <TableHead>Total</TableHead>
                   <TableHead>Present</TableHead>
                   <TableHead>Absent</TableHead>
+                  <TableHead>Unmarked</TableHead>
                   <TableHead>Attendance%</TableHead>
                 </TableRow>
               </TableHeader>
@@ -290,7 +321,8 @@ export default function AttendancePage() {
                   const stats = report[u.id] || {
                     totalSessions: 0,
                     present: 0,
-                    absent: 0
+                    absent: 0,
+                    unmarked: 0
                   }
                   const percentage =
                     stats.totalSessions > 0 ? Math.round((stats.present / stats.totalSessions) * 100) : 0
@@ -298,10 +330,26 @@ export default function AttendancePage() {
                     <TableRow key={u.id}>
                       <TableCell className="font-medium">{u.name}</TableCell>
                       <TableCell>{stats.totalSessions}</TableCell>
-                      <TableCell>{stats.present}</TableCell>
-                      <TableCell>{stats.absent}</TableCell>
                       <TableCell>
-                        <Badge variant={percentage >= 75 ? "success" : "destructive"}>{percentage}%</Badge>
+                        <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                          {stats.present}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
+                          {stats.absent}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
+                          {stats.unmarked}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={percentage >= 75 ? "default" : "destructive"} 
+                               className={percentage >= 75 ? "bg-green-600" : ""}>
+                          {percentage}%
+                        </Badge>
                       </TableCell>
                     </TableRow>
                   )
@@ -315,7 +363,7 @@ export default function AttendancePage() {
                 Previous
               </Button>
               <span className="text-sm text-muted-foreground">
-                Page {currentPage + 1} of {totalPages}
+                Page {currentPage + 1} of {totalPages} ({getFilteredUsers().length} players)
               </span>
               <Button
                 variant="outline"

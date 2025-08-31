@@ -63,7 +63,7 @@ export default function ExportDataPage() {
               `"${p.name || ''}"`,
               `"${p.position || ''}"`,
               p.age || '',
-              `${overallRating}%`,
+              `${overallRating}`,
               attrs.shooting || '',
               attrs.pace || '',
               attrs.positioning || '',
@@ -124,7 +124,7 @@ export default function ExportDataPage() {
               attrs.ballControl || session.ballControl || '',
               attrs.crossing || session.crossing || '',
               session.sessionRating || '',
-              `${overallRating}%`
+              `${overallRating}`
             ].join(',');
           }),
         ].join('\n');
@@ -173,7 +173,7 @@ export default function ExportDataPage() {
                 `"${player.name}"`,
                 `"${player.position}"`,
                 `"${player.age}"`,
-                `"${overallRating}%"`,  // Overall rating as percentage
+                `"${overallRating}"`,  // Overall rating as percentage
                 `"${attrs.shooting}"`,
                 `"${attrs.pace}"`,
                 `"${attrs.positioning}"`,
