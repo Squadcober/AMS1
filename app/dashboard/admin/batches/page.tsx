@@ -78,6 +78,8 @@ export default function BatchesPage() {
   const [allPlayersSelected, setAllPlayersSelected] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [editingBatch, setEditingBatch] = useState<any>(null)
+  const [isCreatingBatch, setIsCreatingBatch] = useState(false)
+  const [isEditingBatch, setIsEditingBatch] = useState(false)
 
   useEffect(() => {
     const fetchBatches = async () => {
@@ -429,155 +431,164 @@ export default function BatchesPage() {
   };
 
   const handleCreateBatch = async () => {
-    // Add validation at the start of the function
-    if (!newBatchName.trim()) {
-      setBatchNameError("Batch name is mandatory");
-      return;
-    }
-    setBatchNameError("");
+  // Add validation at the start of the function
+  if (!newBatchName.trim()) {
+    setBatchNameError("Batch name is mandatory");
+    return;
+  }
+  setBatchNameError("");
 
-    try {
-      if (!user?.academyId || !user?.id) {
-        toast({
-          title: "Error",
-          description: "Missing required information",
-          variant: "destructive",
-        });
-        return;
-      }
+  try {
+    setIsCreatingBatch(true); // Start loading
 
-      // Map selected coach IDs to coach user data
-      const selectedCoachData = coaches
-        .filter(coach => selectedCoaches.includes(coach._id))
-        .map(coach => ({
-          id: coach.id || coach.userId, // Use the user_ ID
-          name: coach.name,
-        }));
-
-      // Only use player ids that start with 'player_'
-      const filteredPlayerIds = selectedPlayers.filter(pid => pid.startsWith('player_'));
-
-      const batchData = {
-        name: newBatchName.trim(),
-        coachIds: selectedCoachData.map(c => c.id), // Use only the user IDs
-        coachNames: selectedCoachData.map(c => c.name), // Store names separately
-        players: filteredPlayerIds, // Only player_ ids
-        academyId: user.academyId,
-        createdBy: user.id,
-        createdAt: new Date().toISOString(),
-        status: 'active'
-      };
-
-      console.log("Creating batch with data:", batchData);
-
-      const response = await fetch('/api/db/ams-batches', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(batchData),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to create batch');
-      }
-
-      const result = await response.json();
-
-      if (!result.success) {
-        throw new Error(result.error || 'Failed to create batch');
-      }
-
-      // Instead of manually updating state, refetch all data
-      await refetchAllBatchData();
-      
-      // Set the newly created batch as selected
-      const newBatch = result.data;
-      setSelectedBatch(newBatch);
-
-      // Reset form
-      setNewBatchName("");
-      setSelectedPlayers([]);
-      setSelectedCoaches([]);
-      setIsCreateDialogOpen(false);
-
-      toast({
-        title: "Success",
-        description: "Batch created successfully",
-        variant: "default",
-      });
-
-    } catch (error) {
-      console.error('Error creating batch:', error);
+    if (!user?.academyId || !user?.id) {
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to create batch",
+        description: "Missing required information",
         variant: "destructive",
       });
+      return;
     }
-  };
+
+    // Map selected coach IDs to coach user data
+    const selectedCoachData = coaches
+      .filter(coach => selectedCoaches.includes(coach._id))
+      .map(coach => ({
+        id: coach.id || coach.userId, // Use the user_ ID
+        name: coach.name,
+      }));
+
+    // Only use player ids that start with 'player_'
+    const filteredPlayerIds = selectedPlayers.filter(pid => pid.startsWith('player_'));
+
+    const batchData = {
+      name: newBatchName.trim(),
+      coachIds: selectedCoachData.map(c => c.id), // Use only the user IDs
+      coachNames: selectedCoachData.map(c => c.name), // Store names separately
+      players: filteredPlayerIds, // Only player_ ids
+      academyId: user.academyId,
+      createdBy: user.id,
+      createdAt: new Date().toISOString(),
+      status: 'active'
+    };
+
+    console.log("Creating batch with data:", batchData);
+
+    const response = await fetch('/api/db/ams-batches', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(batchData),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to create batch');
+    }
+
+    const result = await response.json();
+
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to create batch');
+    }
+
+    // Instead of manually updating state, refetch all data
+    await refetchAllBatchData();
+    
+    // Set the newly created batch as selected
+    const newBatch = result.data;
+    setSelectedBatch(newBatch);
+
+    // Reset form
+    setNewBatchName("");
+    setSelectedPlayers([]);
+    setSelectedCoaches([]);
+    setIsCreateDialogOpen(false);
+
+    toast({
+      title: "Success",
+      description: "Batch created successfully",
+      variant: "default",
+    });
+
+  } catch (error) {
+    console.error('Error creating batch:', error);
+    toast({
+      title: "Error",
+      description: error instanceof Error ? error.message : "Failed to create batch",
+      variant: "destructive",
+    });
+  } finally {
+    setIsCreatingBatch(false); // Stop loading
+  }
+};
+
 
   const handleEditBatch = async () => {
-    if (!editingBatch?._id) return;
-    
-    if (!newBatchName.trim()) {
-      setBatchNameError("Batch name is mandatory");
-      return;
+  if (!editingBatch?._id) return;
+  
+  if (!newBatchName.trim()) {
+    setBatchNameError("Batch name is mandatory");
+    return;
+  }
+  setBatchNameError("");
+
+  try {
+    setIsEditingBatch(true); // Start loading
+
+    // Map selected coach IDs to coach user data
+    const selectedCoachData = coaches
+      .filter(coach => selectedCoaches.includes(coach._id))
+      .map(coach => ({
+        id: coach.id || coach.userId,
+        name: coach.name,
+      }));
+
+    const batchData = {
+      name: newBatchName.trim(),
+      coachIds: selectedCoachData.map(c => c.id),
+      coachNames: selectedCoachData.map(c => c.name),
+      players: selectedPlayers.filter(pid => pid.startsWith('player_'))
+    };
+
+    const response = await fetch(`/api/db/ams-batches/${editingBatch._id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(batchData),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.error || 'Failed to update batch');
     }
-    setBatchNameError("");
 
-    try {
-      // Map selected coach IDs to coach user data
-      const selectedCoachData = coaches
-        .filter(coach => selectedCoaches.includes(coach._id))
-        .map(coach => ({
-          id: coach.id || coach.userId,
-          name: coach.name,
-        }));
+    // First close the dialog
+    setIsEditDialogOpen(false);
 
-      const batchData = {
-        name: newBatchName.trim(),
-        coachIds: selectedCoachData.map(c => c.id),
-        coachNames: selectedCoachData.map(c => c.name),
-        players: selectedPlayers.filter(pid => pid.startsWith('player_'))
-      };
+    // Then refetch data and reset form state
+    await refetchAllBatchData();
+    setNewBatchName("");
+    setSelectedPlayers([]);
+    setSelectedCoaches([]);
+    setEditingBatch(null);
 
-      const response = await fetch(`/api/db/ams-batches/${editingBatch._id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(batchData),
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to update batch');
-      }
-
-      // First close the dialog
-      setIsEditDialogOpen(false);
-
-      // Then refetch data and reset form state
-      await refetchAllBatchData();
-      setNewBatchName("");
-      setSelectedPlayers([]);
-      setSelectedCoaches([]);
-      setEditingBatch(null);
-
-      toast({
-        title: "Success",
-        description: "Batch updated successfully",
-      });
-    } catch (error) {
-      console.error('Error updating batch:', error);
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to update batch",
-        variant: "destructive",
-      });
-    }
-  };
+    toast({
+      title: "Success",
+      description: "Batch updated successfully",
+    });
+  } catch (error) {
+    console.error('Error updating batch:', error);
+    toast({
+      title: "Error",
+      description: error instanceof Error ? error.message : "Failed to update batch",
+      variant: "destructive",
+    });
+  } finally {
+    setIsEditingBatch(false); // Stop loading
+  }
+};
 
   const handleStartEdit = (batch: any) => {
     setEditingBatch(batch);
@@ -946,8 +957,13 @@ export default function BatchesPage() {
               </div>
             </div>
             <DialogFooter>
-              <Button onClick={handleCreateBatch}>Create Batch</Button>
-            </DialogFooter>
+  <Button 
+    onClick={handleCreateBatch}
+    disabled={isCreatingBatch}
+  >
+    {isCreatingBatch ? "Creating..." : "Create Batch"}
+  </Button>
+</DialogFooter>
           </DialogContent>
         </Dialog>
 
@@ -1042,8 +1058,13 @@ export default function BatchesPage() {
               </div>
             </div>
             <DialogFooter>
-              <Button onClick={handleEditBatch}>Save Changes</Button>
-            </DialogFooter>
+  <Button 
+    onClick={handleEditBatch}
+    disabled={isEditingBatch}
+  >
+    {isEditingBatch ? "Saving..." : "Save Changes"}
+  </Button>
+</DialogFooter>
           </DialogContent>
         </Dialog>
 
