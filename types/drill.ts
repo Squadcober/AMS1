@@ -17,7 +17,7 @@ export type Drill = {
   playersAssigned: string[];
   attendance?: {
     [playerId: string]: {
-      status: "Present" | "Absent";
+      status: "Present" | "Absent" | "Unmarked";
       markedAt: string;
       markedBy: string;
     };

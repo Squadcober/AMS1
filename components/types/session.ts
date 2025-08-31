@@ -15,7 +15,7 @@ export interface Session {
   selectedDays?: string[]
   totalOccurrences?: number
   playerRatings?: { [playerId: string]: number }
-  attendance?: { [playerId: string]: "Present" | "Absent" }
+  attendance?: { [playerId: string]: "Present" | "Absent" | "Unmarked" }
 }
 
 export interface Player {

@@ -79,3 +79,58 @@ export async function PATCH(
     }, { status: 500 });
   }
 }
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const { id } = params;
+    const db = await getDatabase();
+
+    // First check if user exists
+    const existingUser = await db.collection('ams-users').findOne({ id: id });
+    
+    if (!existingUser) {
+      return NextResponse.json(
+        { success: false, error: 'User not found' },
+        { status: 404 }
+      );
+    }
+
+    // Delete the user
+    const result = await db.collection('ams-users').deleteOne({ id: id });
+
+    if (result.deletedCount === 0) {
+      return NextResponse.json(
+        { success: false, error: 'Failed to delete user' },
+        { status: 500 }
+      );
+    }
+
+    // If the user is a player, also delete from ams-player-info collection
+    if (existingUser.role === 'player') {
+      try {
+        await db.collection('ams-player-info').deleteOne({ 
+          username: existingUser.username,
+          academyId: existingUser.academyId 
+        });
+      } catch (playerError) {
+        console.warn('Failed to delete player info:', playerError);
+        // Continue even if player info deletion fails
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: 'User deleted successfully'
+    });
+
+  } catch (error) {
+    console.error('Error deleting user:', error);
+    return NextResponse.json(
+      { success: false, error: 'Failed to delete user' },
+      { status: 500 }
+    );
+  }
+}

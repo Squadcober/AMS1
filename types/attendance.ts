@@ -4,7 +4,7 @@ export interface AttendanceRecord {
   type: 'player' | 'coach';
   records: {
     [id: string]: {
-      status: 'present' | 'absent';
+      status: 'present' | 'absent' | 'unmarked';
       markedBy: string;
       markedAt: string;
       notes?: string;

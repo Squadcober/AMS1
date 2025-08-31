@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/components/ui/use-toast"
 import Sidebar from "@/components/Sidebar"
 import { useAuth } from "@/contexts/AuthContext"
+import { motion, AnimatePresence } from "framer-motion"
 
 export default function UserManagementPage() {
   const { user } = useAuth()
@@ -19,6 +20,7 @@ export default function UserManagementPage() {
   const [users, setUsers] = useState<any[]>([]) // Initialize as empty array
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedRole, setSelectedRole] = useState<string>("all")
+  const [selectedStatus, setSelectedStatus] = useState<string>("all")
   const [newUser, setNewUser] = useState({
     name: "",
     username: "",
@@ -27,6 +29,13 @@ export default function UserManagementPage() {
     password: ""
   })
   const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [deleteConfirmDialog, setDeleteConfirmDialog] = useState({
+    open: false,
+    userId: "",
+    userName: ""
+  })
+  const [deletePassword, setDeletePassword] = useState("")
+  const [deleteLoading, setDeleteLoading] = useState(false)
 
   const fetchUsers = async () => {
     try {
@@ -117,26 +126,74 @@ export default function UserManagementPage() {
     }
   };
 
-  // Delete user using /api/db/ams-users/[id] and refresh list after delete
-  const handleDeleteUser = async (userId: string) => {
-    if (!confirm("Are you sure you want to delete this user?")) return;
+  // Delete user with password verification
+  const handleDeleteUser = async (userId: string, userName: string) => {
+    setDeleteConfirmDialog({
+      open: true,
+      userId: userId,
+      userName: userName
+    });
+    setDeletePassword("");
+  };
+
+  const confirmDeleteUser = async () => {
+    if (!deletePassword) {
+      toast({
+        title: "Error",
+        description: "Password is required to delete user",
+        variant: "destructive"
+      });
+      return;
+    }
+
     try {
-      setLoading(true);
-      const res = await fetch(`/api/db/ams-users/${userId}`, {
+      setDeleteLoading(true);
+      
+      // First verify the current user's password
+      const authResponse = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ 
+          username: user?.username, 
+          password: deletePassword 
+        }),
+      });
+
+      const authData = await authResponse.json();
+
+      if (!authData.success) {
+        toast({
+          title: "Error",
+          description: "Invalid password",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // If password is valid, proceed with deletion
+      const deleteResponse = await fetch(`/api/db/ams-users/${deleteConfirmDialog.userId}`, {
         method: 'DELETE'
       });
-      const data = await res.json();
-      if (data.success) {
+      
+      const deleteData = await deleteResponse.json();
+      
+      if (deleteData.success) {
         await fetchUsers();
         toast({
           title: "User deleted",
           description: "User has been deleted successfully",
           variant: "destructive"
         });
+        setDeleteConfirmDialog({ open: false, userId: "", userName: "" });
+        setDeletePassword("");
       } else {
         toast({
           title: "Error",
-          description: data.error || "Failed to delete user",
+          description: deleteData.error || "Failed to delete user",
           variant: "destructive"
         });
       }
@@ -147,7 +204,7 @@ export default function UserManagementPage() {
         variant: "destructive"
       });
     } finally {
-      setLoading(false);
+      setDeleteLoading(false);
     }
   };
 
@@ -234,7 +291,8 @@ export default function UserManagementPage() {
     const matchesSearch = (user.name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
                          (user.email?.toLowerCase() || '').includes(searchTerm.toLowerCase());
     const matchesRole = selectedRole === "all" || user.role === selectedRole;
-    return matchesSearch && matchesRole;
+    const matchesStatus = selectedStatus === "all" || user.status === selectedStatus;
+    return matchesSearch && matchesRole && matchesStatus;
   }) : [];
 
   return (
@@ -303,28 +361,58 @@ export default function UserManagementPage() {
               <CardTitle>Users ({filteredUsers.length})</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="flex space-x-4 mb-4">
-                <Input
-                  placeholder="Search users..."
-                  value={searchTerm}
-                  onChange={e => setSearchTerm(e.target.value)}
-                  className="max-w-sm"
-                />
-                <Select
-                  value={selectedRole}
-                  onValueChange={setSelectedRole}
-                >
-                  <SelectTrigger className="w-[180px]">
-                    <SelectValue placeholder="Filter by role" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Roles</SelectItem>
-                    <SelectItem value="player">player</SelectItem>
-                    <SelectItem value="coach">Coach</SelectItem>
-                    <SelectItem value="coordinator">Coordinator</SelectItem>
-                    <SelectItem value="admin">Admin</SelectItem>
-                  </SelectContent>
-                </Select>
+              <div className="flex flex-col space-y-4 mb-4">
+                <div className="flex space-x-4">
+                  <Input
+                    placeholder="Search users..."
+                    value={searchTerm}
+                    onChange={e => setSearchTerm(e.target.value)}
+                    className="max-w-sm"
+                  />
+                  <Select
+                    value={selectedRole}
+                    onValueChange={setSelectedRole}
+                  >
+                    <SelectTrigger className="w-[180px]">
+                      <SelectValue placeholder="Filter by role" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Roles</SelectItem>
+                      <SelectItem value="player">player</SelectItem>
+                      <SelectItem value="coach">Coach</SelectItem>
+                      <SelectItem value="coordinator">Coordinator</SelectItem>
+                      <SelectItem value="admin">Admin</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                {/* Status Filter Buttons */}
+                <div className="flex space-x-2">
+                  <Button
+                    variant={selectedStatus === "all" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setSelectedStatus("all")}
+                    className="transition-all duration-200"
+                  >
+                    All Users ({users.length})
+                  </Button>
+                  <Button
+                    variant={selectedStatus === "active" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setSelectedStatus("active")}
+                    className="transition-all duration-200"
+                  >
+                    Active ({users.filter(u => u?.status === "active").length})
+                  </Button>
+                  <Button
+                    variant={selectedStatus === "inactive" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setSelectedStatus("inactive")}
+                    className="transition-all duration-200"
+                  >
+                    Inactive ({users.filter(u => u?.status === "inactive").length})
+                  </Button>
+                </div>
               </div>
 
               <Table>
@@ -365,17 +453,19 @@ export default function UserManagementPage() {
                         </TableCell>
                         <TableCell>
                           <div className="flex space-x-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleStatusToggle(user.id)}
-                            >
-                              {user.status === 'active' ? 'Deactivate' : 'Activate'}
-                            </Button>
+                            {user.role !== 'admin' && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleStatusToggle(user.id)}
+                              >
+                                {user.status === 'active' ? 'Deactivate' : 'Activate'}
+                              </Button>
+                            )}
                             <Button
                               variant="destructive"
                               size="sm"
-                              onClick={() => handleDeleteUser(user.id)}
+                              onClick={() => handleDeleteUser(user.id, user.name)}
                             >
                               Delete
                             </Button>
@@ -388,9 +478,73 @@ export default function UserManagementPage() {
               </Table>
             </CardContent>
           </Card>
+
+          {/* Password Confirmation Dialog for User Deletion */}
+          <AnimatePresence>
+            {deleteConfirmDialog.open && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center">
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="fixed inset-0 bg-black/50 backdrop-blur-sm"
+                  onClick={() => setDeleteConfirmDialog({ open: false, userId: "", userName: "" })}
+                />
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  className="relative bg-white dark:bg-[#2a2f3d] p-6 rounded-lg shadow-xl w-[90%] max-w-md z-10"
+                >
+                  <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+                    Confirm User Deletion
+                  </h3>
+                  <div className="space-y-4">
+                    <p className="text-gray-700 dark:text-gray-300">
+                      Are you sure you want to delete <strong>{deleteConfirmDialog.userName}</strong>?
+                    </p>
+                    <p className="text-red-600 dark:text-red-400 text-sm">
+                      This action cannot be undone.
+                    </p>
+                    <div>
+                      <label htmlFor="deletePassword" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Enter your password to confirm
+                      </label>
+                      <Input
+                        type="password"
+                        id="deletePassword"
+                        value={deletePassword}
+                        onChange={(e) => setDeletePassword(e.target.value)}
+                        placeholder="Enter your password"
+                        className="w-full"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex justify-end space-x-3 mt-6">
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setDeleteConfirmDialog({ open: false, userId: "", userName: "" });
+                        setDeletePassword("");
+                      }}
+                      disabled={deleteLoading}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      onClick={confirmDeleteUser}
+                      disabled={deleteLoading || !deletePassword}
+                    >
+                      {deleteLoading ? 'Deleting...' : 'Delete User'}
+                    </Button>
+                  </div>
+                </motion.div>
+              </div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
     </div>
   )
 }
-

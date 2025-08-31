@@ -77,7 +77,7 @@ export interface Session {
   };
   attendance: {
     [playerId: string]: {
-      status: "Present" | "Absent"
+      status: "Present" | "Absent" | "Unmarked"
       markedAt: string
       markedBy: string
     }
@@ -101,75 +101,127 @@ export interface Batch {
 }
 
 // Move exportToFile inside SessionsContent component
-const exportToFile = (data: Session[], academyId: string, batchesData: Batch[]) => {
-  // Filter sessions for current academy
-  const academySessions = data.filter(session => session.academyId === academyId);
-  
-  // Define headers in specific order
+// Replace existing exportToFile with this definitive implementation
+const exportToFile = (sessions: Session[], academyId: string, batches: Batch[]) => {
+  // filter to only sessions for this academy
+  const academySessions = Array.isArray(sessions)
+    ? sessions.filter(s => s.academyId === academyId)
+    : [];
+
+  // CSV headers (order matters)
   const headers = [
-    'Session ID',
-    'Session Name',
-    'Is Recurring',
-    'Date/Date Range',
-    'Time',
-    'Days',
-    'Assigned Batch',
-    'Assigned Players',
-    'Assigned Coaches',
-    'Academy ID'
+    "Session ID",
+    "Session Name",
+    "Is Recurring",
+    "Parent Session ID",
+    "Occurrence Date",
+    "Date",
+    "Start Time",
+    "End Time",
+    "Duration",
+    "Status",
+    "Days (selectedDays)",
+    "Assigned Batch ID",
+    "Assigned Batch Name",
+    "Assigned Players (IDs)",
+    "Assigned Players (Names)",
+    "Assigned Coaches (IDs)",
+    "Assigned Coaches (Names)",
+    "Academy ID",
+    "Notes"
   ];
 
-  // Helper function to escape CSV values
-  const escapeCsvValue = (value: string) => {
-    if (value.includes(',') || value.includes('"') || value.includes('\n')) {
-      return `"${value.replace(/"/g, '""')}"`;
+  // helper to escape values for CSV
+  const escapeCsvValue = (value: any) => {
+    if (value === null || value === undefined) return "";
+    const str = typeof value === "string" ? value : JSON.stringify(value);
+    if (str.includes('"') || str.includes(",") || str.includes("\n")) {
+      return `"${str.replace(/"/g, '""')}"`;
     }
-    return value;
+    return str;
   };
 
-  // Format each session according to headers
   const rows = academySessions.map(session => {
-    const batchName = batchesData.find(b => b.id === session.assignedBatch)?.name || 'None';
-    const values = {
-      'Session ID': session.id.toString(),
-      'Session Name': session.name,
-      'Is Recurring': session.isRecurring ? 'Yes' : 'No',
-      'Date/Date Range': session.isRecurring 
-        ? `${session.date} to ${session.recurringEndDate}`
-        : session.date,
-      'Time': `${session.startTime} - ${session.endTime}`,
-      'Days': session.isRecurring 
-        ? escapeCsvValue(session.selectedDays?.join(', ') || '')
-        : format(new Date(session.date), 'EEEE'),
-      'Assigned Batch': batchName,
-      'Assigned Players': escapeCsvValue(session.assignedPlayersData.map(p => p.name).join(', ')),
-      'Assigned Coaches': escapeCsvValue(Array.isArray(session.coachNames) 
-        ? session.coachNames.join(', ')
-        : session.coachNames || 'None'),
-      'Academy ID': session.academyId
-    };
-    
-    // Return values in same order as headers
-    return headers.map(header => values[header as keyof typeof values]).join(',');
+    const batchObj = batches.find(b => b.id === session.assignedBatch);
+    const batchName = batchObj?.name || "";
+    const assignedPlayersIds = Array.isArray(session.assignedPlayers)
+      ? session.assignedPlayers.join(", ")
+      : session.assignedPlayers || "";
+    const assignedPlayersNames = Array.isArray(session.assignedPlayersData)
+      ? session.assignedPlayersData.map(p => p.name).join(", ")
+      : "";
+
+    const coachIds = Array.isArray(session.coachId) ? session.coachId.join(", ") : (session.coachId || "");
+    const coachNames = Array.isArray(session.coachNames) ? session.coachNames.join(", ") : (session.coachNames || "");
+
+    const duration = session.startTime && session.endTime
+      ? (() => {
+          try {
+            const [sh, sm] = session.startTime.split(":").map(Number);
+            const [eh, em] = session.endTime.split(":").map(Number);
+            const start = new Date();
+            start.setHours(sh, sm, 0, 0);
+            const end = new Date();
+            end.setHours(eh, em, 0, 0);
+            const diffMs = end.getTime() - start.getTime();
+            if (isNaN(diffMs) || diffMs <= 0) return "";
+            const mins = Math.floor(diffMs / 60000);
+            const h = Math.floor(mins / 60);
+            const m = mins % 60;
+            return h > 0 ? `${h}h ${m}m` : `${m}m`;
+          } catch {
+            return "";
+          }
+        })()
+      : "";
+
+    const values = [
+      session.id ?? "",
+      session.name ?? "",
+      session.isRecurring ? "Yes" : "No",
+      session.parentSessionId ?? "",
+      session.occurrenceDate ?? "",
+      session.date ?? "",
+      session.startTime ?? "",
+      session.endTime ?? "",
+      duration,
+      session.status ?? "",
+      Array.isArray(session.selectedDays) ? session.selectedDays.join("; ") : (session.selectedDays || ""),
+      session.assignedBatch ?? "",
+      batchName,
+      assignedPlayersIds,
+      assignedPlayersNames,
+      coachIds,
+      coachNames,
+      session.academyId ?? "",
+      "" // Notes column reserved
+    ];
+
+    return values.map(escapeCsvValue).join(",");
   });
 
-  // Combine headers and rows
-  const csvContent = [headers.join(','), ...rows].join('\n');
-  
-  // Create and trigger download
-  const date = new Date().toISOString().split('T')[0];
-  const blob = new Blob([csvContent], { type: 'text/csv' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = `sessions_export_${date}.csv`;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
+  // Combine header + rows
+  const csvContent = [headers.join(","), ...rows].join("\n");
+
+  // Trigger download
+  try {
+    const dateStr = new Date().toISOString().split("T")[0];
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", `sessions_export_${academyId}_${dateStr}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  } catch (e) {
+    console.error("CSV download failed", e);
+  }
 
   return academySessions.length;
 };
+
 
 const deleteOldSessions = (sessions: Session[], keepCount: number = 50) => {
   return sessions
@@ -183,10 +235,10 @@ const exportAndClearSessions = async (
   type: 'archive' | 'backup',
   batches: Batch[],
   setSessions: React.Dispatch<React.SetStateAction<Session[]>>,
-  setUnsavedSessions: React.Dispatch<React.SetStateAction<Session[]>>
+  setUnsavedSessions: React.Dispatch<React.SetStateAction<Session[]>>,
+  user: User | null
 ) => {
   try {
-    const { user } = useAuth();
     if (!user?.academyId) {
       toast({
         title: "Error",
@@ -202,8 +254,6 @@ const exportAndClearSessions = async (
     const sessions = await response.json();
 
     // Generate CSV and trigger download
-    const date = new Date().toISOString().split('T')[0];
-    const fileName = `sessions_${type}_${date}`;
     exportToFile(sessions, user.academyId, batches);
 
     // If it's an archive operation, clear the sessions from the database
@@ -237,6 +287,7 @@ const exportAndClearSessions = async (
     });
   }
 };
+
 
 // Add this helper function after other helper functions
 const getNextSessionDate = (session: Session, startDate: string, endDate: string) => {
@@ -2310,12 +2361,9 @@ useEffect(() => {
     setShowExportAlert(true);
   };
 
-  // Remove this duplicate line as we already have it at the top
-
-  // Replace handleConfirmExport to clear all sessions from the database using DELETE API
+// Replace your existing handleConfirmExport with this version
 const handleConfirmExport = async () => {
-  const { user } = useAuth();
-    if (!user?.academyId) {
+  if (!user?.academyId) {
     toast({
       title: "Error",
       description: "No academy ID found",
@@ -2325,40 +2373,69 @@ const handleConfirmExport = async () => {
   }
 
   try {
-    // Export to CSV
+    // fetch sessions (note: your API returns { success, data })
+    const resp = await fetch(`/api/db/ams-sessions?academyId=${encodeURIComponent(user.academyId)}`, {
+      cache: "no-store",
+    });
+    if (!resp.ok) throw new Error("Failed to fetch sessions");
+
+    const result = await resp.json();
+    const sessions = Array.isArray(result.data) ? result.data : [];
+
+    if (sessions.length === 0) {
+      toast({
+        title: "No sessions",
+        description: "No sessions found to export",
+      });
+      setShowExportAlert(false);
+      return;
+    }
+
+    // Export CSV — returns number of exported rows
     const exportedCount = exportToFile(sessions, user.academyId, batches);
 
-    // Clear all sessions from database using a DELETE API (assuming such an endpoint exists)
-    // If not, you may need to call DELETE for each session
-    await Promise.all(
-      sessions
-        .filter(session => session.academyId === user.academyId)
-        .map(session =>
-          fetch(`/api/db/ams-sessions/${session.id}`, { method: 'DELETE' })
-        )
-    );
+    // Clear sessions server-side
+    const clearResp = await fetch("/api/db/ams-sessions/actions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "clear",
+        academyId: user.academyId,
+      }),
+    });
+    if (!clearResp.ok) {
+      // Optionally: read server error message and show it
+      let errMsg = "Failed to clear sessions";
+      try {
+        const errJson = await clearResp.json();
+        errMsg = errJson?.error || errMsg;
+      } catch {}
+      throw new Error(errMsg);
+    }
 
-    // Update local state
+    // Clear local UI state
     setSessions([]);
     setUnsavedSessions([]);
     setHasUnsavedChanges(false);
 
     toast({
       title: "Success",
-      description: `${exportedCount} sessions have been exported and cleared`,
-      variant: "default",
+      description: `${exportedCount} sessions exported and cleared successfully`,
     });
 
     setShowExportAlert(false);
-  } catch (error) {
-    console.error('Error during export:', error);
+  } catch (err) {
+    console.error("Error during export & clear:", err);
     toast({
       title: "Error",
-      description: "Failed to export and clear sessions",
+      description: err instanceof Error ? err.message : "Failed to export and clear sessions",
       variant: "destructive",
     });
   }
 };
+
+
+
 
   // Reset visible count when changing tabs or search
   useEffect(() => {
@@ -2726,6 +2803,74 @@ const PlayerMetricsDialog = () => {
   );
 };
 
+const AttendanceSelector = ({ 
+  currentStatus, 
+  onStatusChange, 
+  disabled = false,
+  playerId,
+  sessionStatus 
+}: {
+  currentStatus?: "Present" | "Absent" | "Unmarked";
+  onStatusChange: (status: "Present" | "Absent" | "Unmarked") => void;
+  disabled?: boolean;
+  playerId: string;
+  sessionStatus: string;
+}) => {
+  const status = currentStatus || "Unmarked";
+  
+  const getStatusConfig = (status: string) => {
+    switch (status) {
+      case "Present":
+        return {
+          color: "bg-green-500 hover:bg-green-600 text-white border-green-500",
+          text: "Present",
+          next: "Absent"
+        };
+      case "Absent":
+        return {
+          color: "bg-red-500 hover:bg-red-600 text-white border-red-500",
+          text: "Absent", 
+          next: "Present" // ✅ Goes back to Present instead of Unmarked
+        };
+      case "Unmarked":
+      default:
+        return {
+          color: "bg-gray-500 hover:bg-gray-600 text-white border-gray-500",
+          text: "Unmarked",
+          next: "Present"
+        };
+    }
+  };
+
+  const config = getStatusConfig(status);
+
+  const handleClick = () => {
+    if (disabled) return;
+    onStatusChange(config.next as "Present" | "Absent" | "Unmarked");
+  };
+
+  return (
+    <div className="flex items-center space-x-2">
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={handleClick}
+        disabled={disabled}
+        className={`min-w-[90px] text-xs transition-colors ${config.color} ${
+          disabled ? 'opacity-50 cursor-not-allowed' : ''
+        }`}
+      >
+        {config.text}
+      </Button>
+      {!disabled && (
+        <span className="text-xs text-gray-400">
+          Click → {config.next}
+        </span>
+      )}
+    </div>
+  );
+};
+
   // Add this new function
   const handleSelectAllPlayers = (checked: boolean) => {
     if (newSession.assignedBatch) {
@@ -2869,9 +3014,7 @@ const renderSessionDetails = (session: Session | undefined) => {
   };
 
   const currentStatus = calculateSessionStatus(session);
-  // Ensure detailsPlayerSearchQuery is defined as a state variable
-  // Add this at the top of your SessionsContent component if not already present:
-  // const [detailsPlayerSearchQuery, setDetailsPlayerSearchQuery] = useState("");
+  
 
   const filteredPlayers = (session.assignedPlayersData || []).filter(player => 
     player.name.toLowerCase().includes((detailsPlayerSearchQuery || "").toLowerCase())
@@ -2951,46 +3094,45 @@ const renderSessionDetails = (session: Session | undefined) => {
                     </div>
                   </div>
                   <div className="flex items-center space-x-4">
-                    <div className="flex items-center space-x-2">
-                      <Switch
-                        checked={isPresent}
-                        onCheckedChange={async (checked) => {
-                            setIsOccurrencesDialogOpen(false)
-                            await handleAttendanceChange(
-                            session.id,
-                            player.id,
-                            checked,
-                            viewDetailsSessionData,
-                            setViewDetailsSessionData,
-                            user,
-                            sessions,
-                            setSessions,
-                            user?.academyId ?? "" // Pass academyId as explicit parameter, fallback to empty string
-                            );
-                        }}
-                        disabled={currentStatus === "Upcoming"}
-                      />
-                      <span className="text-sm">
-                        {isPresent ? "Present" : "Absent"}
-                      </span>
-                    </div>
-                    {isPresent && currentStatus === "Finished" && (
-                      <Button
-                        size="sm"
-                        variant="outline" 
-                        onClick={() => {
-                          if (typeof handleMetricsClick === "function") {
-                            setIsOccurrencesDialogOpen(false);
-                            handleMetricsClick(player.id, player.name, session.id);
-                          } else {
-                            console.error("handleMetricsClick is not defined");
-                          }
-                        }}
-                      >
-                        Input Metrics
-                      </Button>
-                    )}
-                  </div>
+                  <AttendanceSelector
+                    currentStatus={session.attendance?.[player.id]?.status || "Unmarked"}
+                    onStatusChange={async (newStatus) => {
+                      if (!user?.academyId) {
+                        toast({
+                          title: "Error",
+                          description: "No academy ID available. Please contact administrator.",
+                          variant: "destructive",
+                        });
+                        return;
+                      }
+                      if (setSessions && setViewDetailsSessionData) {
+                        await handleAttendanceChange(
+                          Number(session.id),
+                          player.id,
+                          newStatus, // ✅ Now passing string instead of boolean
+                          viewDetailsSessionData ?? null,
+                          setViewDetailsSessionData,
+                          user ?? null,
+                          sessions,
+                          setSessions,
+                          user?.academyId ?? ""
+                        );
+                      }
+                    }}
+                    disabled={currentStatus === "Upcoming"}
+                    playerId={player.id}
+                    sessionStatus={currentStatus}
+                  />
+                  {(session.attendance?.[player.id]?.status === "Present") && currentStatus === "Finished" && (
+                    <Button
+                      size="sm"
+                      variant="outline" 
+                      onClick={() => handleMetricsClick(player.id, player.name, session.id)}
+                    >
+                      Input Metrics
+                    </Button>
+                  )}
+                </div>
                 </div>
               );
             })
@@ -3027,7 +3169,7 @@ const renderSessionDetails = (session: Session | undefined) => {
   const handleAttendanceChange = async (
     sessionId: number | string,
     playerId: string,
-    isPresent: boolean,
+    newStatus: "Present" | "Absent" | "Unmarked",
     viewDetailsSessionData: Session | null,
     setViewDetailsSessionData: (session: Session | null) => void,
     user: { academyId?: string; id?: string } | null,
@@ -3056,7 +3198,7 @@ const renderSessionDetails = (session: Session | undefined) => {
     const updatedAttendance = {
       ...session.attendance,
       [playerId]: {
-        status: isPresent ? "Present" : "Absent",
+        status: newStatus,
         markedAt: new Date().toISOString(),
         markedBy: user?.id || ''
       }
@@ -3106,7 +3248,7 @@ const renderSessionDetails = (session: Session | undefined) => {
     if (typeof toast === "function") {
       toast({
         title: "Updating",
-        description: `Marking as ${isPresent ? "Present" : "Absent"}...`,
+        description: `Marking as ${newStatus}...`,
       });
     }
 
@@ -3156,7 +3298,7 @@ const renderSessionDetails = (session: Session | undefined) => {
       if (typeof toast === "function") {
         toast({
           title: "Success",
-          description: `Attendance saved as ${isPresent ? "Present" : "Absent"}`,
+          description: `Attendance saved as ${newStatus}`,
           variant: "default",
         });
       }
@@ -4199,6 +4341,75 @@ const renderSessionDetails = (
     player.name.toLowerCase().includes(detailsPlayerSearchQuery.toLowerCase())
   );
 
+  // AttendanceSelector component for three-state attendance
+const AttendanceSelector = ({ 
+  currentStatus, 
+  onStatusChange, 
+  disabled = false,
+  playerId,
+  sessionStatus 
+}: {
+  currentStatus?: "Present" | "Absent" | "Unmarked";
+  onStatusChange: (status: "Present" | "Absent" | "Unmarked") => void;
+  disabled?: boolean;
+  playerId: string;
+  sessionStatus: string;
+}) => {
+  const status = currentStatus || "Unmarked";
+  
+  const getStatusConfig = (status: string) => {
+    switch (status) {
+      case "Present":
+        return {
+          color: "bg-green-500 hover:bg-green-600 text-white border-green-500",
+          text: "Present",
+          next: "Absent"
+        };
+      case "Absent":
+        return {
+          color: "bg-red-500 hover:bg-red-600 text-white border-red-500",
+          text: "Absent", 
+          next: "Present" // ✅ Goes back to Present instead of Unmarked
+        };
+      case "Unmarked":
+      default:
+        return {
+          color: "bg-gray-500 hover:bg-gray-600 text-white border-gray-500",
+          text: "Unmarked",
+          next: "Present"
+        };
+    }
+  };
+
+  const config = getStatusConfig(status);
+
+  const handleClick = () => {
+    if (disabled) return;
+    onStatusChange(config.next as "Present" | "Absent" | "Unmarked");
+  };
+
+  return (
+    <div className="flex items-center space-x-2">
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={handleClick}
+        disabled={disabled}
+        className={`min-w-[90px] text-xs transition-colors ${config.color} ${
+          disabled ? 'opacity-50 cursor-not-allowed' : ''
+        }`}
+      >
+        {config.text}
+      </Button>
+      {!disabled && (
+        <span className="text-xs text-gray-400">
+          Click → {config.next}
+        </span>
+      )}
+    </div>
+  );
+};
+
   // Use the passed-in function or fallback to a no-op to avoid errors
   const handleMetricsClickSafe =
     handleMetricsClickParam ||
@@ -4233,47 +4444,45 @@ const renderSessionDetails = (
                 </div>
               </div>
               <div className="flex items-center space-x-4">
-                <div className="flex items-center space-x-2">
-                  <Switch
-                  checked={isPresent}
-                  onCheckedChange={(checked) => {
-                    if (!user?.academyId) {
-                    toast({
-                      title: "Error",
-                      description: "No academy ID available. Please contact administrator.",
-                      variant: "destructive",
-                    });
-                    return;
-                    }
-                    if (setSessions && setViewDetailsSessionData) {
-                    handleAttendanceChange(
-                      Number(session.id),
-                      player.id,
-                      checked,
-                      viewDetailsSessionData ?? null,
-                      setViewDetailsSessionData,
-                      user ?? null,
-                      sessions,
-                      setSessions
-                    );
-                    }
-                  }}
-                  disabled={currentStatus === "Upcoming"}
+                  <AttendanceSelector
+                    currentStatus={session.attendance?.[player.id]?.status || "Unmarked"}
+                    onStatusChange={async (newStatus) => {
+                      if (!user?.academyId) {
+                        toast({
+                          title: "Error",
+                          description: "No academy ID available. Please contact administrator.",
+                          variant: "destructive",
+                        });
+                        return;
+                      }
+                      if (setSessions && setViewDetailsSessionData) {
+                        await handleAttendanceChange(
+                          Number(session.id),
+                          player.id,
+                          newStatus, // ✅ Now passing string instead of boolean
+                          viewDetailsSessionData ?? null,
+                          setViewDetailsSessionData,
+                          user ?? null,
+                          sessions,
+                          setSessions,
+                          user?.academyId ?? ""
+                        );
+                      }
+                    }}
+                    disabled={currentStatus === "Upcoming"}
+                    playerId={player.id}
+                    sessionStatus={currentStatus}
                   />
-                  <span className="text-sm">
-                  {isPresent ? "Present" : "Absent"}
-                  </span>
+                  {(session.attendance?.[player.id]?.status === "Present") && currentStatus === "Finished" && (
+                    <Button
+                      size="sm"
+                      variant="outline" 
+                      onClick={() => handleMetricsClickSafe(player.id, player.name, session.id)}
+                    >
+                      Input Metrics
+                    </Button>
+                  )}
                 </div>
-                {isPresent && currentStatus === "Finished" && (
-                  <Button
-                    size="sm"
-                    variant="outline" 
-                    onClick={() => handleMetricsClickSafe(player.id, player.name, session.id)}
-                  >
-                    Input Metrics
-                  </Button>
-                )}
-              </div>
             </div>
           );
         })}
@@ -4282,13 +4491,11 @@ const renderSessionDetails = (
   );
 };
 
-// Update handleAttendanceChange to handle occurrence sessions correctly
-// Update handleAttendanceChange to handle occurrence sessions correctly and always use the correct id for PATCH
-// Improved handleAttendanceChange: ensures optimistic UI, but always fetches latest attendance from backend after PATCH to avoid stale state
+
 const handleAttendanceChange = async (
   sessionId: number | string,
   playerId: string,
-  isPresent: boolean,
+  newStatus: string,
   viewDetailsSessionData: Session | null,
   setViewDetailsSessionData: (session: Session | null) => void,
   user: { academyId?: string; id?: string } | null,
@@ -4318,7 +4525,7 @@ const handleAttendanceChange = async (
 
   const timestamp = new Date().toISOString();
   const newEntry = {
-    status: isPresent ? "Present" : "Absent",
+    status: newStatus,
     markedAt: timestamp,
     markedBy: user?.id || ''
   };
@@ -4333,7 +4540,7 @@ const handleAttendanceChange = async (
             ...s.attendance,
             [playerId]: {
               ...newEntry,
-              status: (isPresent ? "Present" : "Absent") as "Present" | "Absent"
+              status: newStatus === "Present" ? "Present" : newStatus === "Absent" ? "Absent" : "Unmarked"
             }
           }
         };
@@ -4351,14 +4558,14 @@ const handleAttendanceChange = async (
         ...viewDetailsSessionData.attendance,
         [playerId]: { 
           ...newEntry, 
-          status: (isPresent ? "Present" : "Absent") as "Present" | "Absent"
+          status: (newStatus === "Present" ? "Present" : newStatus === "Absent" ? "Absent" : "Unmarked") as "Present" | "Absent" | "Unmarked"
         }
       }
     });
   }
 
   if (typeof toast === "function") {
-    toast({ title: "Updating", description: `Marking as ${isPresent ? "Present" : "Absent"}...` });
+    toast({ title: "Updating", description: `Marking as ${newStatus === "Present" ? "Present" : newStatus === "Absent" ? "Absent" : "Unmarked"}...` });
   }
 
   // Find correct API id
@@ -4444,7 +4651,7 @@ const handleAttendanceChange = async (
     }
 
     if (typeof toast === "function") {
-      toast({ title: "Success", description: `Attendance saved as ${isPresent ? 'Present' : 'Absent'}`, variant: "default" });
+      toast({ title: "Success", description: `Attendance saved as ${newStatus === "Present" ? 'Present' : newStatus === "Absent" ? 'Absent' : 'Unmarked'}`, variant: "default" });
     }
   } catch (error) {
     // Revert optimistic update on error

@@ -282,7 +282,7 @@ export default function AttendancePage() {
                   <TableHead>Total</TableHead>
                   <TableHead>Present</TableHead>
                   <TableHead>Absent</TableHead>
-                  <TableHead>Present%</TableHead>
+                  <TableHead>Attendance%</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
