@@ -2,15 +2,15 @@
 
 import { useState, useRef, useEffect } from "react"
 import Image from "next/image"
-import { Plus, X, Save, Edit, Facebook, Instagram, Youtube, Twitter, Upload, FileImage, FileVideo, FileText } from "lucide-react"
+import { Plus, X, Save, Edit, Facebook, Instagram, Youtube, Twitter, Upload, FileImage, FileText, Download, Eye } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { CollateralModal } from "@/components/collateral-modal"
 import type { Collateral as ImportedCollateral, CollateralFile as ImportedCollateralFile } from "@/types/collateral"
 import type React from "react"
 import { toast } from "@/components/ui/use-toast"
-import { Sidebar } from "@/components/Sidebar" // Import the Sidebar component
-import { Textarea } from "@/components/ui/textarea" // Import Textarea component
+import { Sidebar } from "@/components/Sidebar"
+import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useAuth } from "@/contexts/AuthContext"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -49,6 +49,7 @@ interface CollateralFile {
   url: string;
   type: string;
   dateUploaded: string;
+  size?: number; // Add file size for better UX
 }
 
 interface Collateral {
@@ -68,81 +69,19 @@ type AboutPageData = {
   color: string
   socialMedia: SocialMedia[]
   collaterals: Collateral[]
-  about: string // Add about to the type
+  about: string
 }
 
-const STORAGE_KEY = 'aboutPageData' // Consistent storage key
-
-const INITIAL_COLLATERALS = [
-  {
-    academyId: "",
-    name: "Static Graphics & Images",
-    checked: false,
-    files: [],
-    acceptedTypes: ".jpg,.jpeg,.png,.gif"
-  },
-  {
-    academyId: "",
-    name: "Videos & Motion Graphics",
-    checked: false,
-    files: [],
-    acceptedTypes: ".mp4,.mov,.avi"
-  },
-  {
-    academyId: "",
-    name: "Stories & Interactive Content",
-    checked: false,
-    files: [],
-    acceptedTypes: ".mp4,.jpg,.jpeg,.png"
-  },
-  {
-    academyId: "",
-    name: "Ad Creatives",
-    checked: false,
-    files: [],
-    acceptedTypes: ".jpg,.jpeg,.png,.gif,.mp4"
-  },
-  {
-    academyId: "",
-    name: "Templates & Guides",
-    checked: false,
-    files: [],
-    acceptedTypes: ".pdf,.doc,.docx,.ppt,.pptx"
-  },
-  {
-    academyId: "",
-    name: "Documents & PDFs",
-    checked: false,
-    files: [],
-    acceptedTypes: ".pdf,.doc,.docx"
-  }
-];
-
-const COLLATERAL_TYPES = [
-  {
-    name: "Images & Graphics",
-    acceptedTypes: ".jpg,.jpeg,.png,.gif",
-    icon: FileImage
-  },
-  {
-    name: "Videos",
-    acceptedTypes: ".mp4,.mov,.avi",
-    icon: FileVideo
-  },
-  {
-    name: "Documents",
-    acceptedTypes: ".pdf,.doc,.docx,.ppt,.pptx",
-    icon: FileText
-  }
-];
+const STORAGE_KEY = 'aboutPageData'
 
 export default function AboutPage() {
+  console.log("🚀 AboutPage with upload/download features loaded!");
   const { user } = useAuth()
   const [isEditing, setIsEditing] = useState(false)
   const [formData, setFormData] = useState<AboutPageData>({
     logo: null,
     color: "#000000",
-    about: "", // Initialize about field
+    about: "",
     socialMedia: [
       { name: "Facebook", url: "" },
       { name: "Instagram", url: "" },
@@ -154,11 +93,6 @@ export default function AboutPage() {
         name: "Images & Graphics",
         files: [],
         acceptedTypes: ".jpg,.jpeg,.png,.gif"
-      },
-      {
-        name: "Videos",
-        files: [],
-        acceptedTypes: ".mp4,.mov,.avi"
       },
       {
         name: "Documents",
@@ -189,7 +123,7 @@ export default function AboutPage() {
   });
   const [isLoading, setIsLoading] = useState(true);
 
-  // Load data from MongoDB instead of localStorage
+  // Load data from MongoDB
   useEffect(() => {
     const fetchAboutData = async () => {
       if (!user?.academyId) return;
@@ -202,7 +136,6 @@ export default function AboutPage() {
         const data = await response.json();
         
         if (data && Object.keys(data).length > 0) {
-          // Update both aboutData and formData from MongoDB
           setAboutData(data);
           setFormData({
             logo: data.logos?.[0] || null,
@@ -212,47 +145,10 @@ export default function AboutPage() {
               name: name.charAt(0).toUpperCase() + name.slice(1),
               url: url as string
             })),
-            collaterals: data.collaterals || formData.collaterals.map(col => ({
+            collaterals: (data.collaterals && data.collaterals.length > 0) ? data.collaterals : formData.collaterals.map(col => ({
               ...col,
               academyId: user.academyId
             }))
-          });
-        }
-      } catch (error) {
-        console.error('Error loading about data:', error);
-        toast({
-          title: "Error",
-          description: "Failed to load academy information",
-          variant: "destructive",
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchAboutData();
-  }, [user?.academyId]);
-
-  useEffect(() => {
-    const fetchAboutData = async () => {
-      if (!user?.academyId) return;
-
-      try {
-        setIsLoading(true);
-        const response = await fetch(`/api/db/ams-about?academyId=${user.academyId}`);
-        if (!response.ok) throw new Error('Failed to fetch about data');
-
-        const data = await response.json();
-        if (data && Object.keys(data).length > 0) {
-          setFormData({
-            logo: data.logos?.[0] || null,
-            color: data.color || "#000000",
-            about: data.description || "",
-            socialMedia: Object.entries(data.contact?.socialMedia || {}).map(([name, url]) => ({
-              name: name.charAt(0).toUpperCase() + name.slice(1),
-              url: url as string
-            })),
-            collaterals: data.collaterals || []
           });
         }
       } catch (error) {
@@ -324,18 +220,8 @@ export default function AboutPage() {
     setHasUnsavedChanges(true)
   }
 
-  const handleCollateralClick = (index: number) => {
-    const updatedCollaterals = [...formData.collaterals]
-    updatedCollaterals[index].checked = !updatedCollaterals[index].checked
-    setFormData(prev => ({
-      ...prev,
-      collaterals: updatedCollaterals
-    }))
-    setSelectedCollateral(index)
-    setHasUnsavedChanges(true)
-  }
-
-  const handleFileUpload = (index: number, files: FileList) => {
+  // Enhanced file upload handler with better file processing
+  const handleFileUpload = (collateralIndex: number, files: FileList) => {
     const updatedCollaterals = [...formData.collaterals]
     const newFiles: CollateralFile[] = Array.from(files).map((file) => ({
       academyId: user?.academyId || '',
@@ -343,18 +229,72 @@ export default function AboutPage() {
       name: file.name,
       url: URL.createObjectURL(file),
       type: file.type,
-      dateUploaded: new Date().toLocaleDateString(),
+      size: file.size,
+      dateUploaded: new Date().toISOString(),
     }))
-    updatedCollaterals[index].files = [...updatedCollaterals[index].files, ...newFiles]
+    
+    updatedCollaterals[collateralIndex].files = [...updatedCollaterals[collateralIndex].files, ...newFiles]
     setFormData(prev => ({
       ...prev,
       collaterals: updatedCollaterals
     }))
     setHasUnsavedChanges(true)
+    
+    toast({
+      title: "Files Uploaded",
+      description: `${files.length} file(s) uploaded successfully`,
+    });
+  }
+
+  // Enhanced file download handler
+  const handleFileDownload = async (file: CollateralFile) => {
+    try {
+      // For blob URLs created from file uploads
+      if (file.url.startsWith('blob:')) {
+        const response = await fetch(file.url);
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = file.name;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      } else {
+        // For regular URLs
+        const a = document.createElement('a');
+        a.href = file.url;
+        a.download = file.name;
+        a.target = '_blank';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      }
+      
+      toast({
+        title: "Download Started",
+        description: `Downloading ${file.name}`,
+      });
+    } catch (error) {
+      console.error('Download error:', error);
+      toast({
+        title: "Download Failed",
+        description: "Failed to download file",
+        variant: "destructive",
+      });
+    }
   }
 
   const handleFileDelete = (collateralIndex: number, fileId: string) => {
     const updatedCollaterals = [...formData.collaterals]
+    const fileToDelete = updatedCollaterals[collateralIndex].files.find(f => f.id === fileId);
+    
+    // Clean up blob URL to prevent memory leaks
+    if (fileToDelete && fileToDelete.url.startsWith('blob:')) {
+      URL.revokeObjectURL(fileToDelete.url);
+    }
+    
     updatedCollaterals[collateralIndex].files = updatedCollaterals[collateralIndex].files.filter(
       (file) => file.id !== fileId,
     )
@@ -363,6 +303,11 @@ export default function AboutPage() {
       collaterals: updatedCollaterals
     }))
     setHasUnsavedChanges(true)
+    
+    toast({
+      title: "File Deleted",
+      description: "File removed successfully",
+    });
   }
 
   const handleSave = async () => {
@@ -432,7 +377,7 @@ export default function AboutPage() {
             name: name.charAt(0).toUpperCase() + name.slice(1),
             url: url as string
           })),
-          collaterals: data.collaterals || formData.collaterals
+          collaterals: (data.collaterals && data.collaterals.length > 0) ? data.collaterals : formData.collaterals
         });
       }
     } catch (error) {
@@ -448,19 +393,30 @@ export default function AboutPage() {
     setHasUnsavedChanges(false);
   };
 
-  // Add deleteTeamPhoto function
   const deleteTeamPhoto = (index: number) => {
     const newPhotos = [...teamPhotos]
     newPhotos.splice(index, 1)
     setTeamPhotos(newPhotos)
   }
 
-  // Add function to handle file click
   const handleFileClick = (file: CollateralFile) => {
     setSelectedFile(file)
   }
 
-  // Add helper function to get icon for social media platform
+  // Helper function to get file type icon
+  const getFileIcon = (fileType: string) => {
+    if (fileType.startsWith('image/')) return <FileImage className="w-4 h-4" />
+    return <FileText className="w-4 h-4" />
+  }
+
+  // Helper function to format file size
+  const formatFileSize = (bytes?: number) => {
+    if (!bytes) return 'Unknown size';
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(1024));
+    return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i];
+  }
+
   const getSocialIcon = (platformName: string) => {
     const name = platformName.toLowerCase()
     switch (name) {
@@ -478,6 +434,7 @@ export default function AboutPage() {
     }
   }
 
+  // Enhanced CollateralSection with better file management
   const CollateralSection = () => {
     const fileInputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
@@ -489,83 +446,116 @@ export default function AboutPage() {
             return (
               <Card key={collateral.name} className="relative">
                 <CardHeader>
-                  <CardTitle className="flex items-center space-x-2">
-                    <span>{collateral.name}</span>
+                  <CardTitle className="flex items-center justify-between">
+                    <span className="flex items-center space-x-2">
+                      {collateral.name === "Images & Graphics" && <FileImage className="w-5 h-5" />}
+                      {collateral.name === "Documents" && <FileText className="w-5 h-5" />}
+                      <span>{collateral.name}</span>
+                    </span>
+                    {isEditing && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => fileInputRefs.current[index]?.click()}
+                        className="ml-2"
+                      >
+                        <Upload className="w-4 h-4 mr-1" />
+                        Upload
+                      </Button>
+                    )}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-gray-400">
-                        {collateral.files.length} files
+                        {collateral.files.length} file{collateral.files.length !== 1 ? 's' : ''}
                       </span>
-                      {isEditing && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => fileInputRefs.current[index]?.click()}
-                        >
-                          <Upload className="w-4 h-4 mr-2" />
-                          Upload
-                        </Button>
-                      )}
-                      <input
-                        type="file"
-                        ref={el => { fileInputRefs.current[index] = el }}
-                        className="hidden"
-                        accept={collateral.acceptedTypes}
-                        multiple
-                        onChange={(e) => {
-                          if (e.target.files) {
-                            const newFiles = Array.from(e.target.files).map(file => ({
-                              academyId: user?.academyId || '',
-                              id: Math.random().toString(36).substr(2, 9),
-                              name: file.name,
-                              url: URL.createObjectURL(file),
-                              type: file.type,
-                              dateUploaded: new Date().toISOString()
-                            }));
-                            
-                            setFormData(prev => ({
-                              ...prev,
-                              collaterals: prev.collaterals.map((col, i) => 
-                                i === index ? {
-                                  ...col,
-                                  files: [...col.files, ...newFiles]
-                                } : col
-                              )
-                            }));
-                            setHasUnsavedChanges(true);
-                          }
-                        }}
-                      />
+                      <span className="text-xs text-gray-500">
+                        Accepts: {collateral.acceptedTypes}
+                      </span>
                     </div>
-                    <div className="space-y-2">
-                      {collateral.files.map(file => (
-                        <div key={file.id} className="flex items-center justify-between p-2 bg-gray-800 rounded">
-                          <span className="truncate flex-1">{file.name}</span>
+                    
+                    <input
+                      type="file"
+                      ref={el => { fileInputRefs.current[index] = el }}
+                      className="hidden"
+                      accept={collateral.acceptedTypes}
+                      multiple
+                      onChange={(e) => {
+                        if (e.target.files) {
+                          handleFileUpload(index, e.target.files);
+                          e.target.value = ''; // Reset input for re-uploads
+                        }
+                      }}
+                    />
+                    
+                    <div className="space-y-2 max-h-60 overflow-y-auto">
+                      {collateral.files.length === 0 ? (
+                        <div className="text-center py-8 text-gray-500">
+                          <div className="mb-2">
+                            {collateral.name === "Images & Graphics" && <FileImage className="w-8 h-8 mx-auto mb-2 opacity-50" />}
+                            {collateral.name === "Documents" && <FileText className="w-8 h-8 mx-auto mb-2 opacity-50" />}
+                          </div>
+                          <p className="text-sm">No files uploaded</p>
                           {isEditing && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => {
-                                setFormData(prev => ({
-                                  ...prev,
-                                  collaterals: prev.collaterals.map((col, i) => 
-                                    i === index ? {
-                                      ...col,
-                                      files: col.files.filter(f => f.id !== file.id)
-                                    } : col
-                                  )
-                                }));
-                                setHasUnsavedChanges(true);
-                              }}
-                            >
-                              <X className="w-4 h-4" />
-                            </Button>
+                            <p className="text-xs mt-1">Click Upload to add files</p>
                           )}
                         </div>
-                      ))}
+                      ) : (
+                        collateral.files.map(file => (
+                          <div key={file.id} className="flex items-center justify-between p-3 bg-gray-800 rounded-lg hover:bg-gray-700 transition-colors">
+                            <div className="flex items-center space-x-3 flex-1 min-w-0">
+                              {getFileIcon(file.type)}
+                              <div className="flex-1 min-w-0">
+                                <p className="truncate font-medium text-sm">{file.name}</p>
+                                <div className="flex items-center space-x-2 text-xs text-gray-400">
+                                  <span>{formatFileSize(file.size)}</span>
+                                  <span>•</span>
+                                  <span>{new Date(file.dateUploaded).toLocaleDateString()}</span>
+                                </div>
+                              </div>
+                            </div>
+                            
+                            <div className="flex items-center space-x-1">
+                              {/* Preview button */}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleFileClick(file)}
+                                className="h-8 w-8 p-0"
+                                title="Preview file"
+                              >
+                                <Eye className="w-4 h-4" />
+                              </Button>
+                              
+                              {/* Download button */}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleFileDownload(file)}
+                                className="h-8 w-8 p-0"
+                                title="Download file"
+                              >
+                                <Download className="w-4 h-4" />
+                              </Button>
+                              
+                              {/* Delete button (only in edit mode) */}
+                              {isEditing && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleFileDelete(index, file.id)}
+                                  className="h-8 w-8 p-0 text-red-400 hover:text-red-300"
+                                  title="Delete file"
+                                >
+                                  <X className="w-4 h-4" />
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        ))
+                      )}
                     </div>
                   </div>
                 </CardContent>
@@ -579,7 +569,7 @@ export default function AboutPage() {
 
   return (
     <div className="flex h-screen overflow-hidden">
-      <Sidebar /> {/* Add the Sidebar component here */}
+      <Sidebar />
       <div className="flex-1 flex flex-col space-y-6 overflow-auto p-8">
         {/* Top bar with Edit/Save buttons */}
         <div className="flex justify-end mb-8 space-x-4">
@@ -608,7 +598,6 @@ export default function AboutPage() {
           )}
         </div>
 
-        {/* Rest of the component remains similar to previous implementation */}
         {/* Team Logo */}
         <div className="mb-12">
           <div className="flex justify-between items-start">
@@ -676,7 +665,7 @@ export default function AboutPage() {
           </div>
         </div>
 
-        {/* About Section - Updated */}
+        {/* About Section */}
         <Card className="w-full">
           <CardHeader>
             <CardTitle>About Academy</CardTitle>
@@ -760,49 +749,86 @@ export default function AboutPage() {
         {/* Social Media Collaterals */}
         <CollateralSection />
 
-        {/* Collateral Modal */}
-        {selectedCollateral !== null && (
-          <CollateralModal
-            isOpen={true}
-            onClose={() => setSelectedCollateral(null)}
-            title={formData.collaterals[selectedCollateral].name}
-            acceptedTypes={formData.collaterals[selectedCollateral].acceptedTypes}
-            files={formData.collaterals[selectedCollateral].files}
-            onFileUpload={(files) => handleFileUpload(selectedCollateral, files)}
-            onFileDelete={(fileId) => handleFileDelete(selectedCollateral, fileId)}
-            onFileClick={handleFileClick}
-          />
-        )}
-
         {/* File Content Modal */}
         {selectedFile && (
           <Dialog open={true} onOpenChange={() => setSelectedFile(null)}>
             <DialogContent className="max-w-4xl">
               <DialogHeader>
-                <DialogTitle>{selectedFile.name}</DialogTitle>
+                <DialogTitle className="flex items-center space-x-2">
+                  {getFileIcon(selectedFile.type)}
+                  <span>{selectedFile.name}</span>
+                </DialogTitle>
               </DialogHeader>
               <div className="py-4">
                 {selectedFile.type.startsWith("image/") ? (
-                  <Image src={selectedFile.url} alt={selectedFile.name} width={600} height={400} />
+                  (selectedFile.size && selectedFile.size > 1024 * 1024) ? (
+                    <div className="text-center py-8">
+                      <FileImage className="w-16 h-16 mx-auto mb-4 text-gray-400" />
+                      <p className="mb-2 text-lg font-medium">File too large to preview</p>
+                      <p className="mb-4 text-gray-400">
+                        Files larger than 1MB cannot be previewed.<br />
+                        File size: {formatFileSize(selectedFile.size)}
+                      </p>
+                      <Button onClick={() => handleFileDownload(selectedFile)}>
+                        <Download className="w-4 h-4 mr-2" />
+                        Download to View
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="flex justify-center">
+                      <Image 
+                        src={selectedFile.url} 
+                        alt={selectedFile.name} 
+                        width={600} 
+                        height={400} 
+                        className="max-w-full h-auto rounded-lg"
+                      />
+                    </div>
+                  )
                 ) : (
-                  <iframe src={selectedFile.url} className="w-full h-[400px]" />
+                  (selectedFile.size && selectedFile.size > 1024 * 1024) ? (
+                    <div className="text-center py-8">
+                      <FileText className="w-16 h-16 mx-auto mb-4 text-gray-400" />
+                      <p className="mb-2 text-lg font-medium">Document too large to preview</p>
+                      <p className="mb-4 text-gray-400">
+                        Files larger than 1MB cannot be previewed.<br />
+                        File size: {formatFileSize(selectedFile.size)}
+                      </p>
+                      <Button onClick={() => handleFileDownload(selectedFile)}>
+                        <Download className="w-4 h-4 mr-2" />
+                        Download to View
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <FileText className="w-16 h-16 mx-auto mb-4 text-gray-400" />
+                      <p className="mb-4">Preview not available for this file type</p>
+                      <Button onClick={() => handleFileDownload(selectedFile)}>
+                        <Download className="w-4 h-4 mr-2" />
+                        Download to View
+                      </Button>
+                    </div>
+                  )
                 )}
               </div>
-              <DialogFooter>
-                <Button variant="default" onClick={() => setSelectedFile(null)}>
-                  Close
-                </Button>
+              <DialogFooter className="flex justify-between">
+                <div className="flex items-center space-x-4 text-sm text-gray-400">
+                  <span>Size: {formatFileSize(selectedFile.size)}</span>
+                  <span>Uploaded: {new Date(selectedFile.dateUploaded).toLocaleDateString()}</span>
+                </div>
+                <div className="flex space-x-2">
+                  <Button variant="outline" onClick={() => handleFileDownload(selectedFile)}>
+                    <Download className="w-4 h-4 mr-2" />
+                    Download
+                  </Button>
+                  <Button variant="default" onClick={() => setSelectedFile(null)}>
+                    Close
+                  </Button>
+                </div>
               </DialogFooter>
             </DialogContent>
           </Dialog>
         )}
-
-        {/* Sponsorship Button */}
-        <div className="mt-12 flex justify-end">
-          <Button className="bg-cyan-500 text-black px-6 py-3 font-bold hover:bg-cyan-400">
-            APPLY FOR SPONSORSHIP
-          </Button>
-        </div>
       </div>
     </div>
   )
