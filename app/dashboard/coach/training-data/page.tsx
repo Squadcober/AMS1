@@ -1740,6 +1740,9 @@ const handleSaveMetrics = async (sessionId: number | string, playerId: string, m
       throw new Error('Missing required data');
     }
 
+    const sessionObj = sessions.find(s => s.id?.toString() === sessionId.toString());
+    const sessionDate = sessionObj ? sessionObj.date : new Date().toISOString();
+
     const numericMetrics = {
       shooting: Math.min(Math.max(Number(metricsToSave.shooting || 0), 0), 10),
       pace: Math.min(Math.max(Number(metricsToSave.pace || 0), 0), 10),
@@ -1768,7 +1771,7 @@ const handleSaveMetrics = async (sessionId: number | string, playerId: string, m
         sessionRating,
         overall,
         type: 'training',
-        date: new Date().toISOString(),
+        date: sessionDate,
         academyId: user.academyId
       }),
     });
