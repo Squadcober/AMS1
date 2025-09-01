@@ -52,6 +52,8 @@ interface Player {
 
 interface PerformanceEntry {
   date: string;
+  sessionId?: string;
+  matchId?: string;
   attributes: {
     shooting?: number;
     pace?: number;
@@ -74,8 +76,11 @@ export default function PerformanceReports() {
   const { batches } = useBatches()
   const [selectedPerson, setSelectedPerson] = useState<Player | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [entryDates, setEntryDates] = useState<{[key: string]: string}>({})
   const [view, setView] = useState<"players" | "coaches">("players")
   const [selectedplayer, setSelectedplayer] = useState<string>("")
+  const [attributeFilter, setAttributeFilter] = useState<"latest" | "overall">("latest")
+  const [sessionsAttended, setSessionsAttended] = useState<{[key: string]: number}>({})
   interface PerformanceData {
     date: string;
     value: number;
@@ -104,6 +109,141 @@ export default function PerformanceReports() {
     // Calculate average out of 10 and convert to scale of 100
     const avgOutOfTen = values.reduce((sum, val) => sum + val, 0) / values.length;
     return Math.round(avgOutOfTen * 100) / 10; // This will convert 9.1 to 91
+  };
+
+  // Function to calculate average attributes for OVERALL filter
+  const calculateAverageAttributes = (player: Player, sessionsAttendedCount: number): PlayerAttributes => {
+    if (!player?.performanceHistory?.length) {
+      return player?.attributes || {
+        shooting: 0,
+        pace: 0,
+        positioning: 0,
+        passing: 0,
+        ballControl: 0,
+        crossing: 0,
+        overall: 0
+      };
+    }
+
+    const attributeKeys: (keyof PlayerAttributes)[] = ['shooting', 'pace', 'positioning', 'passing', 'ballControl', 'crossing'];
+    const averageAttributes: PlayerAttributes = {
+      shooting: 0,
+      pace: 0,
+      positioning: 0,
+      passing: 0,
+      ballControl: 0,
+      crossing: 0,
+      overall: 0
+    };
+
+    attributeKeys.forEach(key => {
+      // Sum all attribute scores from performance history
+      let totalScore = 0;
+      let validEntries = 0;
+
+      player.performanceHistory.forEach((entry: any) => {
+        if (entry.attributes && typeof entry.attributes[key] === 'number' && entry.attributes[key] > 0) {
+          totalScore += entry.attributes[key];
+          validEntries++;
+          console.log(`Performance entry for ${key}: ${entry.attributes[key]}`);
+        }
+      });
+
+      // Calculate average from performance history only (not including latest)
+      const average = validEntries > 0 ? totalScore / validEntries : player.attributes?.[key] || 0;
+      console.log(`Calculated average for ${key}: ${average} (from ${validEntries} entries)`);
+      averageAttributes[key] = Math.round(average * 10) / 10; // Round to 1 decimal place
+    });
+
+    // Calculate overall score
+    averageAttributes.overall = calculateOverall(averageAttributes);
+
+    return averageAttributes;
+  };
+
+  // Fixed function to calculate sessions attended from API
+  const calculateSessionsAttended = async (playerId: string, academyId: string): Promise<number> => {
+    try {
+      const response = await fetch(`${getBaseUrl()}/api/db/ams-sessions?academyId=${academyId}`, {
+        credentials: 'include'
+      });
+
+      if (!response.ok) {
+        console.error('Failed to fetch sessions:', response.status);
+        return 0;
+      }
+
+      const result = await response.json();
+
+      if (!result.success) {
+        console.error('Sessions API returned success: false');
+        return 0;
+      }
+
+      // Filter sessions assigned to the player and count those marked as present
+      const attendedSessions = result.data.filter((session: any) => {
+        // Check if player is assigned to this session
+        const isAssigned = session.assignedPlayers.includes(playerId);
+
+        // Check if player's attendance is marked as present (case-insensitive check)
+        const attendanceStatus = session.attendance?.[playerId]?.status;
+
+        // Case-insensitive check for "present" status
+        return isAssigned && attendanceStatus?.toLowerCase() === 'present';
+      });
+
+      return attendedSessions.length;
+    } catch (error) {
+      console.error('Error calculating sessions attended:', error);
+      return 0;
+    }
+  };
+
+  // Helper function to get base URL for API calls
+  const getBaseUrl = () => {
+    if (typeof window !== 'undefined') {
+      return window.location.origin
+    }
+    return process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
+  };
+
+  // Function to fetch session date
+  const fetchSessionDate = async (sessionId: string): Promise<string | null> => {
+    try {
+      const response = await fetch(`${getBaseUrl()}/api/db/ams-sessions/${sessionId}`, {
+        credentials: 'include'
+      });
+      if (!response.ok) return null;
+      const result = await response.json();
+      if (result.success && result.data) {
+        return result.data.date || result.data.startDate || null;
+      }
+      return null;
+    } catch (error) {
+      console.error('Error fetching session date:', error);
+      return null;
+    }
+  };
+
+  // Function to fetch match date
+  const fetchMatchDate = async (matchId: string): Promise<string | null> => {
+    try {
+      const response = await fetch(`${getBaseUrl()}/api/db/ams-matches?academyId=${user?.academyId}`, {
+        credentials: 'include'
+      });
+      if (!response.ok) return null;
+      const result = await response.json();
+      if (result.success && result.data) {
+        const match = result.data.find((m: any) => m._id === matchId || m.id === matchId);
+        if (match) {
+          return match.date || match.matchDate || null;
+        }
+      }
+      return null;
+    } catch (error) {
+      console.error('Error fetching match date:', error);
+      return null;
+    }
   };
 
   useEffect(() => {
@@ -173,6 +313,60 @@ export default function PerformanceReports() {
     setPerformanceData(mockPerformanceData)
   }, [selectedplayer])
 
+  // Load sessions attended data for all players
+  useEffect(() => {
+    const loadSessionsAttended = async () => {
+      if (!players.length || !user?.academyId) return;
+
+      const sessionsData: {[key: string]: number} = {};
+
+      for (const player of players) {
+        try {
+          const count = await calculateSessionsAttended(player.id, user.academyId);
+          sessionsData[player.id] = count;
+        } catch (error) {
+          console.error(`Error loading sessions for player ${player.id}:`, error);
+          sessionsData[player.id] = 0;
+        }
+      }
+
+      setSessionsAttended(sessionsData);
+    };
+
+    loadSessionsAttended();
+  }, [players, user?.academyId]);
+
+  // Fetch dates for performance history entries
+  useEffect(() => {
+    const fetchEntryDates = async () => {
+      if (!selectedPerson || !selectedPerson.performanceHistory.length) return;
+
+      setEntryDates({}); // Clear previous dates
+
+      const filteredHistory = selectedPerson.performanceHistory.filter(entry => entry.type !== 'drill');
+      const datePromises = filteredHistory.map(async (entry, index) => {
+        let date = entry.date;
+        if (entry.type === 'session' && entry.sessionId) {
+          const fetchedDate = await fetchSessionDate(entry.sessionId);
+          if (fetchedDate) date = fetchedDate;
+        } else if (entry.type === 'match' && entry.matchId) {
+          const fetchedDate = await fetchMatchDate(entry.matchId);
+          if (fetchedDate) date = fetchedDate;
+        }
+        return { index, date };
+      });
+
+      const results = await Promise.all(datePromises);
+      const newDates: {[key: string]: string} = {};
+      results.forEach(({ index, date }) => {
+        newDates[index] = date;
+      });
+      setEntryDates(newDates);
+    };
+
+    fetchEntryDates();
+  }, [selectedPerson]);
+
   const handlePersonClick = (person: any) => {
     if (person.academyId !== user?.academyId) {
       console.log("Player not in same academy")
@@ -202,6 +396,20 @@ export default function PerformanceReports() {
       },
     ],
   })
+
+  // New function to get filtered attributes based on attributeFilter state
+  const getFilteredAttributes = (player: Player): PlayerAttributes => {
+    if (attributeFilter === "latest") {
+      return player.attributes;
+    } else if (attributeFilter === "overall") {
+      const sessionsCount = sessionsAttended[player.id] || 0;
+      console.log(`Player ${player.name}: sessionsCount = ${sessionsCount}, performanceHistory length = ${player.performanceHistory?.length || 0}`);
+      const result = calculateAverageAttributes(player, sessionsCount);
+      console.log(`Calculated average attributes for ${player.name}:`, result);
+      return result;
+    }
+    return player.attributes;
+  };
 
   const radarOptions = {
     scales: {
@@ -236,10 +444,12 @@ export default function PerformanceReports() {
   }
 
   const renderPerformanceHistory = (history: PerformanceEntry[]) => {
-    return history.map((entry, index) => (
+    // Filter to only show session and match entries, exclude drill training
+    const filteredHistory = history.filter(entry => entry.type !== 'drill');
+    return filteredHistory.map((entry, index) => (
       <div key={index} className="border-b border-gray-700 pb-4">
         <div className="flex justify-between mb-2">
-          <p className="font-semibold">{new Date(entry.date).toLocaleDateString()}</p>
+          <p className="font-semibold">{new Date(entryDates[index] || entry.date).toLocaleDateString()}</p>
           <Badge>{entry.type}</Badge>
         </div>
         <div className="grid grid-cols-2 gap-4 mt-2">
@@ -275,15 +485,36 @@ export default function PerformanceReports() {
   const PlayerDetailsDialog = () => {
     if (!selectedPerson) return null;
 
+    const filteredAttributes = getFilteredAttributes(selectedPerson);
+    const overallScore = calculateOverall(filteredAttributes);
+
     return (
       <Dialog open={!!selectedPerson} onOpenChange={() => setSelectedPerson(null)}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{selectedPerson.name}'s Performance Progress</DialogTitle>
+            <div className="flex justify-between items-center">
+              <DialogTitle>{selectedPerson.name}'s Performance Progress</DialogTitle>
+              <div className="flex gap-2">
+                <Button
+                  variant={attributeFilter === "latest" ? "default" : "outline"}
+                  onClick={() => setAttributeFilter("latest")}
+                  size="sm"
+                >
+                  Latest
+                </Button>
+                <Button
+                  variant={attributeFilter === "overall" ? "default" : "outline"}
+                  onClick={() => setAttributeFilter("overall")}
+                  size="sm"
+                >
+                  Overall
+                </Button>
+              </div>
+            </div>
           </DialogHeader>
 
           <div className="grid grid-cols-3 gap-4 mb-6">
-            {Object.entries(selectedPerson.attributes || {}).map(([attr, value]) => (
+            {Object.entries(filteredAttributes || {}).map(([attr, value]) => (
               <div key={attr} className="text-center p-3 bg-secondary rounded-lg">
                 <div className="text-lg font-bold">{value}</div>
                 <div className="text-sm text-muted-foreground">
@@ -329,27 +560,31 @@ export default function PerformanceReports() {
             </TableCell>
           </TableRow>
         ) : players.length > 0 ? (
-          players.map((player) => (
-            <TableRow 
-              key={player.id} 
-              onClick={() => handlePersonClick(player)} 
-              className="cursor-pointer hover:bg-secondary/50"
-            >
-              <TableCell className="font-medium">{player.name}</TableCell>
-              <TableCell>{player.position}</TableCell>
-              <TableCell>
-                <Badge variant={player.attributes.overall >= 70 ? "success" : "secondary"}>
-                  {player.attributes.overall}/100
-                </Badge>
-              </TableCell>
-              <TableCell>
-                {player.performanceHistory?.length > 0 
-                  ? new Date(player.performanceHistory[0].date).toLocaleDateString()
-                  : "No data"
-                }
-              </TableCell>
-            </TableRow>
-          ))
+          players.map((player) => {
+            const filteredAttributes = getFilteredAttributes(player);
+            const overallScore = calculateOverall(filteredAttributes);
+            return (
+              <TableRow
+                key={player.id}
+                onClick={() => handlePersonClick(player)}
+                className="cursor-pointer hover:bg-secondary/50"
+              >
+                <TableCell className="font-medium">{player.name}</TableCell>
+                <TableCell>{player.position}</TableCell>
+                <TableCell>
+                  <Badge variant={overallScore >= 70 ? "success" : "secondary"}>
+                    {overallScore}/100
+                  </Badge>
+                </TableCell>
+                <TableCell>
+                  {player.performanceHistory?.length > 0
+                    ? new Date(player.performanceHistory[0].date).toLocaleDateString()
+                    : "No data"
+                  }
+                </TableCell>
+              </TableRow>
+            );
+          })
         ) : (
           <TableRow>
             <TableCell colSpan={4} className="text-center py-4 text-muted-foreground">
@@ -425,7 +660,7 @@ export default function PerformanceReports() {
                       </CardHeader>
                       <CardContent>
                         <div className="grid grid-cols-3 gap-4">
-                          {Object.entries(selectedPerson.attributes || {}).map(([key, value]) => (
+                          {Object.entries(getFilteredAttributes(selectedPerson)).map(([key, value]) => (
                             <div key={key} className="text-center">
                               <div className="w-16 h-16 rounded-full border-4 border-emerald-400 flex items-center justify-center mx-auto">
                                 <span className="text-2xl font-bold">{String(value)}</span>
@@ -439,11 +674,29 @@ export default function PerformanceReports() {
 
                     <Card className="md:col-span-2">
                       <CardHeader>
-                        <CardTitle>Attributes Overview</CardTitle>
+                        <div className="flex justify-between items-center">
+                          <CardTitle>Attributes Overview</CardTitle>
+                          <div className="flex gap-2">
+                            <Button
+                              variant={attributeFilter === "latest" ? "default" : "outline"}
+                              onClick={() => setAttributeFilter("latest")}
+                              size="sm"
+                            >
+                              Latest
+                            </Button>
+                            <Button
+                              variant={attributeFilter === "overall" ? "default" : "outline"}
+                              onClick={() => setAttributeFilter("overall")}
+                              size="sm"
+                            >
+                              Overall
+                            </Button>
+                          </div>
+                        </div>
                       </CardHeader>
                       <CardContent>
                         <div className="h-[400px]">
-                          <Radar data={radarData(selectedPerson.attributes || {})} options={radarOptions} />
+                          <Radar data={radarData(getFilteredAttributes(selectedPerson))} options={radarOptions} />
                         </div>
                       </CardContent>
                     </Card>

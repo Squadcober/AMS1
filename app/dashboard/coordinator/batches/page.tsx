@@ -73,7 +73,13 @@ export default function BatchesPage() {
   const [selectedCoaches, setSelectedCoaches] = useState<string[]>([])
   const [isCoachDetailsOpen, setIsCoachDetailsOpen] = useState(false)
   const [selectedCoachDetails, setSelectedCoachDetails] = useState<any>(null)
-  const [attributeFilter, setAttributeFilter] = useState<"latest" | "overall">("latest")
+  const [batchNameError, setBatchNameError] = useState("")
+  const [allCoachesSelected, setAllCoachesSelected] = useState(false)
+  const [allPlayersSelected, setAllPlayersSelected] = useState(false)
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  const [editingBatch, setEditingBatch] = useState<any>(null)
+  const [isCreatingBatch, setIsCreatingBatch] = useState(false)
+  const [isEditingBatch, setIsEditingBatch] = useState(false)
 
   useEffect(() => {
     const fetchBatches = async () => {
@@ -250,83 +256,6 @@ export default function BatchesPage() {
     fetchCoaches();
   }, [user?.academyId]);
 
-  // Add a helper to fetch player details by ID
-  const fetchPlayerDetails = async (playerId: string) => {
-    try {
-      const response = await fetch(`/api/db/ams-player-data/batch/${playerId}`);
-      if (!response.ok) return null;
-      const result = await response.json();
-      if (result.success && result.data) {
-        return {
-          ...result.data,
-          name: result.data.name || result.data.username || "Unknown Player",
-          photoUrl: result.data.photoUrl || "/placeholder.svg",
-          position: result.data.position || "",
-        };
-      }
-    } catch {
-      return null;
-    }
-    return null;
-  };
-
-  // Add a helper to fetch coach details by ID (including average rating)
-  const fetchCoachDetails = async (coachId: string) => {
-    try {
-      const userResponse = await fetch(`/api/db/ams-users/${coachId}`);
-      const userData = await userResponse.json();
-      const coachResponse = await fetch(`/api/db/coach-profile/${coachId}`);
-      const coachData = await coachResponse.json();
-
-      let averageRating = 0;
-      const ratings = coachData.data?.ratings || [];
-      if (ratings.length > 0) {
-        averageRating = ratings.reduce((sum: number, r: any) => sum + (r.rating || 0), 0) / ratings.length;
-      }
-
-      return {
-        id: coachId,
-        name: userData.data?.name || userData.data?.username || "Unknown Coach",
-        email: userData.data?.email,
-        photoUrl: userData.data?.photoUrl || coachData.data?.photoUrl || "/placeholder.svg",
-        averageRating: averageRating.toFixed(1),
-      };
-    } catch {
-      return null;
-    }
-  };
-
-  // When batchPlayers or batchCoaches are set, fetch and update their details
-  useEffect(() => {
-    const updateBatchPlayersDetails = async () => {
-      if (!selectedBatch?._id || !batchPlayers[selectedBatch._id]) return;
-      const updatedPlayers = await Promise.all(
-        batchPlayers[selectedBatch._id].map(async (player: any) => {
-          if (player.name && player.photoUrl && player.position) return player;
-          const details = await fetchPlayerDetails(player._id || player.id);
-          return { ...player, ...details };
-        })
-      );
-      setBatchPlayers(prev => ({ ...prev, [selectedBatch._id]: updatedPlayers }));
-    };
-    updateBatchPlayersDetails();
-  }, [selectedBatch, batchPlayers[selectedBatch?._id]?.length]);
-
-  useEffect(() => {
-    const updateBatchCoachesDetails = async () => {
-      if (!selectedBatch?._id || !batchCoaches[selectedBatch._id]) return;
-      const updatedCoaches = await Promise.all(
-        batchCoaches[selectedBatch._id].map(async (coach: any) => {
-          if (coach.name && coach.photoUrl && coach.averageRating) return coach;
-          const details = await fetchCoachDetails(coach.id);
-          return { ...coach, ...details };
-        })
-      );
-      setBatchCoaches(prev => ({ ...prev, [selectedBatch._id]: updatedCoaches }));
-    };
-    updateBatchCoachesDetails();
-  }, [selectedBatch, batchCoaches[selectedBatch?._id]?.length]);
-
   const handleDeleteBatch = async (batchId: string) => {
     try {
       if (!window.confirm("Are you sure you want to permanently delete this batch? This action cannot be undone.")) {
@@ -386,81 +315,287 @@ export default function BatchesPage() {
     }
   };
 
-
-  const handleCreateBatch = async () => {
+  const handleAddPlayers = async (batchId: string) => {
     try {
-      if (!user?.academyId || !user?.id) {
-        toast({
-          title: "Error",
-          description: "Missing required information",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Map selected coach IDs to coach user data
-      const selectedCoachData = coaches
-        .filter(coach => selectedCoaches.includes(coach._id))
-        .map(coach => ({
-          id: coach.id || coach.userId, // Use the user_ ID
-          name: coach.name,
-        }));
-
-      const batchData = {
-        name: newBatchName.trim(),
-        coachIds: selectedCoachData.map(c => c.id), // Use only the user IDs
-        coachNames: selectedCoachData.map(c => c.name), // Store names separately
-        players: selectedPlayers,
-        academyId: user.academyId,
-        createdBy: user.id,
-        createdAt: new Date().toISOString(),
-        status: 'active'
-      };
-
-      console.log("Creating batch with data:", batchData);
-
-      const response = await fetch('/api/db/ams-batches', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(batchData),
+      const response = await fetch(`/api/db/ams-batches/${batchId}/players`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ players: selectedPlayers })
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to create batch');
-      }
+      if (!response.ok) throw new Error("Failed to add players to batch");
 
       const result = await response.json();
-
-      if (!result.success) {
-        throw new Error(result.error || 'Failed to create batch');
+      if (result.success) {
+        setBatchPlayers(prev => ({
+          ...prev,
+          [batchId]: [...(prev[batchId] || []), ...players.filter(p => selectedPlayers.includes(p.id))]
+        }));
+        setSelectedPlayers([]);
+        toast({
+          title: "Success",
+          description: "Players added successfully",
+        });
       }
-
-      // Update local state with the new batch
-      setLocalBatches(prev => [...prev, result.data]);
-
-      // Reset form
-      setNewBatchName("");
-      setSelectedPlayers([]);
-      setSelectedCoaches([]);
-      setIsCreateDialogOpen(false);
-
-      toast({
-        title: "Success",
-        description: "Batch created successfully",
-        variant: "default",
-      });
-
     } catch (error) {
-      console.error('Error creating batch:', error);
+      console.error("Error adding players:", error);
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to create batch",
+        description: "Failed to add players",
         variant: "destructive",
       });
     }
+  };
+
+  const handleSelectAllCoaches = (checked: boolean) => {
+    setAllCoachesSelected(checked);
+    if (checked) {
+      setSelectedCoaches(coaches.map(coach => coach._id));
+    } else {
+      setSelectedCoaches([]);
+    }
+  };
+
+  const handleSelectAllPlayers = (checked: boolean) => {
+    setAllPlayersSelected(checked);
+    if (checked) {
+      setSelectedPlayers(players.map(player => player.id));
+    } else {
+      setSelectedPlayers([]);
+    }
+  };
+
+  const refetchAllBatchData = async () => {
+    try {
+      // Fetch all batches
+      const batchesResponse = await fetch(`/api/db/ams-batches?academyId=${user?.academyId}`);
+      const batchesResult = await batchesResponse.json();
+      
+      if (batchesResult.success) {
+        const batches = batchesResult.data;
+        setLocalBatches(batches);
+        
+        // Fetch players and coaches for each batch
+        await Promise.all(batches.map(async (batch: any) => {
+          // Fetch players
+          const playersResponse = await fetch(`/api/db/ams-batches/${batch._id}/players`);
+          const playersResult = await playersResponse.json();
+          if (playersResult.success) {
+            setBatchPlayers(prev => ({
+              ...prev,
+              [batch._id]: playersResult.data
+            }));
+          }
+
+          // Fetch coaches
+          if (batch.coachIds?.length) {
+            const coachPromises = batch.coachIds.map(async (coachId: string) => {
+              if (coachId.startsWith('user_')) {
+                const userResponse = await fetch(`/api/db/ams-users/${coachId}`);
+                const userData = await userResponse.json();
+                
+                if (userData.success) {
+                  const coachResponse = await fetch(`/api/db/coach-profile/${coachId}`);
+                  const coachData = await coachResponse.json();
+                  
+                  return {
+                    id: coachId,
+                    name: userData.data?.name || userData.data?.username || "Unknown Coach",
+                    email: userData.data?.email,
+                    photoUrl: userData.data?.photoUrl,
+                    ...coachData.data
+                  };
+                }
+              }
+              return null;
+            });
+
+            const coachResults = await Promise.all(coachPromises);
+            const validCoaches = coachResults.filter(Boolean);
+
+            setBatchCoaches(prev => ({
+              ...prev,
+              [batch._id]: validCoaches
+            }));
+          }
+        }));
+      }
+    } catch (error) {
+      console.error("Error refetching batch data:", error);
+      toast({
+        title: "Error",
+        description: "Failed to refresh batch data",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleCreateBatch = async () => {
+  // Add validation at the start of the function
+  if (!newBatchName.trim()) {
+    setBatchNameError("Batch name is mandatory");
+    return;
+  }
+  setBatchNameError("");
+
+  try {
+    setIsCreatingBatch(true); // Start loading
+
+    if (!user?.academyId || !user?.id) {
+      toast({
+        title: "Error",
+        description: "Missing required information",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Map selected coach IDs to coach user data
+    const selectedCoachData = coaches
+      .filter(coach => selectedCoaches.includes(coach._id))
+      .map(coach => ({
+        id: coach.id || coach.userId, // Use the user_ ID
+        name: coach.name,
+      }));
+
+    // Only use player ids that start with 'player_'
+    const filteredPlayerIds = selectedPlayers.filter(pid => pid.startsWith('player_'));
+
+    const batchData = {
+      name: newBatchName.trim(),
+      coachIds: selectedCoachData.map(c => c.id), // Use only the user IDs
+      coachNames: selectedCoachData.map(c => c.name), // Store names separately
+      players: filteredPlayerIds, // Only player_ ids
+      academyId: user.academyId,
+      createdBy: user.id,
+      createdAt: new Date().toISOString(),
+      status: 'active'
+    };
+
+    console.log("Creating batch with data:", batchData);
+
+    const response = await fetch('/api/db/ams-batches', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(batchData),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to create batch');
+    }
+
+    const result = await response.json();
+
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to create batch');
+    }
+
+    // Instead of manually updating state, refetch all data
+    await refetchAllBatchData();
+    
+    // Set the newly created batch as selected
+    const newBatch = result.data;
+    setSelectedBatch(newBatch);
+
+    // Reset form
+    setNewBatchName("");
+    setSelectedPlayers([]);
+    setSelectedCoaches([]);
+    setIsCreateDialogOpen(false);
+
+    toast({
+      title: "Success",
+      description: "Batch created successfully",
+      variant: "default",
+    });
+
+  } catch (error) {
+    console.error('Error creating batch:', error);
+    toast({
+      title: "Error",
+      description: error instanceof Error ? error.message : "Failed to create batch",
+      variant: "destructive",
+    });
+  } finally {
+    setIsCreatingBatch(false); // Stop loading
+  }
+};
+
+
+  const handleEditBatch = async () => {
+  if (!editingBatch?._id) return;
+  
+  if (!newBatchName.trim()) {
+    setBatchNameError("Batch name is mandatory");
+    return;
+  }
+  setBatchNameError("");
+
+  try {
+    setIsEditingBatch(true); // Start loading
+
+    // Map selected coach IDs to coach user data
+    const selectedCoachData = coaches
+      .filter(coach => selectedCoaches.includes(coach._id))
+      .map(coach => ({
+        id: coach.id || coach.userId,
+        name: coach.name,
+      }));
+
+    const batchData = {
+      name: newBatchName.trim(),
+      coachIds: selectedCoachData.map(c => c.id),
+      coachNames: selectedCoachData.map(c => c.name),
+      players: selectedPlayers.filter(pid => pid.startsWith('player_'))
+    };
+
+    const response = await fetch(`/api/db/ams-batches/${editingBatch._id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(batchData),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.error || 'Failed to update batch');
+    }
+
+    // First close the dialog
+    setIsEditDialogOpen(false);
+
+    // Then refetch data and reset form state
+    await refetchAllBatchData();
+    setNewBatchName("");
+    setSelectedPlayers([]);
+    setSelectedCoaches([]);
+    setEditingBatch(null);
+
+    toast({
+      title: "Success",
+      description: "Batch updated successfully",
+    });
+  } catch (error) {
+    console.error('Error updating batch:', error);
+    toast({
+      title: "Error",
+      description: error instanceof Error ? error.message : "Failed to update batch",
+      variant: "destructive",
+    });
+  } finally {
+    setIsEditingBatch(false); // Stop loading
+  }
+};
+
+  const handleStartEdit = (batch: any) => {
+    setEditingBatch(batch);
+    setNewBatchName(batch.name);
+    setSelectedCoaches(batch.coachIds || []);
+    setSelectedPlayers(batch.players || []);
+    setIsEditDialogOpen(true);
   };
 
   const handleViewPlayerDetails = async (playerId: string) => {
@@ -579,7 +714,7 @@ export default function BatchesPage() {
             <CardContent>
               <ScrollArea className="h-[600px] pr-4">
                 <div className="space-y-4">
-                  {localBatches.map((batch) => (
+                  {localBatches.map(batch => (
                     <div
                       key={batch._id}
                       onClick={() => setSelectedBatch(batch)}
@@ -590,23 +725,31 @@ export default function BatchesPage() {
                     >
                       <div className="flex justify-between items-center">
                         <h3 className="text-lg font-semibold">{batch.name}</h3>
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteBatch(batch._id);
-                          }}
-                        >
-                          Delete
-                        </Button>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleStartEdit(batch);
+                            }}
+                          >
+                            Edit
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteBatch(batch._id);
+                            }}
+                          >
+                            Delete
+                          </Button>
+                        </div>
                       </div>
                       <p className="text-sm text-muted-foreground mt-2">
-                        Coach: {
-                          Array.isArray(batch.coachNames) && batch.coachNames.length > 0
-                            ? batch.coachNames.join(", ")
-                            : (batch.coachName || "Not available")
-                        }
+                        Coach: {batch.coachName}
                       </p>
                     </div>
                   ))}
@@ -616,10 +759,19 @@ export default function BatchesPage() {
           </Card>
 
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>
                 {selectedBatch ? `${selectedBatch.name} Details` : "Select a Batch"}
               </CardTitle>
+              {selectedBatch && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleStartEdit(selectedBatch)}
+                >
+                  Edit Batch
+                </Button>
+              )}
             </CardHeader>
             <CardContent>
               {selectedBatch ? (
@@ -631,34 +783,22 @@ export default function BatchesPage() {
                         <TableRow>
                           <TableHead>Name</TableHead>
                           <TableHead>Email</TableHead>
-                          <TableHead>Rating</TableHead>
                           <TableHead>Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {batchCoaches[selectedBatch._id]?.length > 0 ? batchCoaches[selectedBatch._id].map((coach: any) => (
+                        {batchCoaches[selectedBatch._id]?.map((coach: any) => (
                           <TableRow key={coach.id}>
                             <TableCell>
                               <div className="flex items-center gap-2">
                                 <Avatar className="h-8 w-8">
                                   <AvatarImage src={coach.photoUrl} />
-                                  <AvatarFallback>{coach.name?.[0] || "N"}</AvatarFallback>
+                                  <AvatarFallback>{coach.name?.[0]}</AvatarFallback>
                                 </Avatar>
-                                {coach.name || "Not available"}
+                                {coach.name}
                               </div>
                             </TableCell>
-                            <TableCell>{coach.email || "Not available"}</TableCell>
-                            <TableCell>
-                              {/* Show stars for averageRating */}
-                              <div className="flex items-center">
-                                <span className="font-bold mr-1">{coach.averageRating || "N/A"}</span>
-                                <span className="text-yellow-400">
-                                  {coach.averageRating && !isNaN(Number(coach.averageRating))
-                                    ? "★".repeat(Math.round(Number(coach.averageRating)))
-                                    : ""}
-                                </span>
-                              </div>
-                            </TableCell>
+                            <TableCell>{coach.email}</TableCell>
                             <TableCell>
                               <Button
                                 variant="ghost"
@@ -669,13 +809,7 @@ export default function BatchesPage() {
                               </Button>
                             </TableCell>
                           </TableRow>
-                        )) : (
-                          <TableRow>
-                            <TableCell colSpan={4} className="text-center text-muted-foreground">
-                              Not available
-                            </TableCell>
-                          </TableRow>
-                        )}
+                        ))}
                       </TableBody>
                     </Table>
                   </div>
@@ -685,40 +819,35 @@ export default function BatchesPage() {
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>Photo</TableHead>
                           <TableHead>Name</TableHead>
                           <TableHead>Position</TableHead>
                           <TableHead>Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {batchPlayers[selectedBatch._id]?.length > 0 ? batchPlayers[selectedBatch._id].map((player: any) => (
-                          <TableRow key={player._id}>
+                        {batchPlayers[selectedBatch.id]?.map((player: any) => (
+                          <TableRow key={player.id}>
                             <TableCell>
-                              <Avatar className="h-8 w-8">
-                                <AvatarImage src={player.photoUrl || "/placeholder.svg"} />
-                                <AvatarFallback>{player.name?.[0] || "U"}</AvatarFallback>
-                              </Avatar>
+                              <div className="flex items-center gap-2">
+                                <Avatar className="h-8 w-8">
+                                  <AvatarImage src={player.photoUrl} />
+                                  <AvatarFallback>{player.name[0]}</AvatarFallback>
+                                </Avatar>
+                                {player.name}
+                              </div>
                             </TableCell>
-                            <TableCell>{player.name || "Unknown Player"}</TableCell>
-                            <TableCell>{player.position || "No position"}</TableCell>
+                            <TableCell>{player.position}</TableCell>
                             <TableCell>
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => handleViewPlayerDetails(player._id)}
+                                onClick={() => handleViewPlayerDetails(player.id)}
                               >
                                 View Details
                               </Button>
                             </TableCell>
                           </TableRow>
-                        )) : (
-                          <TableRow>
-                            <TableCell colSpan={4} className="text-center text-muted-foreground">
-                              No players in this batch
-                            </TableCell>
-                          </TableRow>
-                        )}
+                        ))}
                       </TableBody>
                     </Table>
                   </div>
@@ -742,64 +871,200 @@ export default function BatchesPage() {
                 <Label>Batch Name</Label>
                 <Input
                   value={newBatchName}
-                  onChange={(e) => setNewBatchName(e.target.value)}
+                  onChange={(e) => {
+                    setNewBatchName(e.target.value);
+                    setBatchNameError("");
+                  }}
                   placeholder="Enter batch name"
                 />
+                {batchNameError && (
+                  <p className="text-red-500 text-sm mt-1">{batchNameError}</p>
+                )}
               </div>
 
               <div>
                 <Label>Assign Coaches</Label>
-                <ScrollArea className="h-[150px] border rounded-md p-4">
-                  {coaches.map((coach) => (
-                    <div key={coach._id} className="flex items-center space-x-2 py-2">
+                <div className="border rounded-md p-4">
+                  <div className="mb-2 pb-2 border-b">
+                    <div className="flex items-center space-x-2">
                       <Checkbox
-                        checked={selectedCoaches.includes(coach._id)}
-                        onCheckedChange={(checked) => {
-                          if (checked) {
-                            setSelectedCoaches(prev => [...prev, coach._id]);
-                          } else {
-                            setSelectedCoaches(prev => prev.filter(id => id !== coach._id));
-                          }
-                        }}
+                        checked={allCoachesSelected}
+                        onCheckedChange={handleSelectAllCoaches}
                       />
-                      <div className="flex flex-col">
-                        <span>{coach.name || coach.email}</span>
-                        <span className="text-sm text-muted-foreground">{coach.email}</span>
+                      <Label>Select All Coaches</Label>
+                    </div>
+                  </div>
+                  <ScrollArea className="h-[150px]">
+                    {coaches.map((coach) => (
+                      <div key={coach._id} className="flex items-center space-x-2 py-2">
+                        <Checkbox
+                          checked={selectedCoaches.includes(coach._id)}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setSelectedCoaches(prev => [...prev, coach._id]);
+                            } else {
+                              setSelectedCoaches(prev => prev.filter(id => id !== coach._id));
+                              setAllCoachesSelected(false);
+                            }
+                          }}
+                        />
+                        <div className="flex flex-col">
+                          <span>{coach.name || coach.email}</span>
+                          <span className="text-sm text-muted-foreground">{coach.email}</span>
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                  {coaches.length === 0 && (
-                    <div className="text-center text-muted-foreground py-2">
-                      No coaches available
-                    </div>
-                  )}
-                </ScrollArea>
+                    ))}
+                    {coaches.length === 0 && (
+                      <div className="text-center text-muted-foreground py-2">
+                        No coaches available
+                      </div>
+                    )}
+                  </ScrollArea>
+                </div>
               </div>
 
               <div>
                 <Label>Players</Label>
-                <ScrollArea className="h-[200px] border rounded-md p-4">
-                  {players.map((player) => (
-                    <div key={player._id} className="flex items-center space-x-2 py-2">
+                <div className="border rounded-md p-4">
+                  <div className="mb-2 pb-2 border-b">
+                    <div className="flex items-center space-x-2">
                       <Checkbox
-                        checked={selectedPlayers.includes(player._id)}
-                        onCheckedChange={(checked) => {
-                          if (checked) {
-                            setSelectedPlayers(prev => [...prev, player._id]);
-                          } else {
-                            setSelectedPlayers(prev => prev.filter(id => id !== player._id));
-                          }
-                        }}
+                        checked={allPlayersSelected}
+                        onCheckedChange={handleSelectAllPlayers}
                       />
-                      <span>{player.name}</span>
+                      <Label>Select All Players</Label>
                     </div>
-                  ))}
-                </ScrollArea>
+                  </div>
+                  <ScrollArea className="h-[200px]">
+                    {players.map((player) => (
+                      <div key={player.id} className="flex items-center space-x-2 py-2">
+                        <Checkbox
+                          checked={selectedPlayers.includes(player.id)}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setSelectedPlayers(prev => [...prev, player.id]);
+                            } else {
+                              setSelectedPlayers(prev => prev.filter(id => id !== player.id));
+                              setAllPlayersSelected(false);
+                            }
+                          }}
+                        />
+                        <span>{player.name}</span>
+                      </div>
+                    ))}
+                  </ScrollArea>
+                </div>
               </div>
             </div>
             <DialogFooter>
-              <Button onClick={handleCreateBatch}>Create Batch</Button>
-            </DialogFooter>
+  <Button 
+    onClick={handleCreateBatch}
+    disabled={isCreatingBatch}
+  >
+    {isCreatingBatch ? "Creating..." : "Create Batch"}
+  </Button>
+</DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Edit Batch</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label>Batch Name</Label>
+                <Input
+                  value={newBatchName}
+                  onChange={(e) => {
+                    setNewBatchName(e.target.value);
+                    setBatchNameError("");
+                  }}
+                  placeholder="Enter batch name"
+                />
+                {batchNameError && (
+                  <p className="text-red-500 text-sm mt-1">{batchNameError}</p>
+                )}
+              </div>
+
+              <div>
+                <Label>Assign Coaches</Label>
+                <div className="border rounded-md p-4">
+                  <div className="mb-2 pb-2 border-b">
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        checked={allCoachesSelected}
+                        onCheckedChange={handleSelectAllCoaches}
+                      />
+                      <Label>Select All Coaches</Label>
+                    </div>
+                  </div>
+                  <ScrollArea className="h-[150px]">
+                    {coaches.map((coach) => (
+                      <div key={coach._id} className="flex items-center space-x-2 py-2">
+                        <Checkbox
+                          checked={selectedCoaches.includes(coach._id)}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setSelectedCoaches(prev => [...prev, coach._id]);
+                            } else {
+                              setSelectedCoaches(prev => prev.filter(id => id !== coach._id));
+                              setAllCoachesSelected(false);
+                            }
+                          }}
+                        />
+                        <div className="flex flex-col">
+                          <span>{coach.name || coach.email}</span>
+                          <span className="text-sm text-muted-foreground">{coach.email}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </ScrollArea>
+                </div>
+              </div>
+
+              <div>
+                <Label>Players</Label>
+                <div className="border rounded-md p-4">
+                  <div className="mb-2 pb-2 border-b">
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        checked={allPlayersSelected}
+                        onCheckedChange={handleSelectAllPlayers}
+                      />
+                      <Label>Select All Players</Label>
+                    </div>
+                  </div>
+                  <ScrollArea className="h-[200px]">
+                    {players.map((player) => (
+                      <div key={player.id} className="flex items-center space-x-2 py-2">
+                        <Checkbox
+                          checked={selectedPlayers.includes(player.id)}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setSelectedPlayers(prev => [...prev, player.id]);
+                            } else {
+                              setSelectedPlayers(prev => prev.filter(id => id !== player.id));
+                              setAllPlayersSelected(false);
+                            }
+                          }}
+                        />
+                        <span>{player.name}</span>
+                      </div>
+                    ))}
+                  </ScrollArea>
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+  <Button 
+    onClick={handleEditBatch}
+    disabled={isEditingBatch}
+  >
+    {isEditingBatch ? "Saving..." : "Save Changes"}
+  </Button>
+</DialogFooter>
           </DialogContent>
         </Dialog>
 
@@ -837,25 +1102,7 @@ export default function BatchesPage() {
                   </div>
                   
                   <div>
-                    <div className="flex justify-between items-center mb-4">
-                      <h3 className="text-xl font-semibold">Attributes</h3>
-                      <div className="flex gap-2">
-                        <Button
-                          variant={attributeFilter === "latest" ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => setAttributeFilter("latest")}
-                        >
-                          Latest
-                        </Button>
-                        <Button
-                          variant={attributeFilter === "overall" ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => setAttributeFilter("overall")}
-                        >
-                          Overall
-                        </Button>
-                      </div>
-                    </div>
+                    <h3 className="text-xl font-semibold mb-4">Attributes</h3>
                     <div className="grid grid-cols-2 gap-4">
                       {Object.entries(selectedPlayerDetails.attributes).map(([key, value]) => (
                         <div key={key} className="bg-secondary/50 p-3 rounded-lg">
@@ -877,7 +1124,7 @@ export default function BatchesPage() {
               <DialogTitle>Coach Details</DialogTitle>
             </DialogHeader>
             {selectedCoachDetails && (
-              <div className="space-y-6 p-4">
+              <div className="space-y-6 p-4" style={{ maxHeight: "70vh", overflowY: "auto" }}>
                 <div className="flex items-center gap-4 border-b pb-4">
                   <Avatar className="h-24 w-24">
                     <AvatarImage src={selectedCoachDetails.photoUrl} />
@@ -921,7 +1168,7 @@ export default function BatchesPage() {
                         <div key={index} className="p-3 bg-secondary/50 rounded-lg">
                           <div className="flex justify-between items-center mb-2">
                             <div className="font-semibold">
-                              {review.playerName || 'Anonymous player'}
+                              {review.studentName || 'Anonymous Student'}
                             </div>
                             <div className="text-lg font-bold">{review.rating}/5</div>
                           </div>

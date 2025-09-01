@@ -10,8 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/components/ui/use-toast"
 import Sidebar from "@/components/Sidebar"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import { useAuth } from "@/contexts/AuthContext"
+import { UserRole } from "@/types/user"
 
 interface User {
   id: string;
@@ -25,205 +25,322 @@ interface User {
 
 export default function UserManagement() {
   const { user } = useAuth()
-  const [users, setUsers] = useState<User[]>([])
+  const { toast } = useToast()
+  const [loading, setLoading] = useState(true)
+  const [users, setUsers] = useState<any[]>([]) // Initialize as empty array
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedRole, setSelectedRole] = useState<string>("all")
-  const [selectedAcademy, setSelectedAcademy] = useState<string>("all")
+  const [selectedStatus, setSelectedStatus] = useState<string>("all")
   const [newUser, setNewUser] = useState({
     name: "",
     username: "",
     email: "",
     role: "player",
-    password: "",
-    academyId: ""
+    password: ""
   })
-  const { toast } = useToast()
-  const [academies, setAcademies] = useState<{ id: string, name: string }[]>([])
-  const [loading, setLoading] = useState(true)
+  const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [deleteConfirmDialog, setDeleteConfirmDialog] = useState({
+    open: false,
+    userId: "",
+    userName: ""
+  })
+  const [deletePassword, setDeletePassword] = useState("")
+  const [deleteLoading, setDeleteLoading] = useState(false)
+
+  const fetchUsers = async () => {
+    try {
+      setLoading(true);
+
+      let allUsers: any[] = [];
+
+      // For owners, fetch all academies first, then fetch users from all academies
+      if (user?.role === UserRole.OWNER && !user?.academyId) {
+        // First fetch all academies
+        const academiesResponse = await fetch('/api/db/ams-academy');
+        if (!academiesResponse.ok) throw new Error('Failed to fetch academies');
+
+        const academiesResult = await academiesResponse.json();
+
+        if (academiesResult.success && Array.isArray(academiesResult.data)) {
+          const academyIds = academiesResult.data.map((academy: any) => academy.id);
+
+          // Fetch users from all academies
+          const userPromises = academyIds.map((academyId: string) =>
+            fetch(`/api/db/ams-users?academyId=${academyId}`)
+              .then(res => res.json())
+              .then(result => result.success && Array.isArray(result.data) ? result.data : [])
+              .catch(error => {
+                console.error(`Error fetching users for academy ${academyId}:`, error);
+                return [];
+              })
+          );
+
+          const userResults = await Promise.all(userPromises);
+          allUsers = userResults.flat();
+        }
+      } else {
+        // For other users, fetch users filtered by their academyId
+        const response = await fetch(`/api/db/ams-users?academyId=${user?.academyId}`);
+        if (!response.ok) throw new Error('Failed to fetch users');
+
+        const result = await response.json();
+
+        if (result.success && Array.isArray(result.data)) {
+          allUsers = result.data;
+        }
+      }
+
+      setUsers(allUsers);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to load users",
+        variant: "destructive",
+      });
+      setUsers([]); // Set empty array on error
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true)
-      try {
-        const usersRes = await fetch('/api/db/ams-users')
-        const usersData = await usersRes.json()
-        setUsers(usersData.success && Array.isArray(usersData.data) ? usersData.data : [])
-
-        const academyRes = await fetch('/api/db/ams-academy')
-        const academyData = await academyRes.json()
-        const academyList = academyData.success ? academyData.data : []
-        setAcademies(
-          academyList.map((a: any) => ({
-            id: a.id || a._id,
-            name: a.name || a.academyName || (a.id || a._id)
-          }))
-        )
-      } catch (error) {
-        setUsers([])
-        setAcademies([])
-        toast({
-          title: "Error",
-          description: "Failed to load users or academies",
-          variant: "destructive"
-        })
-      } finally {
-        setLoading(false)
-      }
+    if (user) {
+      fetchUsers();
     }
-    fetchData()
-  }, [])
+  }, [user]);
 
-  const handleAddUser = async () => {
+  // Add user using /api/auth/signup, academyId is always user's academy
+  const handleCreateUser = async (formData: any) => {
     try {
-      setLoading(true)
-      // Only send required fields for API
+      setLoading(true);
       const newUserData: any = {
-        username: newUser.username || newUser.email, // Use username if provided, else email
-        password: newUser.password || "changeme123",
-        email: newUser.email,
-        name: newUser.name,
-        role: newUser.role,
-        academyId: newUser.academyId,
+        username: formData.username || formData.email,
+        password: formData.password || "changeme123",
+        email: formData.email,
+        name: formData.name,
+        role: formData.role,
+        academyId: user?.academyId,
         createdAt: new Date(),
         status: "active"
-      }
+      };
 
-      // Validate required fields before sending
       if (!newUserData.name || !newUserData.email || !newUserData.role || !newUserData.academyId || !newUserData.username) {
         toast({
           title: "Error",
           description: "Name, Username, Email, Role, and Academy are required",
           variant: "destructive"
-        })
-        setLoading(false)
-        return
+        });
+        setLoading(false);
+        return;
       }
 
-      // Use the signup API route for user creation (to ensure role-specific data is created)
       const res = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newUserData)
-      })
-      const data = await res.json()
+      });
+      const data = await res.json();
       if (res.ok && data.success) {
-        // Refresh user list from DB after add
-        const usersRes = await fetch('/api/db/ams-users')
-        const usersData = await usersRes.json()
-        setUsers(usersData.success && Array.isArray(usersData.data) ? usersData.data : [])
+        await fetchUsers();
         toast({
           title: "User added successfully",
-          description: `${newUser.name} has been added as ${newUser.role}`,
-        })
+          description: `${newUserData.name} has been added as ${newUserData.role}`,
+        });
+        setIsDialogOpen(false);
         setNewUser({
           name: "",
           username: "",
           email: "",
           role: "player",
-          password: "",
-          academyId: ""
-        })
+          password: ""
+        });
       } else {
         toast({
           title: "Error",
           description: data.error || "Failed to add user",
           variant: "destructive"
-        })
+        });
       }
     } catch (error) {
       toast({
         title: "Error",
         description: "Failed to add user",
         variant: "destructive"
-      })
+      });
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
-  const handleDeleteUser = async (userId: string) => {
-    if (!confirm("Are you sure you want to delete this user?")) return
+  // Delete user with password verification
+  const handleDeleteUser = async (userId: string, userName: string) => {
+    setDeleteConfirmDialog({
+      open: true,
+      userId: userId,
+      userName: userName
+    });
+    setDeletePassword("");
+  };
+
+  const confirmDeleteUser = async () => {
+    if (!deletePassword) {
+      toast({
+        title: "Error",
+        description: "Password is required to delete user",
+        variant: "destructive"
+      });
+      return;
+    }
+
     try {
-      setLoading(true)
-      const res = await fetch(`/api/db/ams-users/${userId}`, {
+      setDeleteLoading(true);
+      
+      // First verify the current user's password
+      const authResponse = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ 
+          username: user?.username, 
+          password: deletePassword 
+        }),
+      });
+
+      const authData = await authResponse.json();
+
+      if (!authData.success) {
+        toast({
+          title: "Error",
+          description: "Invalid password",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // If password is valid, proceed with deletion
+      const deleteResponse = await fetch(`/api/db/ams-users/${deleteConfirmDialog.userId}`, {
         method: 'DELETE'
-      })
-      const data = await res.json()
-      if (data.success) {
-        const usersRes = await fetch('/api/db/ams-users')
-        const usersData = await usersRes.json()
-        setUsers(usersData.success && Array.isArray(usersData.data) ? usersData.data : [])
+      });
+      
+      const deleteData = await deleteResponse.json();
+      
+      if (deleteData.success) {
+        await fetchUsers();
         toast({
           title: "User deleted",
           description: "User has been deleted successfully",
           variant: "destructive"
-        })
+        });
+        setDeleteConfirmDialog({ open: false, userId: "", userName: "" });
+        setDeletePassword("");
       } else {
         toast({
           title: "Error",
-          description: data.error || "Failed to delete user",
+          description: deleteData.error || "Failed to delete user",
           variant: "destructive"
-        })
+        });
       }
     } catch (error) {
       toast({
         title: "Error",
         description: "Failed to delete user",
         variant: "destructive"
-      })
+      });
     } finally {
-      setLoading(false)
+      setDeleteLoading(false);
     }
-  }
+  };
 
   const handleStatusToggle = async (userId: string) => {
-    const userToUpdate = users.find(u => u.id === userId)
-    if (!userToUpdate) return
-    const newStatus = userToUpdate.status === "active" ? "inactive" : "active"
+    const userToUpdate = users.find(u => u.id === userId);
+    if (!userToUpdate) return;
+
+    // Prevent status toggle for admin users
+    if (userToUpdate.role === "admin") {
+      toast({
+        title: "Error",
+        description: "Cannot change status of admin users",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const newStatus = userToUpdate.status === "active" ? "inactive" : "active";
+
     try {
-      setLoading(true)
-      const res = await fetch(`/api/db/ams-users/${userId}`, {
+      setLoading(true);
+
+      // Update ams-users
+      const userResponse = await fetch(`/api/db/ams-users/${userId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus })
-      })
-      const data = await res.json()
-      if (data.success) {
-        setUsers(prev =>
-          prev.map(u =>
-            (u.id === userId)
-              ? { ...u, status: newStatus }
-              : u
-          )
-        )
-        toast({
-          title: "User status updated",
-          description: `User status has been updated successfully`,
-        })
-      } else {
+      });
+
+      const userData = await userResponse.json();
+
+      if (!userData.success) {
         toast({
           title: "Error",
-          description: data.error || "Failed to update user status",
+          description: userData.error || "Failed to update user status",
           variant: "destructive"
-        })
+        });
+        return;
       }
+
+      // If user is a player, also update ams-player-info
+      if (userToUpdate.role === "player") {
+        const playerResponse = await fetch(`/api/db/ams-player-info/${userId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: newStatus })
+        });
+
+        const playerData = await playerResponse.json();
+
+        if (!playerData.success) {
+          toast({
+            title: "Warning",
+            description: "User status updated but player info may not be synced",
+            variant: "destructive"
+          });
+        }
+      }
+
+      // Update local state
+      setUsers(prev =>
+        prev.map(u =>
+          (u.id === userId)
+            ? { ...u, status: newStatus }
+            : u
+        )
+      );
+
+      toast({
+        title: "User status updated",
+        description: `User status has been updated successfully`,
+      });
+
     } catch (error) {
       toast({
         title: "Error",
         description: "Failed to update user status",
         variant: "destructive"
-      })
+      });
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const filteredUsers = users.filter(user => {
     const matchesSearch = user.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          user.email?.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesRole = selectedRole === "all" || user.role === selectedRole
-    const matchesAcademy = selectedAcademy === "all" || user.academyId === selectedAcademy
-    return matchesSearch && matchesRole && matchesAcademy
+    const matchesStatus = selectedStatus === "all" || user.status === selectedStatus
+    return matchesSearch && matchesRole && matchesStatus
   })
 
   return (
@@ -233,7 +350,7 @@ export default function UserManagement() {
         <div className="space-y-6">
           <div className="flex justify-between items-center">
             <h1 className="text-3xl font-bold">User Management</h1>
-            <Dialog>
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
                 <Button>Add New User</Button>
               </DialogTrigger>
@@ -272,26 +389,15 @@ export default function UserManagement() {
                       <SelectValue placeholder="Select role" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="player">player</SelectItem>
+                      <SelectItem value="player">Player</SelectItem>
                       <SelectItem value="coach">Coach</SelectItem>
                       <SelectItem value="coordinator">Coordinator</SelectItem>
                       <SelectItem value="admin">Admin</SelectItem>
                     </SelectContent>
                   </Select>
-                  <Select
-                    value={newUser.academyId}
-                    onValueChange={value => setNewUser({ ...newUser, academyId: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select Academy" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {academies.map(academy => (
-                        <SelectItem key={academy.id} value={academy.id}>{academy.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Button onClick={handleAddUser}>Add User</Button>
+                  <Button onClick={() => handleCreateUser(newUser)} disabled={loading}>
+                    {loading ? "Adding..." : "Add User"}
+                  </Button>
                 </div>
               </DialogContent>
             </Dialog>
@@ -318,29 +424,28 @@ export default function UserManagement() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Roles</SelectItem>
-                    <SelectItem value="player">player</SelectItem>
+                    <SelectItem value="player">Player</SelectItem>
                     <SelectItem value="coach">Coach</SelectItem>
                     <SelectItem value="coordinator">Coordinator</SelectItem>
                     <SelectItem value="admin">Admin</SelectItem>
                   </SelectContent>
                 </Select>
                 <Select
-                  value={selectedAcademy}
-                  onValueChange={setSelectedAcademy}
+                  value={selectedStatus}
+                  onValueChange={setSelectedStatus}
                 >
                   <SelectTrigger className="w-[180px]">
-                    <SelectValue placeholder="Filter by Academy" />
+                    <SelectValue placeholder="Filter by status" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Academies</SelectItem>
-                    {academies.map(academy => (
-                      <SelectItem key={academy.id} value={academy.id}>{academy.name}</SelectItem>
-                    ))}
+                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="inactive">Inactive</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
-              <ScrollArea className="h-[400px]">
+              <div className="flex overflow-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -348,14 +453,13 @@ export default function UserManagement() {
                       <TableHead>Email</TableHead>
                       <TableHead>Role</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead>Academy</TableHead>
                       <TableHead>Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {loading ? (
                       <TableRow>
-                        <TableCell colSpan={6}>Loading...</TableCell>
+                        <TableCell colSpan={5}>Loading...</TableCell>
                       </TableRow>
                     ) : filteredUsers.map(user => (
                       <TableRow key={user.id}>
@@ -366,9 +470,6 @@ export default function UserManagement() {
                           <Badge variant={user.status === "active" ? "default" : "secondary"}>
                             {user.status}
                           </Badge>
-                        </TableCell>
-                        <TableCell>
-                          {academies.find(a => a.id === user.academyId)?.name || user.academyId}
                         </TableCell>
                         <TableCell>
                           <div className="flex space-x-2">
@@ -382,7 +483,7 @@ export default function UserManagement() {
                             <Button
                               variant="destructive"
                               size="sm"
-                              onClick={() => handleDeleteUser(user.id)}
+                              onClick={() => handleDeleteUser(user.id, user.name)}
                             >
                               Delete
                             </Button>
@@ -392,11 +493,53 @@ export default function UserManagement() {
                     ))}
                   </TableBody>
                 </Table>
-              </ScrollArea>
+              </div>
             </CardContent>
           </Card>
         </div>
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteConfirmDialog.open} onOpenChange={(open) => {
+        if (!open) {
+          setDeleteConfirmDialog({ open: false, userId: "", userName: "" });
+          setDeletePassword("");
+        }
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm Delete</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <p>Are you sure you want to delete user "{deleteConfirmDialog.userName}"?</p>
+            <p className="text-sm text-muted-foreground">This action cannot be undone.</p>
+            <Input
+              type="password"
+              placeholder="Enter your password to confirm"
+              value={deletePassword}
+              onChange={e => setDeletePassword(e.target.value)}
+            />
+            <div className="flex space-x-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setDeleteConfirmDialog({ open: false, userId: "", userName: "" });
+                  setDeletePassword("");
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={confirmDeleteUser}
+                disabled={deleteLoading}
+              >
+                {deleteLoading ? "Deleting..." : "Delete User"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

@@ -31,7 +31,6 @@ interface PlayerAttributes {
   passing: number;
   ballControl: number;
   crossing: number;
-  stamina: number;
   overall: number;
 }
 
@@ -42,7 +41,6 @@ const defaultAttributes: PlayerAttributes = {
   passing: 0,
   ballControl: 0,
   crossing: 0,
-  stamina: 0,
   overall: 0
 };
 
@@ -98,7 +96,8 @@ export default function SearchPage() {
   const [visibleCount, setVisibleCount] = useState(20)
   const [batches, setBatches] = useState<any[]>([])
   const [players, setPlayers] = useState<any[]>([])
-  const [timeRange, setTimeRange] = useState("daily")
+  const [timeRange, setTimeRange] = useState("yearly") // Change default to yearly
+  const [attributeFilter, setAttributeFilter] = useState<"latest" | "overall">("latest")
   const router = useRouter()
 
   const radarOptions = {
@@ -374,7 +373,7 @@ export default function SearchPage() {
       }
 
       const [userInfoResponse, coachProfileResponse, batchesResponse, credentialsResponse] = await Promise.all([
-        fetch(`/api/db/ams-user-info?userId=${userId}`),
+        fetch(`/api/db/ams-users-info?userId=${userId}`),
         fetch(`/api/db/coach-profile/${userId}`),
         fetch(`/api/db/ams-batches?academyId=${academyId}&coachId=${userId}`),
         fetch(`/api/db/ams-credentials?userId=${userId}&academyId=${academyId}`)
@@ -408,7 +407,8 @@ export default function SearchPage() {
         experience: userData.experience || profileData.experience || 0,
         rating: profileData.rating || 'N/A',
         joiningDate: userData.joiningDate,
-        bio: userData.bio || profileData.bio,
+        bio: userData.bio || '', // Bio from ams-users-info
+        about: profileData.about || '', // About from coach profile
         achievements: userData.achievements || profileData.achievements || [],
         certifications: userData.certifications || profileData.certifications || [],
         expertise: userData.expertise || profileData.specializations || [],
@@ -417,12 +417,11 @@ export default function SearchPage() {
           id: batch._id,
           name: batch.name,
           players: batch.players || [],
-          schedule: batch.schedule || 'Not set',
           totalPlayers: batch.players?.length || 0
         })),
         totalBatches: batchesData.length,
         userInfo: {
-          bio: userData.bio || '',
+          experience: userData.experience || 0,
           address: userData.address || '',
           phone: userData.phone || '',
           socialLinks: userData.socialLinks || {},
@@ -536,32 +535,6 @@ export default function SearchPage() {
     let filtered = attributeHistory;
   
     switch (timeRange) {
-      case "daily":
-        filtered = attributeHistory.filter((entry) => {
-          const entryDate = new Date(entry.date);
-          return (
-            entryDate.getDate() === now.getDate() &&
-            entryDate.getMonth() === now.getMonth() &&
-            entryDate.getFullYear() === now.getFullYear()
-          );
-        });
-        break;
-      case "weekly":
-        const weekAgo = new Date(now);
-        weekAgo.setDate(now.getDate() - 7);
-        filtered = attributeHistory.filter((entry) => {
-          const entryDate = new Date(entry.date);
-          return entryDate >= weekAgo && entryDate <= now;
-        });
-        break;
-      case "monthly":
-        const monthAgo = new Date(now);
-        monthAgo.setMonth(now.getMonth() - 1);
-        filtered = attributeHistory.filter((entry) => {
-          const entryDate = new Date(entry.date);
-          return entryDate >= monthAgo && entryDate <= now;
-        });
-        break;
       case "yearly":
         const yearAgo = new Date(now);
         yearAgo.setFullYear(now.getFullYear() - 1);
@@ -607,19 +580,69 @@ export default function SearchPage() {
         );
       }
 
-      const attributes = playerData.attributes || defaultAttributes;
-      
+
+
+      // Function to calculate average attributes for overall filter
+      const calculateAverageAttributes = (player: any): PlayerAttributes => {
+        if (!player?.performanceHistory?.length) {
+          return player?.attributes || defaultAttributes;
+        }
+
+        const attributeKeys: (keyof PlayerAttributes)[] = ['shooting', 'pace', 'positioning', 'passing', 'ballControl', 'crossing'];
+        const averageAttributes: PlayerAttributes = {
+          shooting: 0,
+          pace: 0,
+          positioning: 0,
+          passing: 0,
+          ballControl: 0,
+          crossing: 0,
+          overall: 0
+        };
+
+        attributeKeys.forEach(key => {
+          let totalScore = 0;
+          let validEntries = 0;
+
+          player.performanceHistory.forEach((entry: any) => {
+            if (entry.attributes && typeof entry.attributes[key] === 'number' && entry.attributes[key] > 0) {
+              totalScore += entry.attributes[key];
+              validEntries++;
+            }
+          });
+
+          const average = validEntries > 0 ? totalScore / validEntries : player.attributes?.[key] || 0;
+          averageAttributes[key] = Math.round(average * 10) / 10;
+        });
+
+        // Calculate overall score
+        averageAttributes.overall = calculateOverall(averageAttributes);
+
+        return averageAttributes;
+      };
+
+      // Get filtered attributes based on filter state
+      const getFilteredAttributes = (player: any): PlayerAttributes => {
+        if (attributeFilter === "latest") {
+          return player.attributes;
+        } else if (attributeFilter === "overall") {
+          return calculateAverageAttributes(player);
+        }
+        return player.attributes;
+      };
+
+      const filteredAttributes = getFilteredAttributes(playerData);
+
       const radarData = {
         labels: ["Shooting", "Pace", "Positioning", "Passing", "Ball Control", "Crossing"],
         datasets: [{
           label: "Attributes",
           data: [
-            Number(attributes.shooting) || 0,
-            Number(attributes.pace) || 0,
-            Number(attributes.positioning) || 0,
-            Number(attributes.passing) || 0,
-            Number(attributes.ballControl) || 0,
-            Number(attributes.crossing) || 0,
+            Number(filteredAttributes.shooting) || 0,
+            Number(filteredAttributes.pace) || 0,
+            Number(filteredAttributes.positioning) || 0,
+            Number(filteredAttributes.passing) || 0,
+            Number(filteredAttributes.ballControl) || 0,
+            Number(filteredAttributes.crossing) || 0,
           ],
           backgroundColor: "rgba(147, 51, 234, 0.2)",
           borderColor: "rgb(147, 51, 234)",
@@ -630,6 +653,26 @@ export default function SearchPage() {
 
       return (
         <>
+          <div className="flex justify-between items-center mb-4">
+            <h1 className="text-3xl font-bold text-white">{playerData.name}</h1>
+            <div className="flex gap-2">
+              <Button
+                variant={attributeFilter === "latest" ? "default" : "outline"}
+                onClick={() => setAttributeFilter("latest")}
+                size="sm"
+              >
+                Latest
+              </Button>
+              <Button
+                variant={attributeFilter === "overall" ? "default" : "outline"}
+                onClick={() => setAttributeFilter("overall")}
+                size="sm"
+              >
+                Overall
+              </Button>
+            </div>
+          </div>
+
           <Tabs defaultValue="profile" className="w-full">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="profile">Profile</TabsTrigger>
@@ -639,7 +682,6 @@ export default function SearchPage() {
             <TabsContent value="profile" className="space-y-6">
               <div className="flex justify-between items-start">
                 <div>
-                  <h1 className="text-3xl font-bold text-white">{playerData.name}</h1>
                   <p className="text-gray-400">
                     Age: {playerData.age} | {playerData.position}
                   </p>
@@ -657,8 +699,8 @@ export default function SearchPage() {
                     />
                   </div>
                   <p className="text-xl text-gray-400">ID: {playerData.id}</p>
-                  <Badge variant={calculateOverallRating(playerData?.attributes) >= 80 ? "default" : "secondary"}>
-                    OVR {calculateOverallRating(playerData?.attributes)}%
+                  <Badge variant={calculateOverallRating(filteredAttributes) >= 80 ? "default" : "secondary"}>
+                    OVR {calculateOverallRating(filteredAttributes)}%
                   </Badge>
                 </div>
               </div>
@@ -677,12 +719,12 @@ export default function SearchPage() {
                     {/* Right column: Attributes in single column */}
                     <div className="space-y-4">
                       {[
-                        { label: "Shooting", value: playerData.attributes?.shooting || 0 },
-                        { label: "Pace", value: playerData.attributes?.pace || 0 },
-                        { label: "Positioning", value: playerData.attributes?.positioning || 0 },
-                        { label: "Passing", value: playerData.attributes?.passing || 0 },
-                        { label: "Ball Control", value: playerData.attributes?.ballControl || 0 },
-                        { label: "Crossing", value: playerData.attributes?.crossing || 0 },
+                        { label: "Shooting", value: filteredAttributes.shooting || 0 },
+                        { label: "Pace", value: filteredAttributes.pace || 0 },
+                        { label: "Positioning", value: filteredAttributes.positioning || 0 },
+                        { label: "Passing", value: filteredAttributes.passing || 0 },
+                        { label: "Ball Control", value: filteredAttributes.ballControl || 0 },
+                        { label: "Crossing", value: filteredAttributes.crossing || 0 },
                       ].map((attr) => (
                         <div key={attr.label} className="space-y-2">
                           <div className="flex justify-between">
@@ -770,19 +812,16 @@ export default function SearchPage() {
                   <CardTitle>Attributes Growth</CardTitle>
                   <Select value={timeRange} onValueChange={setTimeRange}>
                     <SelectTrigger className="w-[180px]">
-                      <SelectValue placeholder="Select time range" />
+                      <SelectValue placeholder="Time Range" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="daily">Daily</SelectItem>
-                      <SelectItem value="weekly">Weekly</SelectItem>
-                      <SelectItem value="monthly">Monthly</SelectItem>
                       <SelectItem value="yearly">Yearly</SelectItem>
                     </SelectContent>
                   </Select>
                 </CardHeader>
                 <CardContent className="pt-6">
                   <PerformanceChart
-                    data={filterDataByTimeRange(playerData.attributeHistory || [], timeRange)}
+                    data={filterDataByTimeRange(playerData.attributeHistory || [], "yearly")}
                     attributes={["shooting", "pace", "positioning", "passing", "ballControl", "crossing"]}
                     colors={Object.values(attributeColors)}
                   />
@@ -913,7 +952,7 @@ export default function SearchPage() {
                 <CardTitle>About</CardTitle>
               </CardHeader>
               <CardContent>
-                <p>{coachData.bio || 'No bio available'}</p>
+                <p>{coachData.about || 'No about information available'}</p>
               </CardContent>
             </Card>
 
@@ -925,7 +964,7 @@ export default function SearchPage() {
               <CardContent className="space-y-4">
                 <div className="flex items-center space-x-2">
                   <Mail className="h-4 w-4 opacity-70" />
-                  <span>{coachData.email}</span>
+                  <span>{user.email}</span>
                 </div>
                 {coachData.phone && (
                   <div className="flex items-center space-x-2">
@@ -948,7 +987,6 @@ export default function SearchPage() {
                     <TableRow>
                       <TableHead>Batch Name</TableHead>
                       <TableHead>players</TableHead>
-                      <TableHead>Schedule</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -957,7 +995,6 @@ export default function SearchPage() {
                           <TableRow key={batch.id}>
                             <TableCell className="font-medium">{batch.name}</TableCell>
                             <TableCell>{batch.totalPlayers} players</TableCell>
-                            <TableCell>{batch.schedule}</TableCell>
                           </TableRow>
                         ))
                       ) : (
@@ -993,10 +1030,10 @@ export default function SearchPage() {
                   </div>
                 )}
                 
-                {coachData.userInfo.bio && (
+                {coachData.experience && (
                   <div>
-                    <h3 className="font-semibold mb-2">Biography</h3>
-                    <p className="text-sm text-muted-foreground">{coachData.userInfo.bio}</p>
+                    <h3 className="font-semibold mb-2">Experience</h3>
+                    <p className="text-sm text-muted-foreground">{coachData.experience} years</p>
                   </div>
                 )}
 

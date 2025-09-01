@@ -6,242 +6,260 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Download, CalendarIcon, Search } from "lucide-react"
-import { useAuth } from "@/contexts/AuthContext"
-import Sidebar from "@/components/Sidebar"
+import { Download, Search, ChevronLeft, ChevronRight } from "lucide-react"
 import { Input } from "@/components/ui/input"
+import Sidebar from "@/components/Sidebar"
+import { useAuth } from "@/contexts/AuthContext"
 import { useToast } from "@/components/ui/use-toast"
 
-interface AttendanceRecord {
-  id?: string
-  userId: string
-  date: string
-  status: "present" | "absent" | "late"
-  markedBy: string
+interface User {
+  id: string
+  name: string
+  email: string
   academyId: string
-  type: "players" | "coaches"
-  markedAt?: string
+  status: string
+}
+
+interface Session {
+  _id: string
+  id: string
+  name: string
+  date: string
+  startTime: string
+  endTime: string
+  status: "Upcoming" | "Finished" | "On-going"
+  assignedPlayers: string[]
+  attendance: {
+    [playerId: string]: {
+      status: "Present" | "Absent"
+      markedAt: string
+      markedBy: string
+    }
+  }
+  isOccurrence: boolean
+  parentSessionId?: string
+  academyId: string
+}
+
+interface PlayerAttendanceSummary {
+  playerId: string
+  totalSessions: number
+  present: number
+  absent: number
+  unmarked: number
+  presentDates: string[]
+  absentDates: string[]
+  unmarkedDates: string[]
+}
+
+const updateSessionStatus = (sessions: Session[]): Session[] => {
+  const now = new Date()
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+
+  return sessions.map(session => {
+    const occurrenceDateTime = new Date(session.date)
+    const [startHour, startMinute] = session.startTime.split(":").map(Number)
+    const [endHour, endMinute] = session.endTime.split(":").map(Number)
+
+    const sessionStart = new Date(occurrenceDateTime)
+    sessionStart.setHours(startHour, startMinute, 0)
+
+    const sessionEnd = new Date(occurrenceDateTime)
+    sessionEnd.setHours(endHour, endMinute, 0)
+
+    let status: Session["status"]
+    if (occurrenceDateTime < today) {
+      status = "Finished"
+    } else if (occurrenceDateTime.getTime() === today.getTime()) {
+      if (now >= sessionEnd) {
+        status = "Finished"
+      } else if (now >= sessionStart && now <= sessionEnd) {
+        status = "On-going"
+      } else {
+        status = "Upcoming"
+      }
+    } else {
+      status = "Upcoming"
+    }
+
+    return { ...session, status }
+  })
 }
 
 export default function AttendancePage() {
   const { toast } = useToast()
   const { user } = useAuth()
   const [date, setDate] = useState<Date>(new Date())
-  const [view, setView] = useState<"daily" | "monthly">("daily")
-  const [userType, setUserType] = useState<"players" | "coaches">("players")
-  const [users, setUsers] = useState<any[]>([])
-  const [attendance, setAttendance] = useState<AttendanceRecord[]>([])
+  const [users, setUsers] = useState<User[]>([])
+  const [sessions, setSessions] = useState<Session[]>([])
   const [searchQuery, setSearchQuery] = useState("")
-  const [visibleCount, setVisibleCount] = useState(20)
+  const [currentPage, setCurrentPage] = useState(0)
+  const [isSearchFocused, setIsSearchFocused] = useState(false)
+  const ITEMS_PER_PAGE = 10
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        if (!user?.academyId) return;
-
-        // Fetch users
-        let response;
-        if (userType === "players") {
-          response = await fetch(`/api/db/ams-player-data?academyId=${user.academyId}`);
-          if (!response.ok) throw new Error('Failed to fetch players');
-          const result = await response.json();
-          
-          // Ensure we're using the data property from the response
-          if (result.success && Array.isArray(result.data)) {
-            const formattedplayers = result.data.map((player: any) => ({
-              id: player.id || player._id?.toString(),
-              name: player.name || player.username || 'Unknown player',
-              email: player.email,
-              academyId: player.academyId
-            }));
-            setUsers(formattedplayers);
-          } else {
-            console.error('Invalid player data format:', result);
-            setUsers([]);
-          }
-        } else {
-          // Handle coaches fetch
-          response = await fetch(`/api/db/ams-users?academyId=${user.academyId}&role=coach`);
-          if (!response.ok) throw new Error('Failed to fetch coaches');
-          const coachData = await response.json();
-          setUsers(Array.isArray(coachData) ? coachData : []);
-        }
-
-        // Fetch attendance for current date
-        const dateStr = date.toISOString().split('T')[0];
-        const attendanceResponse = await fetch(
-          `/api/db/ams-attendance?academyId=${user.academyId}&date=${dateStr}&type=${userType}`
-        );
-        
-        if (attendanceResponse.ok) {
-          const attendanceData = await attendanceResponse.json();
-          setAttendance(Array.isArray(attendanceData) ? attendanceData : []);
-        }
-      } catch (error) {
-        console.error('Error fetching data:', error);
-        toast({
-          title: "Error",
-          description: "Failed to fetch data",
-          variant: "destructive",
-        });
-      }
-    };
-
-    fetchData();
-  }, [user?.academyId, userType, date]);
-
-  const getAttendanceStats = (userId: string) => {
-    if (view === "daily") {
-      const dateStr = date.toISOString().split("T")[0];
-      const record = attendance.find(r => r.userId === userId && r.date === dateStr);
-      const isPresent = record?.status === "present";
-      return {
-        total: 1,
-        present: isPresent ? 1 : 0,
-        percentage: isPresent ? 100 : 0,
-      };
-    } else {
-      // Monthly view
-      const currentMonth = date.getMonth();
-      const currentYear = date.getFullYear();
-      const userRecords = attendance.filter(record => {
-        const recordDate = new Date(record.date);
-        return record.userId === userId && 
-               recordDate.getMonth() === currentMonth &&
-               recordDate.getFullYear() === currentYear;
-      });
-      
-      const total = userRecords.length;
-      const present = userRecords.filter(record => record.status === "present").length;
-      const percentage = total > 0 ? Math.round((present / total) * 100) : 0;
-      
-      return { total, present, percentage };
-    }
-  };
-
-  const handleMarkAttendance = async (userId: string, status: "present" | "absent" | "late") => {
+  const fetchSessionsData = async () => {
+    if (!user?.academyId) return
     try {
-      if (!user?.academyId) throw new Error("Academy ID not found");
-      
-      const dateStr = date.toISOString().split("T")[0];
-      
-      const attendanceData = {
-        academyId: user.academyId,
-        userId,
-        date: dateStr,
-        status,
-        type: userType,
-        markedBy: user.id,
-        markedAt: new Date().toISOString()
-      };
-
-      console.log('Sending attendance data:', attendanceData);
-
-      const response = await fetch("/api/db/ams-attendance", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(attendanceData),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("Error response:", errorText);
-        throw new Error(errorText || "Failed to mark attendance");
+      const response = await fetch(`/api/db/ams-sessions?academyId=${encodeURIComponent(user.academyId)}`)
+      if (response.ok) {
+        const result = await response.json()
+        if (result.success && Array.isArray(result.data)) {
+          const updatedSessions = updateSessionStatus(result.data)
+          setSessions(updatedSessions)
+        } else {
+          setSessions([])
+        }
       }
-
-      const result = await response.json();
-      console.log('Attendance saved successfully:', result);
-
-      // Refresh attendance data
-      const refreshResponse = await fetch(
-        `/api/db/ams-attendance?academyId=${user.academyId}&date=${dateStr}&type=${userType}`
-      );
-      
-      if (refreshResponse.ok) {
-        const refreshedData = await refreshResponse.json();
-        setAttendance(Array.isArray(refreshedData) ? refreshedData : []);
-      }
-
-      toast({
-        title: "Success",
-        description: `Attendance marked as ${status}`,
-      });
-
     } catch (error) {
-      console.error("Error marking attendance:", error);
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to mark attendance",
-        variant: "destructive",
-      });
+      console.error("Error fetching sessions:", error)
     }
-  };
+  }
 
-  const getUserAttendanceStatus = (userId: string) => {
-    const dateStr = date.toISOString().split("T")[0];
-    const record = attendance.find(r => 
-      r.userId === userId && 
-      r.date === dateStr && 
-      r.type === userType
-    );
-    return record?.status || "Not marked";
-  };
+  const fetchUsersData = async () => {
+    if (!user?.academyId) return
+    try {
+      const response = await fetch(`/api/db/ams-player-data?academyId=${user.academyId}`)
+      if (response.ok) {
+        const result = await response.json()
+        if (result.success && Array.isArray(result.data)) {
+          const formattedPlayers: User[] = result.data
+            .filter((player: any) => player.status === "active" || !player.status)
+            .map((player: any) => ({
+              id: player.id || player._id,
+              name: player.name || player.username || "Unknown player",
+              email: player.email,
+              academyId: player.academyId,
+              status: player.status || "active"
+            }))
+          setUsers(formattedPlayers)
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching users:", error)
+    }
+  }
+
+  const calculatePlayerAttendance = (sessions: Session[]): Record<string, PlayerAttendanceSummary> => {
+    const finishedSessions = sessions.filter(s => s.status === "Finished")
+
+    const summary: Record<string, PlayerAttendanceSummary> = {}
+
+    for (const session of finishedSessions) {
+      for (const playerId of session.assignedPlayers) {
+        if (!summary[playerId]) {
+          summary[playerId] = {
+            playerId,
+            totalSessions: 0,
+            present: 0,
+            absent: 0,
+            unmarked: 0,
+            presentDates: [],
+            absentDates: [],
+            unmarkedDates: []
+          }
+        }
+
+        summary[playerId].totalSessions++
+
+        const attendanceRecord = session.attendance?.[playerId]
+        if (attendanceRecord?.status === "Present") {
+          summary[playerId].present++
+          summary[playerId].presentDates.push(session.date)
+        } else if (attendanceRecord?.status === "Absent") {
+          summary[playerId].absent++
+          summary[playerId].absentDates.push(session.date)
+        } else {
+          // No attendance record means unmarked
+          summary[playerId].unmarked++
+          summary[playerId].unmarkedDates.push(session.date)
+        }
+      }
+    }
+
+    return summary
+  }
 
   const exportAttendance = () => {
-    // Get attendance stats for all users
-    const exportData = users
-      .filter(user => user.academyId === user?.academyId)
-      .map(user => {
-        const stats = getAttendanceStats(user.id);
-        return {
-          id: user.id,
-          name: user.name,
-          attendance: `${stats.present}/${stats.total}`
-        };
-      });
+    const report = calculatePlayerAttendance(sessions)
+    const exportData = users.map(u => {
+      const stats = report[u.id] || {
+        totalSessions: 0,
+        present: 0,
+        absent: 0,
+        unmarked: 0
+      }
+      return {
+        id: u.id,
+        name: u.name,
+        total: stats.totalSessions,
+        present: stats.present,
+        absent: stats.absent,
+        unmarked: stats.unmarked,
+        attendance: stats.totalSessions > 0 ? 
+          `${Math.round((stats.present / stats.totalSessions) * 100)}%` : "0%"
+      }
+    })
 
-    // Create CSV content
     const csvContent = [
-      ['player ID', 'player Name', 'Attendance (Present/Total)'].join(','),
+      ["Player ID", "Player Name", "Total Sessions", "Present", "Absent", "Unmarked", "Attendance %"].join(","),
       ...exportData.map(row => [
-        row.id,
-        row.name,
+        row.id, 
+        row.name, 
+        row.total, 
+        row.present, 
+        row.absent, 
+        row.unmarked, 
         row.attendance
-      ].join(','))
-    ].join('\n');
+      ].join(","))
+    ].join("\n")
 
-    // Create and trigger download
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    
-    link.setAttribute('href', url);
-    link.setAttribute('download', `attendance_report_${date.toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    
-    link.click();
-    
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  };
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" })
+    const link = document.createElement("a")
+    const url = URL.createObjectURL(blob)
+    link.setAttribute("href", url)
+    link.setAttribute("download", `attendance_report_${date.toISOString().split("T")[0]}.csv`)
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+  }
 
   const getFilteredUsers = () => {
-    // Ensure users is an array before filtering
-    return Array.isArray(users)
-      ? users.filter(user => 
-          user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          (user.email && user.email.toLowerCase().includes(searchQuery.toLowerCase()))
-        )
-      : [];
-  };
-
-  const handleViewMore = () => {
-    setVisibleCount(prev => prev + 20);
+    if (!Array.isArray(users)) return []
+    if (!searchQuery.trim()) return users
+    const query = searchQuery.toLowerCase().trim()
+    return users.filter(
+      u => (u.name || "").toLowerCase().includes(query) || (u.email || "").toLowerCase().includes(query)
+    )
   }
+
+  useEffect(() => {
+    if (user?.academyId) {
+      fetchUsersData()
+      fetchSessionsData()
+    }
+  }, [user?.academyId])
+
+  useEffect(() => {
+    setCurrentPage(0)
+  }, [searchQuery])
+
+  const paginateUsers = () => {
+    const filtered = getFilteredUsers()
+    const startIndex = currentPage * ITEMS_PER_PAGE
+    return filtered.slice(startIndex, startIndex + ITEMS_PER_PAGE)
+  }
+
+  const totalPages = Math.ceil(getFilteredUsers().length / ITEMS_PER_PAGE)
+
+  const handleNextPage = () => {
+    if (currentPage < totalPages - 1) setCurrentPage(prev => prev + 1)
+  }
+  const handlePrevPage = () => {
+    if (currentPage > 0) setCurrentPage(prev => prev - 1)
+  }
+
+  const report = calculatePlayerAttendance(sessions)
 
   return (
     <div className="flex h-screen">
@@ -250,9 +268,7 @@ export default function AttendancePage() {
         <div className="flex justify-between items-center mb-6">
           <div className="space-y-1">
             <h2 className="text-2xl font-bold tracking-tight">Attendance Management</h2>
-            <p className="text-muted-foreground">
-              Mark and monitor attendance for players and coaches
-            </p>
+            <p className="text-muted-foreground">Monitor attendance for players</p>
           </div>
           <Button onClick={exportAttendance} variant="outline">
             <Download className="mr-2 h-4 w-4" />
@@ -260,185 +276,108 @@ export default function AttendancePage() {
           </Button>
         </div>
 
-        <div className="space-y-4">
-          <div className="flex space-x-4">
-            <Tabs value={view} onValueChange={(v) => setView(v as "daily" | "monthly")}>
-              <TabsList>
-                <TabsTrigger value="daily">Daily</TabsTrigger>
-                <TabsTrigger value="monthly">Monthly</TabsTrigger>
-              </TabsList>
-            </Tabs>
-            <Select value={userType} onValueChange={(v) => setUserType(v as "players" | "coaches")}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="players">players</SelectItem>
-                <SelectItem value="coaches">Coaches</SelectItem>
-              </SelectContent>
-            </Select>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mb-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Calendar</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Calendar mode="single" selected={date} onSelect={newDate => newDate && setDate(newDate)} />
+            </CardContent>
+          </Card>
+        </div>
 
-            <div className="flex-1 max-w-sm">
+        <Card>
+          <CardHeader>
+            <div className="flex justify-between items-center">
+              <CardTitle>Attendance Statistics</CardTitle>
               <div className="relative">
-                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
                 <Input
-                  placeholder={`Search ${userType}...`}
+                  placeholder="Search players..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-8"
+                  onFocus={() => setIsSearchFocused(true)}
+                  onBlur={() => setIsSearchFocused(false)}
+                  className="pl-10 w-64"
                 />
               </div>
             </div>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            <Card>
-              <CardHeader>
-                <CardTitle>Calendar</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Calendar
-                  mode="single"
-                  selected={date}
-                  onSelect={(newDate) => newDate && setDate(newDate)}
-                />
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle>Attendance Sheet</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Actions</TableHead>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Player</TableHead>
+                  <TableHead>Total</TableHead>
+                  <TableHead>Present</TableHead>
+                  <TableHead>Absent</TableHead>
+                  <TableHead>Unmarked</TableHead>
+                  <TableHead>Attendance%</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {paginateUsers().map(u => {
+                  const stats = report[u.id] || {
+                    totalSessions: 0,
+                    present: 0,
+                    absent: 0,
+                    unmarked: 0
+                  }
+                  const percentage =
+                    stats.totalSessions > 0 ? Math.round((stats.present / stats.totalSessions) * 100) : 0
+                  return (
+                    <TableRow key={u.id}>
+                      <TableCell className="font-medium">{u.name}</TableCell>
+                      <TableCell>{stats.totalSessions}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                          {stats.present}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
+                          {stats.absent}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
+                          {stats.unmarked}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={percentage >= 75 ? "default" : "destructive"} 
+                               className={percentage >= 75 ? "bg-green-600" : ""}>
+                          {percentage}%
+                        </Badge>
+                      </TableCell>
                     </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {getFilteredUsers().map((user) => {
-                      const currentStatus = getUserAttendanceStatus(user.id)
-                      return (
-                        <TableRow key={user.id}>
-                          <TableCell>{user.name}</TableCell>
-                          <TableCell>
-                            <Badge
-                              variant={
-                                currentStatus === "present"
-                                  ? "success"
-                                  : currentStatus === "late"
-                                  ? "outline"
-                                  : currentStatus === "absent"
-                                  ? "destructive"
-                                  : "secondary"
-                              }
-                            >
-                              {currentStatus}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex space-x-2">
-                              <Button
-                                variant={currentStatus === "present" ? "default" : "outline"}
-                                size="sm"
-                                onClick={() => handleMarkAttendance(user.id, "present")}
-                              >
-                                Present
-                              </Button>
-                              <Button
-                                variant={currentStatus === "late" ? "default" : "outline"}
-                                size="sm"
-                                onClick={() => handleMarkAttendance(user.id, "late")}
-                              >
-                                Late
-                              </Button>
-                              <Button
-                                variant={currentStatus === "absent" ? "default" : "outline"}
-                                size="sm"
-                                onClick={() => handleMarkAttendance(user.id, "absent")}
-                              >
-                                Absent
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      )
-                    })}
-                  </TableBody>
-                </Table>
+                  )
+                })}
+              </TableBody>
+            </Table>
 
-                {visibleCount < (Array.isArray(users) ? users.filter(user => 
-                  user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                  (user.email && user.email.toLowerCase().includes(searchQuery.toLowerCase()))
-                ).length : 0) && (
-                  <Button
-                    variant="outline"
-                    className="w-full mt-4"
-                    onClick={handleViewMore}
-                  >
-                    View More ({Array.isArray(users) ? users.filter(user => 
-                      user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                      (user.email && user.email.toLowerCase().includes(searchQuery.toLowerCase()))
-                    ).length - visibleCount : 0} remaining)
-                  </Button>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Attendance Statistics</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {getFilteredUsers().map((user) => {
-                    const stats = getAttendanceStats(user.id)
-                    return (
-                      <div key={user.id} className="p-4 border rounded-lg">
-                        <h3 className="font-semibold mb-2">{user.name}</h3>
-                        <div className="grid grid-cols-2 gap-2 text-sm">
-                          <div>Total Days:</div>
-                          <div>{stats.total}</div>
-                          <div>Present:</div>
-                          <div>{stats.present}</div>
-                          <div>Attendance:</div>
-                          <div>
-                            <Badge variant={stats.percentage >= 75 ? "success" : "destructive"}>
-                              {stats.percentage}%
-                            </Badge>
-                          </div>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-
-                {visibleCount < (Array.isArray(users) ? users.filter(user => 
-                  user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                  (user.email && user.email.toLowerCase().includes(searchQuery.toLowerCase()))
-                ).length : 0) && (
-                  <Button
-                    variant="outline"
-                    className="w-full mt-4"
-                    onClick={handleViewMore}
-                  >
-                    View More Statistics ({Array.isArray(users) ? users.filter(user => 
-                      user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                      (user.email && user.email.toLowerCase().includes(searchQuery.toLowerCase()))
-                    ).length - visibleCount : 0} remaining)
-                  </Button>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        </div>
+            <div className="flex justify-between items-center mt-4">
+              <Button variant="outline" size="sm" onClick={handlePrevPage} disabled={currentPage === 0}>
+                <ChevronLeft className="h-4 w-4 mr-2" />
+                Previous
+              </Button>
+              <span className="text-sm text-muted-foreground">
+                Page {currentPage + 1} of {totalPages} ({getFilteredUsers().length} players)
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleNextPage}
+                disabled={currentPage >= totalPages - 1}
+              >
+                Next
+                <ChevronRight className="h-4 w-4 ml-2" />
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   )
 }
-
