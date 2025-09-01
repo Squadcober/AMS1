@@ -10,24 +10,24 @@ export interface Player {
   academyId: string;
   userId?: string;
   attributes: {
-    shooting: number;
+    Attack: number;
     pace: number;
-    positioning: number;
+    Physicality: number;
+    Defense: number;
     passing: number;
-    ballControl: number;
-    crossing: number;
+    Technique: number;
     [key: string]: any;
   };
   performanceHistory?: Array<{
     date: string;
     type?: string;
     attributes: {
-      shooting: number;
+      Attack: number;
       pace: number;
-      positioning: number;
+      Physicality: number;
+      Defense: number;
       passing: number;
-      ballControl: number;
-      crossing: number;
+      Technique: number;
       [key: string]: any;
     };
     matchId?: string;

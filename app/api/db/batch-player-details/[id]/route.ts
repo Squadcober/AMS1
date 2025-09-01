@@ -36,12 +36,12 @@ export async function GET(
       position: player.position,
       photoUrl: player.photoUrl,
       attributes: {
-        shooting: player.attributes?.shooting || 0,
+        Attack: player.attributes?.Attack || 0,
         pace: player.attributes?.pace || 0,
-        positioning: player.attributes?.positioning || 0,
+        Physicality: player.attributes?.Physicality || 0,
+        Defense: player.attributes?.Defense || 0,
         passing: player.attributes?.passing || 0,
-        ballControl: player.attributes?.ballControl || 0,
-        crossing: player.attributes?.crossing || 0
+        Technique: player.attributes?.Technique || 0
       },
       overallRating: player.overallRating || 0,
       averagePerformance: player.averagePerformance || 0,

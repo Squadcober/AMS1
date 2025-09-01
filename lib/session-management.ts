@@ -144,12 +144,12 @@ export class SessionManager {
     sessionId: string, 
     playerId: string, 
     metrics: {
-      shooting?: number;
+      Attack?: number;
       pace?: number;
-      positioning?: number;
+      Physicality?: number;
+      Defense?: number;
       passing?: number;
-      ballControl?: number;
-      crossing?: number;
+      Technique?: number;
       sessionRating?: number;
     }
   ): Promise<boolean> {

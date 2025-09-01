@@ -25,22 +25,22 @@ import { calculateAveragePerformance } from "@/utils/calculations"
 ChartJS.register(RadialLinearScale, PointElement, LineElement, Filler, Tooltip, Legend, CategoryScale, LinearScale)
 
 interface PlayerAttributes {
-  shooting: number;
+  Attack: number;
   pace: number;
-  positioning: number;
+  Physicality: number;
+  Defense: number;
   passing: number;
-  ballControl: number;
-  crossing: number;
+  Technique: number;
   overall: number;
 }
 
 const defaultAttributes: PlayerAttributes = {
-  shooting: 0,
+  Attack: 0,
   pace: 0,
-  positioning: 0,
+  Physicality: 0,
+  Defense: 0,
   passing: 0,
-  ballControl: 0,
-  crossing: 0,
+  Technique: 0,
   overall: 0
 };
 
@@ -55,12 +55,12 @@ const formatPerformanceDate = (date: string) => {
 const calculateOverallRating = (attributes: any): number => {
   if (!attributes) return 0;
   const ratings = [
-    Number(attributes.shooting) || 0,
+    Number(attributes.Attack) || 0,
     Number(attributes.pace) || 0,
-    Number(attributes.positioning) || 0,
+    Number(attributes.Physicality) || 0,
+    Number(attributes.Defense) || 0,
     Number(attributes.passing) || 0,
-    Number(attributes.ballControl) || 0,
-    Number(attributes.crossing) || 0
+    Number(attributes.Technique) || 0
   ];
   const sum = ratings.reduce((acc, val) => acc + val, 0);
   const average = sum / ratings.length;
@@ -248,12 +248,12 @@ export default function SearchPage() {
     if (!attributes) return 0;
     
     const values = [
-      attributes.shooting || 0,
+      attributes.Attack || 0,
       attributes.pace || 0,
-      attributes.positioning || 0,
+      attributes.Physicality || 0,
+      attributes.Defense || 0,
       attributes.passing || 0,
-      attributes.ballControl || 0,
-      attributes.crossing || 0
+      attributes.Technique || 0
     ];
     
     return Number((values.reduce((a, b) => a + b, 0) / values.length).toFixed(1));
@@ -322,12 +322,12 @@ export default function SearchPage() {
         .filter((entry: any) => entry.attributes && Object.keys(entry.attributes).length > 0)
         .map((entry: any) => ({
           date: new Date(entry.date).toLocaleDateString(),
-          shooting: entry.attributes?.shooting || null,
+          Attack: entry.attributes?.Attack || null,
           pace: entry.attributes?.pace || null,
-          positioning: entry.attributes?.positioning || null,
+          Physicality: entry.attributes?.Physicality || null,
+          Defense: entry.attributes?.Defense || null,
           passing: entry.attributes?.passing || null,
-          ballControl: entry.attributes?.ballControl || null,
-          crossing: entry.attributes?.crossing || null,
+          Technique: entry.attributes?.Technique || null,
         }));
 
       // Calculate match stats
@@ -551,12 +551,12 @@ export default function SearchPage() {
   
   // Define colors for each attribute
   const attributeColors: { [key: string]: string } = {
-    shooting: "#f59e42",
+    Attack: "#f59e42",
     pace: "#3b82f6",
-    positioning: "#10b981",
-    passing: "#f43f5e",
-    ballControl: "#a21caf",
-    crossing: "#fbbf24"
+    Physicality: "#10b981",
+    Defense: "#f43f5e",
+    passing: "#a21caf",
+    Technique: "#fbbf24"
   };
 
   // Helper to calculate sessions attended from performance history
@@ -588,14 +588,14 @@ export default function SearchPage() {
           return player?.attributes || defaultAttributes;
         }
 
-        const attributeKeys: (keyof PlayerAttributes)[] = ['shooting', 'pace', 'positioning', 'passing', 'ballControl', 'crossing'];
+        const attributeKeys: (keyof PlayerAttributes)[] = ['Attack', 'pace', 'Physicality', 'Defense', 'passing', 'Technique'];
         const averageAttributes: PlayerAttributes = {
-          shooting: 0,
+          Attack: 0,
           pace: 0,
-          positioning: 0,
+          Physicality: 0,
+          Defense: 0,
           passing: 0,
-          ballControl: 0,
-          crossing: 0,
+          Technique: 0,
           overall: 0
         };
 
@@ -633,16 +633,16 @@ export default function SearchPage() {
       const filteredAttributes = getFilteredAttributes(playerData);
 
       const radarData = {
-        labels: ["Shooting", "Pace", "Positioning", "Passing", "Ball Control", "Crossing"],
+        labels: ["Attack", "Pace", "Physicality", "Defense", "passing", "Technique"],
         datasets: [{
           label: "Attributes",
           data: [
-            Number(filteredAttributes.shooting) || 0,
+            Number(filteredAttributes.Attack) || 0,
             Number(filteredAttributes.pace) || 0,
-            Number(filteredAttributes.positioning) || 0,
+            Number(filteredAttributes.Physicality) || 0,
+            Number(filteredAttributes.Defense) || 0,
             Number(filteredAttributes.passing) || 0,
-            Number(filteredAttributes.ballControl) || 0,
-            Number(filteredAttributes.crossing) || 0,
+            Number(filteredAttributes.Technique) || 0,
           ],
           backgroundColor: "rgba(147, 51, 234, 0.2)",
           borderColor: "rgb(147, 51, 234)",
@@ -719,12 +719,12 @@ export default function SearchPage() {
                     {/* Right column: Attributes in single column */}
                     <div className="space-y-4">
                       {[
-                        { label: "Shooting", value: filteredAttributes.shooting || 0 },
+                        { label: "Attack", value: filteredAttributes.Attack || 0 },
                         { label: "Pace", value: filteredAttributes.pace || 0 },
-                        { label: "Positioning", value: filteredAttributes.positioning || 0 },
-                        { label: "Passing", value: filteredAttributes.passing || 0 },
-                        { label: "Ball Control", value: filteredAttributes.ballControl || 0 },
-                        { label: "Crossing", value: filteredAttributes.crossing || 0 },
+                        { label: "Physicality", value: filteredAttributes.Physicality || 0 },
+                        { label: "Defense", value: filteredAttributes.Defense || 0 },
+                        { label: "passing", value: filteredAttributes.passing || 0 },
+                        { label: "Technique", value: filteredAttributes.Technique || 0 },
                       ].map((attr) => (
                         <div key={attr.label} className="space-y-2">
                           <div className="flex justify-between">
@@ -822,7 +822,7 @@ export default function SearchPage() {
                 <CardContent className="pt-6">
                   <PerformanceChart
                     data={filterDataByTimeRange(playerData.attributeHistory || [], "yearly")}
-                    attributes={["shooting", "pace", "positioning", "passing", "ballControl", "crossing"]}
+                    attributes={["Attack", "pace", "Physicality", "Defense", "passing", "Technique"]}
                     colors={Object.values(attributeColors)}
                   />
                 </CardContent>

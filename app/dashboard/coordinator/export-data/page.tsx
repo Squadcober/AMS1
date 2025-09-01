@@ -23,12 +23,12 @@ export default function ExportDataPage() {
 
   const calculateOverallRating = (attributes: any) => {
     const stats = [
-      attributes?.shooting || 0,
+      attributes?.Attack || 0,
       attributes?.pace || 0,
-      attributes?.positioning || 0,
+      attributes?.Physicality || 0,
+      attributes?.Defense || 0,
       attributes?.passing || 0,
-      attributes?.ballControl || 0,
-      attributes?.crossing || 0
+      attributes?.Technique || 0
     ];
     
     const validStats = stats.filter(stat => stat > 0);
@@ -54,7 +54,7 @@ export default function ExportDataPage() {
     switch (type) {
       case 'players':
         csvContent = [
-          'ID,Name,Position,Age,Overall Rating,Shooting,Pace,Positioning,Passing,Ball Control,Crossing,Average Performance,Stamina,Enrollment Date',
+          'ID,Name,Position,Age,Overall Rating,Attack,Pace,Physicality,Defense,passing,Technique,Average Performance,Stamina,Enrollment Date',
           ...data.map(p => {
             const attrs = p.attributes || {};
             const overallRating = calculateOverallRating(attrs);
@@ -64,12 +64,12 @@ export default function ExportDataPage() {
               `"${p.position || ''}"`,
               p.age || '',
               `${overallRating}`,
-              attrs.shooting || '',
+              attrs.Attack || '',
               attrs.pace || '',
-              attrs.positioning || '',
+              attrs.Physicality || '',
+              attrs.Defense || '',
               attrs.passing || '',
-              attrs.ballControl || '',
-              attrs.crossing || '',
+              attrs.Technique || '',
               p.averagePerformance || '',
               p.stamina || '',
               p.enrollmentDate || ''
@@ -98,13 +98,13 @@ export default function ExportDataPage() {
         
         if (!data || !Array.isArray(data) || data.length === 0) {
           console.log('No performance data found');
-          return 'Player ID,Player Name,Date,Time,Session ID,Type,Shooting,Pace,Positioning,Passing,Ball Control,Crossing,Session Rating,Overall\n'; // Empty CSV with headers
+          return 'Player ID,Player Name,Date,Time,Session ID,Type,Attack,Pace,Physicality,Defense,passing,Technique,Session Rating,Overall\n'; // Empty CSV with headers
         }
 
         console.log('Total performance records:', data.length); // Debug log
 
         csvContent = [
-          'Player ID,Player Name,Date,Time,Session ID,Type,Shooting,Pace,Positioning,Passing,Ball Control,Crossing,Session Rating,Overall',
+          'Player ID,Player Name,Date,Time,Session ID,Type,Attack,Pace,Physicality,Defense,passing,Technique,Session Rating,Overall',
           ...data.map((session: any) => {
             const { date, time } = formatDateTime(session.date);
             const attrs = session.attributes || {};
@@ -117,12 +117,12 @@ export default function ExportDataPage() {
               time,
               session.sessionId || '',
               session.type || 'training',
-              attrs.shooting || session.shooting || '',
+              attrs.Attack || session.Attack || '',
               attrs.pace || session.pace || '',
-              attrs.positioning || session.positioning || '',
+              attrs.Physicality || session.Physicality || '',
+              attrs.Defense || session.Defense || '',
               attrs.passing || session.passing || '',
-              attrs.ballControl || session.ballControl || '',
-              attrs.crossing || session.crossing || '',
+              attrs.Technique || session.Technique || '',
               session.sessionRating || '',
               `${overallRating}`
             ].join(',');
@@ -157,7 +157,7 @@ export default function ExportDataPage() {
           // Player section header
           csvContent += [
             'Role', 'ID', 'Name', 'Position', 'Age', 'Overall Rating',
-            'shooting', 'pace', 'positioning', 'passing', 'ballControl', 'crossing',
+            'Attack', 'pace', 'Physicality', 'Defense', 'passing', 'Technique',
             'averagePerformance', 'stamina', 'lastUpdated'
           ].join(',') + '\n';
 
@@ -174,12 +174,12 @@ export default function ExportDataPage() {
                 `"${player.position}"`,
                 `"${player.age}"`,
                 `"${overallRating}"`,  // Overall rating as percentage
-                `"${attrs.shooting}"`,
+                `"${attrs.Attack}"`,
                 `"${attrs.pace}"`,
-                `"${attrs.positioning}"`,
+                `"${attrs.Physicality}"`,
+                `"${attrs.Defense}"`,
                 `"${attrs.passing}"`,
-                `"${attrs.ballControl}"`,
-                `"${attrs.crossing}"`,
+                `"${attrs.Technique}"`,
                 `"${player.averagePerformance}"`,
                 `"${player.stamina}"`,
                 `"${player.lastUpdated}"`
@@ -240,12 +240,12 @@ export default function ExportDataPage() {
           age: playerData.age || '',
           attributes: playerData.attributes || {
             overall: playerData.overall || '',
-            shooting: playerData.shooting || '',
+            Attack: playerData.Attack || '',
             pace: playerData.pace || '',
-            positioning: playerData.positioning || '',
+            Physicality: playerData.Physicality || '',
+            Defense: playerData.Defense || '',
             passing: playerData.passing || '',
-            ballControl: playerData.ballControl || '',
-            crossing: playerData.crossing || ''
+            Technique: playerData.Technique || ''
           },
           averagePerformance: playerData.averagePerformance || '',
           stamina: playerData.stamina || '',

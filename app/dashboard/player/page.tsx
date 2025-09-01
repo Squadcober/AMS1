@@ -19,14 +19,14 @@ const playerData = {
   injuryStatus: "Fit",
   topAttributes: [
     { name: "PACE", value: 7 },
-    { name: "SHOOTING", value: 8 },
-    { name: "PASSING", value: 7 },
-    { name: "POSITIONING", value: 7 },
+    { name: "Attack", value: 8 },
+    { name: "Defense", value: 7 },
+    { name: "Physicality", value: 7 },
   ],
   attributes: {
     pace: 7,
-    shooting: 8,
-    passing: 7,
+    Attack: 8,
+    Defense: 7,
     dribbling: 6,
     defending: 5,
     physical: 6,
@@ -34,21 +34,21 @@ const playerData = {
 }
 
 const performanceData = [
-  { month: "Apr", shooting: 6, passing: 5, stamina: 7 },
-  { month: "Jul", shooting: 7, passing: 6, stamina: 7 },
-  { month: "Oct", shooting: 8, passing: 7, stamina: 8 },
-  { month: "Jan", shooting: 8, passing: 7, stamina: 8 },
+  { month: "Apr", Attack: 6, Defense: 5, stamina: 7 },
+  { month: "Jul", Attack: 7, Defense: 6, stamina: 7 },
+  { month: "Oct", Attack: 8, Defense: 7, stamina: 8 },
+  { month: "Jan", Attack: 8, Defense: 7, stamina: 8 },
 ]
 
 const weeklyChanges = [
   { attribute: "Pace", change: 15 },
-  { attribute: "Shooting", change: 12 },
+  { attribute: "Attack", change: 12 },
   { attribute: "Heading", change: 3 },
   { attribute: "Weak foot", change: 6 },
   { attribute: "Dribbling", change: 2 },
 ]
 
-const suggestedDrills = ["Speed Drills – G1T1", "Passing Drills – G2T1", "Strength Training – G3T2", "Shooting – G3T1"]
+const suggestedDrills = ["Speed Drills – G1T1", "Defense Drills – G2T1", "Strength Training – G3T2", "Attack – G3T1"]
 
 export default function playerDashboard() {
   const [activeTab, setActiveTab] = useState("profile")
@@ -158,8 +158,8 @@ export default function playerDashboard() {
                   <XAxis dataKey="month" />
                   <YAxis />
                   <Tooltip />
-                  <Line type="monotone" dataKey="shooting" stroke="#8884d8" />
-                  <Line type="monotone" dataKey="passing" stroke="#82ca9d" />
+                  <Line type="monotone" dataKey="Attack" stroke="#8884d8" />
+                  <Line type="monotone" dataKey="Defense" stroke="#82ca9d" />
                   <Line type="monotone" dataKey="stamina" stroke="#ffc658" />
                 </LineChart>
               </ResponsiveContainer>

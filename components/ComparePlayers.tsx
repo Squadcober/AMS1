@@ -14,12 +14,12 @@ import { Loader2, TrendingUp, Calendar } from "lucide-react"
 ChartJS.register(RadialLinearScale, PointElement, LineElement, Filler, Tooltip, Legend)
 
 interface PlayerAttributes {
-  shooting: number;
+  Attack: number;
   pace: number;
-  positioning: number;
+  Physicality: number;
+  Defense: number;
   passing: number;
-  ballControl: number;
-  crossing: number;
+  Technique: number;
 }
 
 interface Props {
@@ -127,7 +127,7 @@ export default function ComparePlayers({ batchId }: Props) {
 
   // Updated generateRadarData function with enhanced styling
   const generateRadarData = () => {
-    const labels = ["Shooting", "Pace", "Positioning", "Passing", "Ball Control", "Crossing"]
+    const labels = ["Attack", "Pace", "Physicality", "Defense", "passing", "Technique"]
     
     // Define distinct colors for better visibility
     const colors = [
@@ -161,12 +161,12 @@ export default function ComparePlayers({ batchId }: Props) {
       return {
         label: `${player?.name || ""}${labelSuffix}`,
         data: [
-          getAttributeValue('shooting'),
+          getAttributeValue('Attack'),
           getAttributeValue('pace'),
-          getAttributeValue('positioning'),
+          getAttributeValue('Physicality'),
+          getAttributeValue('Defense'),
           getAttributeValue('passing'),
-          getAttributeValue('ballControl'),
-          getAttributeValue('crossing'),
+          getAttributeValue('Technique'),
         ],
         backgroundColor: colorSet.bg,
         borderColor: colorSet.border,
@@ -434,10 +434,10 @@ export default function ComparePlayers({ batchId }: Props) {
                     </tr>
                   </thead>
                   <tbody>
-                    {["shooting", "pace", "positioning", "passing", "ballControl", "crossing"].map((attr) => (
+                    {["Attack", "pace", "Physicality", "Defense", "passing", "Technique"].map((attr) => (
                       <tr key={attr} className="even:bg-gray-900 hover:bg-gray-800/50">
                         <td className="border border-gray-700 px-3 py-2 font-semibold capitalize">
-                          {attr === 'ballControl' ? 'Ball Control' : attr}
+                          {attr === 'passing' ? 'passing' : attr}
                         </td>
                         {playersToCompare.map((playerId) => {
                           const player = players.find((p) => p.id.toString() === playerId)

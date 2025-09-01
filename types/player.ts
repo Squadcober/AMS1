@@ -3,12 +3,12 @@
 import { Drill } from "./drill"
 
 export interface PlayerAttributes {
-  shooting: number;
+  Attack: number;
   pace: number;
-  positioning: number;
+  Physicality: number;
+  Defense: number;
   passing: number;
-  ballControl: number;
-  crossing: number;
+  Technique: number;
   tackling: number;
   vision: number;
   stamina: number;
@@ -53,12 +53,12 @@ export type PerformanceHistoryEntry = {
   attendance?: boolean;
   position?: string;
   attributes?: {
-    shooting: number;
+    Attack: number;
     pace: number;
-    positioning: number;
+    Physicality: number;
+    Defense: number;
     passing: number;
-    ballControl: number;
-    crossing: number;
+    Technique: number;
     matchPoints?: number;
     trainingPoints?: number;
   };

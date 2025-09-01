@@ -20,12 +20,12 @@ import { useToast } from "@/components/ui/use-toast" // Add this line
 ChartJS.register(RadialLinearScale, PointElement, LineElement, Filler, Tooltip, Legend)
 
 interface PlayerAttributes {
-  shooting: number;
+  Attack: number;
   pace: number;
-  positioning: number;
+  Physicality: number;
+  Defense: number;
   passing: number;
-  ballControl: number;
-  crossing: number;
+  Technique: number;
   overall: number;
 }
 
@@ -55,12 +55,12 @@ interface PerformanceEntry {
   sessionId?: string;
   matchId?: string;
   attributes: {
-    shooting?: number;
+    Attack?: number;
     pace?: number;
-    positioning?: number;
+    Physicality?: number;
+    Defense?: number;
     passing?: number;
-    ballControl?: number;
-    crossing?: number;
+    Technique?: number;
   };
   stats?: {
     [key: string]: number;
@@ -103,7 +103,7 @@ export default function PerformanceReports() {
   // Update the calculation function to properly scale to 100
   const calculateOverall = (attributes: Partial<PlayerAttributes>) => {
     if (!attributes) return 0;
-    const keys = ['shooting', 'pace', 'positioning', 'passing', 'ballControl', 'crossing'];
+    const keys = ['Attack', 'pace', 'Physicality', 'Defense', 'passing', 'Technique'];
     const values = keys.map(key => attributes[key as keyof PlayerAttributes] || 0);
     if (values.length === 0) return 0;
     // Calculate average out of 10 and convert to scale of 100
@@ -115,24 +115,24 @@ export default function PerformanceReports() {
   const calculateAverageAttributes = (player: Player, sessionsAttendedCount: number): PlayerAttributes => {
     if (!player?.performanceHistory?.length) {
       return player?.attributes || {
-        shooting: 0,
+        Attack: 0,
         pace: 0,
-        positioning: 0,
+        Physicality: 0,
+        Defense: 0,
         passing: 0,
-        ballControl: 0,
-        crossing: 0,
+        Technique: 0,
         overall: 0
       };
     }
 
-    const attributeKeys: (keyof PlayerAttributes)[] = ['shooting', 'pace', 'positioning', 'passing', 'ballControl', 'crossing'];
+    const attributeKeys: (keyof PlayerAttributes)[] = ['Attack', 'pace', 'Physicality', 'Defense', 'passing', 'Technique'];
     const averageAttributes: PlayerAttributes = {
-      shooting: 0,
+      Attack: 0,
       pace: 0,
-      positioning: 0,
+      Physicality: 0,
+      Defense: 0,
       passing: 0,
-      ballControl: 0,
-      crossing: 0,
+      Technique: 0,
       overall: 0
     };
 
@@ -280,12 +280,12 @@ export default function PerformanceReports() {
           academyId: player.academyId,
           photoUrl: player.photoUrl || "/default-avatar.png",
           attributes: {
-            shooting: player.attributes?.shooting || 0,
+            Attack: player.attributes?.Attack || 0,
             pace: player.attributes?.pace || 0,
-            positioning: player.attributes?.positioning || 0,
+            Physicality: player.attributes?.Physicality || 0,
+            Defense: player.attributes?.Defense || 0,
             passing: player.attributes?.passing || 0,
-            ballControl: player.attributes?.ballControl || 0,
-            crossing: player.attributes?.crossing || 0,
+            Technique: player.attributes?.Technique || 0,
             overall: calculateOverall(player.attributes)
           },
           performanceHistory: player.performanceHistory || []
@@ -377,17 +377,17 @@ export default function PerformanceReports() {
   }
 
   const radarData = (attributes: PlayerAttributes) => ({
-    labels: ["Shooting", "Pace", "Positioning", "Passing", "Ball Control", "Crossing"],
+    labels: ["Attack", "Pace", "Physicality", "Defense", "passing", "Technique"],
     datasets: [
       {
         label: "Attributes",
         data: [
-          attributes.shooting,
+          attributes.Attack,
           attributes.pace,
-          attributes.positioning,
+          attributes.Physicality,
+          attributes.Defense,
           attributes.passing,
-          attributes.ballControl,
-          attributes.crossing,
+          attributes.Technique,
         ],
         backgroundColor: "rgba(147, 51, 234, 0.2)",
         borderColor: "rgb(147, 51, 234)",

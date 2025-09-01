@@ -26,12 +26,12 @@ interface TrainingSession {
   metrics: {
     playerId: string
     attributes: {
-      shooting: number
+      Attack: number
       pace: number
-      positioning: number
+      Physicality: number
+      Defense: number
       passing: number
-      ballControl: number
-      crossing: number
+      Technique: number
       trainingPoints: number
       matchPoints: number
     }
@@ -140,12 +140,12 @@ export default function TrainingData() {
       metrics: selectedPlayers.map((playerId) => ({
         playerId,
         attributes: {
-          shooting: 0,
+          Attack: 0,
           pace: 0,
-          positioning: 0,
+          Physicality: 0,
+          Defense: 0,
           passing: 0,
-          ballControl: 0,
-          crossing: 0,
+          Technique: 0,
           trainingPoints: 0,
           matchPoints: 0,
         },
@@ -350,12 +350,12 @@ export default function TrainingData() {
                         <TableHeader>
                           <TableRow>
                             <TableHead>Player</TableHead>
-                            <TableHead>Shooting</TableHead>
+                            <TableHead>Attack</TableHead>
                             <TableHead>Pace</TableHead>
-                            <TableHead>Positioning</TableHead>
-                            <TableHead>Passing</TableHead>
-                            <TableHead>Ball Control</TableHead>
-                            <TableHead>Crossing</TableHead>
+                            <TableHead>Physicality</TableHead>
+                            <TableHead>Defense</TableHead>
+                            <TableHead>passing</TableHead>
+                            <TableHead>Technique</TableHead>
                             <TableHead>Training Points</TableHead>
                             <TableHead>Match Points</TableHead>
                           </TableRow>

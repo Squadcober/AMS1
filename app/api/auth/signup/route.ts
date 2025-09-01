@@ -26,12 +26,12 @@ const createRoleSpecificData = async (db: any, userData: any, userId: string) =>
           playingStyle: "",
           photoUrl: "",
           attributes: {
-            shooting: 0,
+            Attack: 0,
             pace: 0,
-            positioning: 0,
+            Physicality: 0,
+            Defense: 0,
             passing: 0,
-            ballControl: 0,
-            crossing: 0,
+            Technique: 0,
             overall: 0,
             averagePerformance: 0,
             stamina: 0

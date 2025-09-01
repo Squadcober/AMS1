@@ -49,12 +49,12 @@ const calculateOverallRating = (attributes: any): number => {
   if (!attributes) return 0;
   
   const ratings = [
-    Number(attributes.shooting) || 0,
+    Number(attributes.Attack) || 0,
     Number(attributes.pace) || 0,
-    Number(attributes.positioning) || 0,
+    Number(attributes.Physicality) || 0,
+    Number(attributes.Defense) || 0,
     Number(attributes.passing) || 0,
-    Number(attributes.ballControl) || 0,
-    Number(attributes.crossing) || 0
+    Number(attributes.Technique) || 0
   ];
   
   const sum = ratings.reduce((acc, val) => acc + val, 0);
@@ -90,7 +90,7 @@ const calculateAverageAttributes = (player: any, sessionsAttended: number) => {
     return player?.attributes || {};
   }
 
-  const attributeKeys = ['shooting', 'pace', 'positioning', 'passing', 'ballControl', 'crossing'];
+  const attributeKeys = ['Attack', 'pace', 'Physicality', 'Defense', 'passing', 'Technique'];
   const averageAttributes: any = {};
 
   attributeKeys.forEach(key => {
@@ -321,14 +321,14 @@ export default function Performance() {
             data: matchData.map((d: { date: string; points: number }) => d.points)
           },
           attributes: {
-            labels: ["Shooting", "Pace", "Positioning", "Passing", "Ball Control", "Crossing"],
+            labels: ["Attack", "Pace", "Physicality", "Defense", "passing", "Technique"],
             data: [
-              data.attributes?.shooting || 0,
+              data.attributes?.Attack || 0,
               data.attributes?.pace || 0,
-              data.attributes?.positioning || 0,
+              data.attributes?.Physicality || 0,
+              data.attributes?.Defense || 0,
               data.attributes?.passing || 0,
-              data.attributes?.ballControl || 0,
-              data.attributes?.crossing || 0
+              data.attributes?.Technique || 0
             ]
           }
         });
@@ -346,12 +346,12 @@ export default function Performance() {
           .map((entry: any) => {
             const processedEntry = {
               date: new Date(entry.date).toLocaleDateString(),
-              shooting: Number(entry.attributes?.shooting) || null,
+              Attack: Number(entry.attributes?.Attack) || null,
               pace: Number(entry.attributes?.pace) || null,
-              positioning: Number(entry.attributes?.positioning) || null,
+              Physicality: Number(entry.attributes?.Physicality) || null,
+              Defense: Number(entry.attributes?.Defense) || null,
               passing: Number(entry.attributes?.passing) || null,
-              ballControl: Number(entry.attributes?.ballControl) || null,
-              crossing: Number(entry.attributes?.crossing) || null,
+              Technique: Number(entry.attributes?.Technique) || null,
             };
             console.log('Processed entry:', processedEntry);
             return processedEntry;
@@ -417,14 +417,14 @@ export default function Performance() {
     setChartData(prev => ({
       ...prev,
       attributes: {
-        labels: ["Shooting", "Pace", "Positioning", "Passing", "Ball Control", "Crossing"],
+        labels: ["Attack", "Pace", "Physicality", "Defense", "passing", "Technique"],
         data: [
-          attributesToUse.shooting || 0,
+          attributesToUse.Attack || 0,
           attributesToUse.pace || 0,
-          attributesToUse.positioning || 0,
+          attributesToUse.Physicality || 0,
+          attributesToUse.Defense || 0,
           attributesToUse.passing || 0,
-          attributesToUse.ballControl || 0,
-          attributesToUse.crossing || 0
+          attributesToUse.Technique || 0
         ]
       }
     }));
@@ -486,12 +486,12 @@ export default function Performance() {
 
   // Add chart configuration
   const attributeColors = {
-    shooting: "#ef4444",     // Red
+    Attack: "#ef4444",     // Red
     pace: "#3b82f6",        // Blue
-    positioning: "#10b981",  // Green
-    passing: "#f59e0b",     // Yellow
-    ballControl: "#8b5cf6",  // Purple
-    crossing: "#ec4899"      // Pink
+    Physicality: "#10b981",  // Green
+    Defense: "#f59e0b",     // Yellow
+    passing: "#8b5cf6",  // Purple
+    Technique: "#ec4899"      // Pink
   };
 
   // Replace the existing filterDataByTimeRange function
@@ -504,29 +504,29 @@ export default function Performance() {
 
     // Track first appearance dates for each attribute
     const firstAppearance: {
-      shooting: Date | null;
+      Attack: Date | null;
       pace: Date | null;
-      positioning: Date | null;
+      Physicality: Date | null;
+      Defense: Date | null;
       passing: Date | null;
-      ballControl: Date | null;
-      crossing: Date | null;
+      Technique: Date | null;
     } = {
-      shooting: null,
+      Attack: null,
       pace: null,
-      positioning: null,
+      Physicality: null,
+      Defense: null,
       passing: null,
-      ballControl: null,
-      crossing: null
+      Technique: null
     };
 
     // Track last known values for each attribute
     let lastKnownValues = {
-      shooting: null,
+      Attack: null,
       pace: null,
-      positioning: null,
+      Physicality: null,
+      Defense: null,
       passing: null,
-      ballControl: null,
-      crossing: null
+      Technique: null
     };
 
     // Find first appearance dates and update last known values
@@ -817,7 +817,7 @@ export default function Performance() {
             <CardContent className="pt-6">
               <PerformanceChart
                 data={filterDataByTimeRange(attributeHistory, timeRange)}
-                attributes={["shooting", "pace", "positioning", "passing", "ballControl", "crossing"]}
+                attributes={["Attack", "pace", "Physicality", "Defense", "passing", "Technique"]}
                 colors={Object.values(attributeColors)}
               />
             </CardContent>

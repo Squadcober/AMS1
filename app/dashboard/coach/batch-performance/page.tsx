@@ -57,7 +57,7 @@ export default function BatchPerformancePage() {
   const [batchPlayers, setBatchPlayers] = useState<any[]>([])
   const [batchCoaches, setBatchCoaches] = useState<any[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false)
-  const [selectedAttribute, setSelectedAttribute] = useState<string>("shooting")
+  const [selectedAttribute, setSelectedAttribute] = useState<string>("Attack")
   const [searchTerm, setSearchTerm] = useState<string>("")
   const [attributeFilter, setAttributeFilter] = useState<"latest" | "overall">("latest")
 
@@ -211,7 +211,7 @@ export default function BatchPerformancePage() {
       return player?.attributes || {};
     }
 
-    const attributeKeys = ['shooting', 'pace', 'positioning', 'passing', 'ballControl', 'crossing'];
+    const attributeKeys = ['Attack', 'pace', 'Physicality', 'Defense', 'passing', 'Technique'];
     const averageAttributes: any = {};
 
     console.log('Calculating average attributes for player:', player.name);
@@ -329,7 +329,7 @@ export default function BatchPerformancePage() {
   };
 
   const radarData = {
-    labels: ["Shooting", "Pace", "Positioning", "Passing", "Ball Control", "Crossing"],
+    labels: ["Attack", "Pace", "Physicality", "Defense", "passing", "Technique"],
     datasets: selectedPlayers.map((playerId, index) => {
       const player = batchPlayers.find((p) => p._id.toString() === playerId);
       
@@ -341,12 +341,12 @@ export default function BatchPerformancePage() {
       });
 
       const dataPoints = [
-        getAttributeValue(player, 'shooting'),
+        getAttributeValue(player, 'Attack'),
         getAttributeValue(player, 'pace'),
-        getAttributeValue(player, 'positioning'),
+        getAttributeValue(player, 'Physicality'),
+        getAttributeValue(player, 'Defense'),
         getAttributeValue(player, 'passing'),
-        getAttributeValue(player, 'ballControl'),
-        getAttributeValue(player, 'crossing'),
+        getAttributeValue(player, 'Technique'),
       ];
 
       console.log('Generated data points:', dataPoints);
@@ -458,26 +458,26 @@ export default function BatchPerformancePage() {
     const totalAttributes = batchPlayers.reduce(
       (totals, player) => {
         return {
-          shooting: totals.shooting + getLatestAttributeValue(player, 'shooting'),
+          Attack: totals.Attack + getLatestAttributeValue(player, 'Attack'),
           pace: totals.pace + getLatestAttributeValue(player, 'pace'),
-          positioning: totals.positioning + getLatestAttributeValue(player, 'positioning'),
+          Physicality: totals.Physicality + getLatestAttributeValue(player, 'Physicality'),
+          Defense: totals.Defense + getLatestAttributeValue(player, 'Defense'),
           passing: totals.passing + getLatestAttributeValue(player, 'passing'),
-          ballControl: totals.ballControl + getLatestAttributeValue(player, 'ballControl'),
-          crossing: totals.crossing + getLatestAttributeValue(player, 'crossing'),
+          Technique: totals.Technique + getLatestAttributeValue(player, 'Technique'),
         };
       },
-      { shooting: 0, pace: 0, positioning: 0, passing: 0, ballControl: 0, crossing: 0 }
+      { Attack: 0, pace: 0, Physicality: 0, Defense: 0, passing: 0, Technique: 0 }
     );
 
     const playerCount = batchPlayers.length;
 
     return {
-      shooting: (totalAttributes.shooting / playerCount).toFixed(1),
+      Attack: (totalAttributes.Attack / playerCount).toFixed(1),
       pace: (totalAttributes.pace / playerCount).toFixed(1),
-      positioning: (totalAttributes.positioning / playerCount).toFixed(1),
+      Physicality: (totalAttributes.Physicality / playerCount).toFixed(1),
+      Defense: (totalAttributes.Defense / playerCount).toFixed(1),
       passing: (totalAttributes.passing / playerCount).toFixed(1),
-      ballControl: (totalAttributes.ballControl / playerCount).toFixed(1),
-      crossing: (totalAttributes.crossing / playerCount).toFixed(1),
+      Technique: (totalAttributes.Technique / playerCount).toFixed(1),
     };
   };
 
@@ -533,7 +533,7 @@ export default function BatchPerformancePage() {
         </TableRow>
       </TableHeader>
       <TableBody>
-        {["shooting", "pace", "positioning", "passing", "ballControl", "crossing"].map((attr) => (
+        {["Attack", "pace", "Physicality", "Defense", "passing", "Technique"].map((attr) => (
           <TableRow key={attr}>
             <TableCell className="font-medium">
               {attr.charAt(0).toUpperCase() + attr.slice(1)}
@@ -752,7 +752,7 @@ export default function BatchPerformancePage() {
                   </CardHeader>
                   <CardContent>
                     <div className="flex flex-wrap gap-2 mb-4">
-                      {["shooting", "pace", "positioning", "passing", "ballControl", "crossing"].map((attr) => (
+                      {["Attack", "pace", "Physicality", "Defense", "passing", "Technique"].map((attr) => (
                         <Button
                           key={attr}
                           variant={selectedAttribute === attr ? "default" : "outline"}

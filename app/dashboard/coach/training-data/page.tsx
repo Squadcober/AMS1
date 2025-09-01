@@ -65,12 +65,12 @@ export interface Session {
   assignedPlayersData: { id: string, name: string, position: string, photoUrl?: string }[] // Add this new property with photoUrl
   playerMetrics?: {
     [playerId: string]: {
-      shooting: number;
+      Attack: number;
       pace: number;
-      positioning: number;
+      Physicality: number;
+      Defense: number;
       passing: number;
-      ballControl: number;
-      crossing: number;
+      Technique: number;
       sessionRating: number;
     }
   };
@@ -649,12 +649,12 @@ function SessionsContent() {
   const router = useRouter();
   const [playerMetrics, setPlayerMetrics] = useState<{
     [playerId: string]: {
-      shooting: string;
+      Attack: string;
       pace: string;
-      positioning: string;
+      Physicality: string;
+      Defense: string;
       passing: string;
-      ballControl: string;
-      crossing: string;
+      Technique: string;
       sessionRating: string;
     }
   }>({});
@@ -1672,23 +1672,23 @@ const [availableCoaches, setAvailableCoaches] = useState<any[]>([]);
     if (sessionMetrics && sessionMetrics.attributes) {
       // If session-specific metrics exist, use them
       metrics = {
-        shooting: sessionMetrics.attributes.shooting?.toString() || "0",
+        Attack: sessionMetrics.attributes.Attack?.toString() || "0",
         pace: sessionMetrics.attributes.pace?.toString() || "0",
-        positioning: sessionMetrics.attributes.positioning?.toString() || "0",
+        Physicality: sessionMetrics.attributes.Physicality?.toString() || "0",
+        Defense: sessionMetrics.attributes.Defense?.toString() || "0",
         passing: sessionMetrics.attributes.passing?.toString() || "0",
-        ballControl: sessionMetrics.attributes.ballControl?.toString() || "0",
-        crossing: sessionMetrics.attributes.crossing?.toString() || "0",
+        Technique: sessionMetrics.attributes.Technique?.toString() || "0",
         sessionRating: sessionMetrics.sessionRating?.toString() || "0"
       };
     } else {
       // If no session-specific metrics, use player's current attributes (latest)
       metrics = {
-        shooting: player.attributes?.shooting?.toString() || "0",
+        Attack: player.attributes?.Attack?.toString() || "0",
         pace: player.attributes?.pace?.toString() || "0",
-        positioning: player.attributes?.positioning?.toString() || "0",
+        Physicality: player.attributes?.Physicality?.toString() || "0",
+        Defense: player.attributes?.Defense?.toString() || "0",
         passing: player.attributes?.passing?.toString() || "0",
-        ballControl: player.attributes?.ballControl?.toString() || "0",
-        crossing: player.attributes?.crossing?.toString() || "0",
+        Technique: player.attributes?.Technique?.toString() || "0",
         sessionRating: "0" // Default session rating for unmarked sessions
       };
     }
@@ -1704,8 +1704,8 @@ const [availableCoaches, setAvailableCoaches] = useState<any[]>([]);
   } catch (error) {
     console.error('Error getting player metrics:', error);
     return metricsCache[cacheKey]?.data || {
-      shooting: "0", pace: "0", positioning: "0",
-      passing: "0", ballControl: "0", crossing: "0",
+      Attack: "0", pace: "0", Physicality: "0",
+      Defense: "0", passing: "0", Technique: "0",
       sessionRating: "0"
     };
   }
@@ -1744,12 +1744,12 @@ const handleSaveMetrics = async (sessionId: number | string, playerId: string, m
     const sessionDate = sessionObj ? sessionObj.date : new Date().toISOString();
 
     const numericMetrics = {
-      shooting: Math.min(Math.max(Number(metricsToSave.shooting || 0), 0), 10),
+      Attack: Math.min(Math.max(Number(metricsToSave.Attack || 0), 0), 10),
       pace: Math.min(Math.max(Number(metricsToSave.pace || 0), 0), 10),
-      positioning: Math.min(Math.max(Number(metricsToSave.positioning || 0), 0), 10),
+      Physicality: Math.min(Math.max(Number(metricsToSave.Physicality || 0), 0), 10),
+      Defense: Math.min(Math.max(Number(metricsToSave.Defense || 0), 0), 10),
       passing: Math.min(Math.max(Number(metricsToSave.passing || 0), 0), 10),
-      ballControl: Math.min(Math.max(Number(metricsToSave.ballControl || 0), 0), 10),
-      crossing: Math.min(Math.max(Number(metricsToSave.crossing || 0), 0), 10),
+      Technique: Math.min(Math.max(Number(metricsToSave.Technique || 0), 0), 10),
     };
 
     const sessionRating = Math.min(Math.max(Number(metricsToSave.sessionRating || 0), 0), 10);
@@ -1876,12 +1876,12 @@ const PlayerMetricsDialog = () => {
         const playerData = mongoPlayers.find(p => p.id === selectedPlayerForMetrics.id);
 
         const metrics = {
-          shooting: playerMetrics?.shooting?.toString() || playerData?.attributes?.shooting?.toString() || "0",
+          Attack: playerMetrics?.Attack?.toString() || playerData?.attributes?.Attack?.toString() || "0",
           pace: playerMetrics?.pace?.toString() || playerData?.attributes?.pace?.toString() || "0",
-          positioning: playerMetrics?.positioning?.toString() || playerData?.attributes?.positioning?.toString() || "0",
+          Physicality: playerMetrics?.Physicality?.toString() || playerData?.attributes?.Physicality?.toString() || "0",
+          Defense: playerMetrics?.Defense?.toString() || playerData?.attributes?.Defense?.toString() || "0",
           passing: playerMetrics?.passing?.toString() || playerData?.attributes?.passing?.toString() || "0",
-          ballControl: playerMetrics?.ballControl?.toString() || playerData?.attributes?.ballControl?.toString() || "0",
-          crossing: playerMetrics?.crossing?.toString() || playerData?.attributes?.crossing?.toString() || "0",
+          Technique: playerMetrics?.Technique?.toString() || playerData?.attributes?.Technique?.toString() || "0",
           sessionRating: playerMetrics?.sessionRating?.toString() || "0",
         };
 
@@ -2311,7 +2311,7 @@ const renderSessionDetails = (session: Session | undefined) => {
                         await handleAttendanceChange(
                           Number(session.id),
                           player.id,
-                          newStatus, // ✅ Now passing string instead of boolean
+                          newStatus, // ✅ Now Defense string instead of boolean
                           viewDetailsSessionData ?? null,
                           setViewDetailsSessionData,
                           user ?? null,
@@ -2825,12 +2825,12 @@ const renderSessionDetails = (session: Session | undefined) => {
 
 // Add this after the interfaces and before the component
 const METRICS_CONFIG = [
-  { key: "shooting", label: "Shooting" },
+  { key: "Attack", label: "Attack" },
   { key: "pace", label: "Pace" },
-  { key: "positioning", label: "Positioning" },
-  { key: "passing", label: "Passing" },
-  { key: "ballControl", label: "Ball Control" },
-  { key: "crossing", label: "Crossing" },
+  { key: "Physicality", label: "Physicality" },
+  { key: "Defense", label: "Defense" },
+  { key: "passing", label: "passing" },
+  { key: "Technique", label: "Technique" },
   { key: "sessionRating", label: "Session Rating" }
 ] as const;
 
@@ -3002,7 +3002,7 @@ const AttendanceSelector = ({
                         await handleAttendanceChange(
                           Number(session.id),
                           player.id,
-                          newStatus, // ✅ Now passing string instead of boolean
+                          newStatus, // ✅ Now Defense string instead of boolean
                           viewDetailsSessionData ?? null,
                           setViewDetailsSessionData,
                           user ?? null,

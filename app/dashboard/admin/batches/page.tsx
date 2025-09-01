@@ -32,12 +32,12 @@ const calculateOverallRating = (attributes: any) => {
   if (!attributes) return 0;
   
   const values = [
-    attributes.shooting || 0,
+    attributes.Attack || 0,
     attributes.pace || 0,
-    attributes.positioning || 0,
+    attributes.Physicality || 0,
+    attributes.Defense || 0,
     attributes.passing || 0,
-    attributes.ballControl || 0,
-    attributes.crossing || 0
+    attributes.Technique || 0
   ];
   
   const sum = values.reduce((acc, val) => acc + val, 0);
@@ -614,12 +614,12 @@ export default function BatchesPage() {
       const playerData = {
         ...result.data,
         attributes: {
-          shooting: result.data.attributes?.shooting || 0,
+          Attack: result.data.attributes?.Attack || 0,
           pace: result.data.attributes?.pace || 0,
-          positioning: result.data.attributes?.positioning || 0,
+          Physicality: result.data.attributes?.Physicality || 0,
+          Defense: result.data.attributes?.Defense || 0,
           passing: result.data.attributes?.passing || 0,
-          ballControl: result.data.attributes?.ballControl || 0,
-          crossing: result.data.attributes?.crossing || 0
+          Technique: result.data.attributes?.Technique || 0
         },
         overallRating: calculateOverallRating(result.data.attributes)*10,
         averagePerformance: calculateAveragePerformance(result.data)

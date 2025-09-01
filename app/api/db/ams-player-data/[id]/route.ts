@@ -69,12 +69,12 @@ export async function PATCH(
     // Calculate overall rating (sum of all attributes out of 100)
     const attributes = updates.$set?.attributes || currentPlayer.attributes || {};
     const attributeValues = [
-      attributes.shooting || 0,
+      attributes.Attack || 0,
       attributes.pace || 0,
-      attributes.positioning || 0,
+      attributes.Physicality || 0,
+      attributes.Defense || 0,
       attributes.passing || 0,
-      attributes.ballControl || 0,
-      attributes.crossing || 0
+      attributes.Technique || 0
     ];
     
     const overallRating = (attributeValues.reduce((sum, val) => sum + val, 0) / 60) * 100;

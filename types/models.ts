@@ -19,12 +19,12 @@ export interface Player {
   email: string
   phone: string
   attributes?: {
-    shooting: number
+    Attack: number
     pace: number
-    positioning: number
+    Physicality: number
+    Defense: number
     passing: number
-    ballControl: number
-    crossing: number
+    Technique: number
     overall: number
   }
   performanceHistory?: Array<{
@@ -73,12 +73,12 @@ export interface Session {
     markedBy: string
   }>
   playerMetrics?: Record<string, {
-    shooting: number
+    Attack: number
     pace: number
-    positioning: number
+    Physicality: number
+    Defense: number
     passing: number
-    ballControl: number
-    crossing: number
+    Technique: number
     sessionRating: number
   }>
 }

@@ -61,17 +61,17 @@ export default function CoachProfile() {
   }
 
   const radarData = {
-    labels: ["Shooting", "Pace", "Positioning", "Passing", "Ball Control", "Crossing"],
+    labels: ["Attack", "Pace", "Physicality", "Defense", "passing", "Technique"],
     datasets: [
       {
         label: "Player Attributes",
         data: [
-          profileData.attributes?.shooting || 0,
+          profileData.attributes?.Attack || 0,
           profileData.attributes?.pace || 0,
-          profileData.attributes?.positioning || 0,
+          profileData.attributes?.Physicality || 0,
+          profileData.attributes?.Defense || 0,
           profileData.attributes?.passing || 0,
-          profileData.attributes?.ballControl || 0,
-          profileData.attributes?.crossing || 0,
+          profileData.attributes?.Technique || 0,
         ],
         backgroundColor: "rgba(147, 51, 234, 0.2)",
         borderColor: "rgb(147, 51, 234)",
@@ -114,12 +114,12 @@ export default function CoachProfile() {
   }
 
   const topAttributes = [
-    { name: "SHOOTING", value: profileData.attributes?.shooting || 0 },
+    { name: "Attack", value: profileData.attributes?.Attack || 0 },
     { name: "PACE", value: profileData.attributes?.pace || 0 },
-    { name: "POSITIONING", value: profileData.attributes?.positioning || 0 },
-    { name: "PASSING", value: profileData.attributes?.passing || 0 },
-    { name: "BALL CONTROL", value: profileData.attributes?.ballControl || 0 },
-    { name: "CROSSING", value: profileData.attributes?.crossing || 0 },
+    { name: "Physicality", value: profileData.attributes?.Physicality || 0 },
+    { name: "Defense", value: profileData.attributes?.Defense || 0 },
+    { name: "passing", value: profileData.attributes?.passing || 0 },
+    { name: "Technique", value: profileData.attributes?.Technique || 0 },
   ]
 
   return (

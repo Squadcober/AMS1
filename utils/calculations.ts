@@ -16,12 +16,12 @@ export function calculateOverall(attributes: Partial<PlayerAttributes>, performa
   }
 
   const weights = {
-    shooting: 0.15,
+    Attack: 0.15,
     pace: 0.15,
-    positioning: 0.15,
+    Physicality: 0.15,
+    Defense: 0.15,
     passing: 0.15,
-    ballControl: 0.15,
-    crossing: 0.15,
+    Technique: 0.15,
     sessionRating: 0.1
   };
 

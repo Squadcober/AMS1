@@ -56,12 +56,12 @@ const calculateOverallRating = (attributes: any): number => {
   if (!attributes) return 0;
   
   const ratings = [
-    Number(attributes.shooting) || 0,
+    Number(attributes.Attack) || 0,
     Number(attributes.pace) || 0,
-    Number(attributes.positioning) || 0,
+    Number(attributes.Physicality) || 0,
+    Number(attributes.Defense) || 0,
     Number(attributes.passing) || 0,
-    Number(attributes.ballControl) || 0,
-    Number(attributes.crossing) || 0
+    Number(attributes.Technique) || 0
   ];
   
   // Calculate average out of 10, then convert to percentage
@@ -170,17 +170,17 @@ const renderPlayerProfile = (player: any, filter: "latest" | "overall", sessions
     : player?.attributes || {};
 
   const radarData = {
-    labels: ["Shooting", "Pace", "Positioning", "Passing", "Ball Control", "Crossing"],
+    labels: ["Attack", "Pace", "Physicality", "Defense", "passing", "Technique"],
     datasets: [
       {
         label: filter === "overall" ? "Overall Attributes" : "Latest Attributes",
         data: [
-          attributes.shooting || 0,
+          attributes.Attack || 0,
           attributes.pace || 0,
-          attributes.positioning || 0,
+          attributes.Physicality || 0,
+          attributes.Defense || 0,
           attributes.passing || 0,
-          attributes.ballControl || 0,
-          attributes.crossing || 0,
+          attributes.Technique || 0,
         ],
         backgroundColor: filter === "overall" ? "rgba(59, 130, 246, 0.2)" : "rgba(147, 51, 234, 0.2)",
         borderColor: filter === "overall" ? "rgb(59, 130, 246)" : "rgb(147, 51, 234)",
@@ -258,12 +258,12 @@ const renderPlayerProfile = (player: any, filter: "latest" | "overall", sessions
           {/* Right column: Attributes in single column */}
           <div className="space-y-4">
             {[
-              { label: "Shooting", value: attributes.shooting || 0 },
+              { label: "Attack", value: attributes.Attack || 0 },
               { label: "Pace", value: attributes.pace || 0 },
-              { label: "Positioning", value: attributes.positioning || 0 },
-              { label: "Passing", value: attributes.passing || 0 },
-              { label: "Ball Control", value: attributes.ballControl || 0 },
-              { label: "Crossing", value: attributes.crossing || 0 },
+              { label: "Physicality", value: attributes.Physicality || 0 },
+              { label: "Defense", value: attributes.Defense || 0 },
+              { label: "passing", value: attributes.passing || 0 },
+              { label: "Technique", value: attributes.Technique || 0 },
             ].map((attr) => (
               <div key={attr.label} className="space-y-2">
                 <div className="flex justify-between">
@@ -304,7 +304,7 @@ const calculateAverageAttributes = (player: any, sessionsAttended: number) => {
     return player?.attributes || {};
   }
 
-  const attributeKeys = ['shooting', 'pace', 'positioning', 'passing', 'ballControl', 'crossing'];
+  const attributeKeys = ['Attack', 'pace', 'Physicality', 'Defense', 'passing', 'Technique'];
   const averageAttributes: any = {};
 
   console.log('Calculating average attributes for player:', player.name);
@@ -433,12 +433,12 @@ export default function playerProfile() {
         setPlayerData({
           ...data,
           attributes: {
-            shooting: 0,
+            Attack: 0,
             pace: 0,
-            positioning: 0,
+            Physicality: 0,
+            Defense: 0,
             passing: 0,
-            ballControl: 0,
-            crossing: 0,
+            Technique: 0,
             overall: 0,
             averagePerformance: 0,
             stamina: 0,

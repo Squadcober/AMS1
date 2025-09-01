@@ -86,12 +86,12 @@ interface Position {
 }
 
 export interface PlayerAttributes {
-  shooting: number
+  Attack: number
   pace: number
-  positioning: number
+  Physicality: number
+  Defense: number
   passing: number
-  ballControl: number
-  crossing: number
+  Technique: number
 }
 
 interface GamePlan {
@@ -186,7 +186,7 @@ export default function TeamBuilder() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [selectedPlayers, setSelectedPlayers] = useState<string[]>([])
   const [searchTerm, setSearchTerm] = useState<string>("")
-  const [selectedAttribute, setSelectedAttribute] = useState<string>("shooting")
+  const [selectedAttribute, setSelectedAttribute] = useState<string>("Attack")
   const [activeTab, setActiveTab] = useState<number>(0)
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const fieldRef = useRef<HTMLDivElement>(null) // Add this ref
@@ -1274,7 +1274,7 @@ const calculateAverageAttributes = (player: any) => {
     return player.attributes || {}
   }
 
-  const attributeKeys = ["shooting", "pace", "positioning", "passing", "ballControl", "crossing"] as const
+  const attributeKeys = ["Attack", "pace", "Physicality", "Defense", "passing", "Technique"] as const
   const averages: Record<string, number> = {}
 
   attributeKeys.forEach((key) => {
@@ -1360,7 +1360,7 @@ const getAttributeValue = (player: any, attribute: string, mode: "latest" | "ove
 
 // Also update how you use getAttributeValue in your radar chart data
 const radarData = {
-  labels: ["Shooting", "Pace", "Positioning", "Passing", "Ball Control", "Crossing"],
+  labels: ["Attack", "Pace", "Physicality", "Defense", "passing", "Technique"],
   datasets: selectedPlayers.map((playerId, index) => {
     const player = players.find((p) => p.id.toString() === playerId)
     console.log('Creating radar data for player:', player?.name, 'with filter:', attributeFilter)
@@ -1368,12 +1368,12 @@ const radarData = {
     return {
       label: player?.name || `Player ${index + 1}`,
       data: [
-        getAttributeValue(player, "shooting", attributeFilter),
+        getAttributeValue(player, "Attack", attributeFilter),
         getAttributeValue(player, "pace", attributeFilter),
-        getAttributeValue(player, "positioning", attributeFilter),
+        getAttributeValue(player, "Physicality", attributeFilter),
+        getAttributeValue(player, "Defense", attributeFilter),
         getAttributeValue(player, "passing", attributeFilter),
-        getAttributeValue(player, "ballControl", attributeFilter),
-        getAttributeValue(player, "crossing", attributeFilter),
+        getAttributeValue(player, "Technique", attributeFilter),
       ],
       backgroundColor: PLAYER_COLORS[index % PLAYER_COLORS.length],
       borderColor: PLAYER_BORDER_COLORS[index % PLAYER_BORDER_COLORS.length],
@@ -2725,7 +2725,7 @@ const lineOptions = {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {["shooting", "pace", "positioning", "passing", "ballControl", "crossing"].map((attr) => (
+                  {["Attack", "pace", "Physicality", "Defense", "passing", "Technique"].map((attr) => (
                     <TableRow key={attr} className="border-b border-gray-700">
                       <TableCell className="text-white font-semibold text-base">
                         {attr.charAt(0).toUpperCase() + attr.slice(1)}
@@ -2756,7 +2756,7 @@ const lineOptions = {
             </CardHeader>
             <CardContent className="pt-4">
               <div className="flex flex-wrap gap-2 mb-4">
-                {["shooting", "pace", "positioning", "passing", "ballControl", "crossing"].map((attr) => (
+                {["Attack", "pace", "Physicality", "Defense", "passing", "Technique"].map((attr) => (
                   <Button
                     key={attr}
                     variant={selectedAttribute === attr ? "default" : "outline"}
