@@ -25,21 +25,21 @@ import { calculateAveragePerformance } from "@/utils/calculations"
 ChartJS.register(RadialLinearScale, PointElement, LineElement, Filler, Tooltip, Legend, CategoryScale, LinearScale)
 
 interface PlayerAttributes {
-  Attack: number;
+  attacck: number;
   pace: number;
   Physicality: number;
   Defense: number;
-  passing: number;
+  Passing: number;
   Technique: number;
   overall: number;
 }
 
 const defaultAttributes: PlayerAttributes = {
-  Attack: 0,
+  attacck: 0,
   pace: 0,
   Physicality: 0,
   Defense: 0,
-  passing: 0,
+  Passing: 0,
   Technique: 0,
   overall: 0
 };
@@ -55,11 +55,11 @@ const formatPerformanceDate = (date: string) => {
 const calculateOverallRating = (attributes: any): number => {
   if (!attributes) return 0;
   const ratings = [
-    Number(attributes.Attack) || 0,
+    Number(attributes.attacck) || 0,
     Number(attributes.pace) || 0,
     Number(attributes.Physicality) || 0,
     Number(attributes.Defense) || 0,
-    Number(attributes.passing) || 0,
+    Number(attributes.Passing) || 0,
     Number(attributes.Technique) || 0
   ];
   const sum = ratings.reduce((acc, val) => acc + val, 0);
@@ -138,8 +138,7 @@ export default function SearchPage() {
         grid: {
           display: false,
         },
-      },
-      y: {
+      },      y: {
         beginAtZero: true,
         grid: {
           color: "rgba(255, 255, 255, 0.1)",
@@ -158,11 +157,11 @@ export default function SearchPage() {
     if (!attributes) return 0;
 
     const values = [
-      attributes.Attack || 0,
+      attributes.attacck || 0,
       attributes.pace || 0,
       attributes.Physicality || 0,
       attributes.Defense || 0,
-      attributes.passing || 0,
+      attributes.Passing || 0,
       attributes.Technique || 0
     ];
 
@@ -320,11 +319,11 @@ export default function SearchPage() {
         .filter((entry: any) => entry.attributes && Object.keys(entry.attributes).length > 0)
         .map((entry: any) => ({
           date: new Date(entry.date).toLocaleDateString(),
-          Attack: entry.attributes?.Attack || null,
+          attacck: entry.attributes?.attacck || null,
           pace: entry.attributes?.pace || null,
           Physicality: entry.attributes?.Physicality || null,
           Defense: entry.attributes?.Defense || null,
-          passing: entry.attributes?.passing || null,
+          Passing: entry.attributes?.Passing || null,
           Technique: entry.attributes?.Technique || null,
         }));
 
@@ -549,11 +548,11 @@ export default function SearchPage() {
   
   // Define colors for each attribute
   const attributeColors: { [key: string]: string } = {
-    Attack: "#f59e42",
+    attacck: "#f59e42",
     pace: "#3b82f6",
     Physicality: "#10b981",
     Defense: "#f43f5e",
-    passing: "#a21caf",
+    Passing: "#a21caf",
     Technique: "#fbbf24"
   };
 
@@ -586,13 +585,13 @@ export default function SearchPage() {
           return player?.attributes || defaultAttributes;
         }
 
-        const attributeKeys: (keyof PlayerAttributes)[] = ['Attack', 'pace', 'Physicality', 'Defense', 'passing', 'Technique'];
+        const attributeKeys: (keyof PlayerAttributes)[] = ['attacck', 'pace', 'Physicality', 'Defense', 'Passing', 'Technique'];
         const averageAttributes: PlayerAttributes = {
-          Attack: 0,
+          attacck: 0,
           pace: 0,
           Physicality: 0,
           Defense: 0,
-          passing: 0,
+          Passing: 0,
           Technique: 0,
           overall: 0
         };
@@ -631,15 +630,15 @@ export default function SearchPage() {
       const filteredAttributes = getFilteredAttributes(playerData);
 
       const radarData = {
-        labels: ["Attack", "Pace", "Physicality", "Defense", "passing", "Technique"],
+        labels: ["attacck", "Pace", "Physicality", "Defense", "Passing", "Technique"],
         datasets: [{
           label: "Attributes",
           data: [
-            Number(filteredAttributes.Attack) || 0,
+            Number(filteredAttributes.attacck) || 0,
             Number(filteredAttributes.pace) || 0,
             Number(filteredAttributes.Physicality) || 0,
             Number(filteredAttributes.Defense) || 0,
-            Number(filteredAttributes.passing) || 0,
+            Number(filteredAttributes.Passing) || 0,
             Number(filteredAttributes.Technique) || 0,
           ],
           backgroundColor: "rgba(147, 51, 234, 0.2)",
@@ -717,11 +716,11 @@ export default function SearchPage() {
                     {/* Right column: Attributes in single column */}
                     <div className="space-y-4">
                       {[
-                        { label: "Attack", value: filteredAttributes.Attack || 0 },
+                        { label: "attacck", value: filteredAttributes.attacck || 0 },
                         { label: "Pace", value: filteredAttributes.pace || 0 },
                         { label: "Physicality", value: filteredAttributes.Physicality || 0 },
                         { label: "Defense", value: filteredAttributes.Defense || 0 },
-                        { label: "passing", value: filteredAttributes.passing || 0 },
+                        { label: "Passing", value: filteredAttributes.Passing || 0 },
                         { label: "Technique", value: filteredAttributes.Technique || 0 },
                       ].map((attr) => (
                         <div key={attr.label} className="space-y-2">
@@ -820,7 +819,7 @@ export default function SearchPage() {
                 <CardContent className="pt-6">
                   <PerformanceChart
                     data={filterDataByTimeRange(playerData.attributeHistory || [], "yearly")}
-                    attributes={["Attack", "pace", "Physicality", "Defense", "passing", "Technique"]}
+                    attributes={["attacck", "pace", "Physicality", "Defense", "Passing", "Technique"]}
                     colors={Object.values(attributeColors)}
                   />
                 </CardContent>
