@@ -11,7 +11,7 @@ import { Radar } from "react-chartjs-2"
 import { usePlayers } from "@/contexts/PlayerContext"
 import { useAuth } from "@/contexts/AuthContext"
 import { FileUp } from "lucide-react"
-import { Chart as ChartJS, RadialLinearScale, PointElement, LineElement, Filler, Tooltip, Legend } from "chart.js"
+import { Chart as ChartJS, RadialLinearScale, PointElement, LineElement, Filler, Tooltip, Legend, TooltipItem } from "chart.js"
 import { setCache, getCache } from "@/app/cache"
 import { Sidebar } from "@/components/Sidebar" // Import the Sidebar component
 import { cn } from '@/lib/utils'
@@ -20,6 +20,7 @@ import { updateUserData } from "@/utils/userDataSync"
 import Link from 'next/link'
 import { useRouter } from "next/navigation" // Change this line
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { CustomTooltip } from "@/components/custom-tooltip"
 import PaymentsTab from "./tabs/PaymentsTab"
 import GalleryTab from "./tabs/GalleryTab"
 import dynamic from 'next/dynamic'
@@ -113,6 +114,19 @@ const calculateSessionsAttended = async (playerId: string, academyId: string): P
     console.error('Error calculating sessions attended:', error);
     return 0;
   }
+};
+
+// Helper function to get attribute tooltips
+const getAttributeTooltip = (attribute: string): string => {
+  const tooltips: Record<string, string> = {
+    Attack: "Finishing, Creativity, Positioning",
+    Pace: "Acceleration, speed, agility",
+    Physicality: "Strength, Stamina, Aerial ability, GK-shotStopping Reflexes",
+    Defense: "Tackling, marking, interception, GK-awareness",
+    passing: "Short pass, long pass, Vision",
+    Technique: "First touch, Ball control, Dribbling",
+  };
+  return tooltips[attribute] || "";
 };
 
 // Add this helper function at the top of the file
@@ -218,6 +232,20 @@ const renderPlayerProfile = (player: any, filter: "latest" | "overall", sessions
       legend: {
         display: false,
       },
+      tooltip: {
+        callbacks: {
+          title: (context: TooltipItem<'radar'>[]) => {
+            const label = context[0].label;
+            return label;
+          },
+          label: (context: TooltipItem<'radar'>) => {
+            const label = context.label || "";
+            const value = context.parsed.r;
+            const tooltipText = getAttributeTooltip(label);
+            return `${value}/10 - ${tooltipText || label}`;
+          }
+        }
+      },
     },
     maintainAspectRatio: false,
   }
@@ -267,13 +295,15 @@ const renderPlayerProfile = (player: any, filter: "latest" | "overall", sessions
             ].map((attr) => (
               <div key={attr.label} className="space-y-2">
                 <div className="flex justify-between">
-                  <Label>{attr.label}</Label>
+                  <CustomTooltip content={getAttributeTooltip(attr.label)}>
+                    <Label className="cursor-help">{attr.label}</Label>
+                  </CustomTooltip>
                   <span className="font-bold">{attr.value}/10</span>
                 </div>
                 <div className="w-full bg-secondary rounded-full h-2">
-                  <div 
-                    className="bg-primary h-2 rounded-full transition-all duration-300" 
-                    style={{ width: `${(attr.value / 10) * 100}%` }} 
+                  <div
+                    className="bg-primary h-2 rounded-full transition-all duration-300"
+                    style={{ width: `${(attr.value / 10) * 100}%` }}
                   />
                 </div>
               </div>
