@@ -842,44 +842,239 @@ export default function BatchesPage() {
             </DialogHeader>
             {selectedPlayerDetails && (
               <div className="space-y-6 p-4">
-                <div className="flex items-center gap-4 border-b pb-4">
+                {/* Player Header Section */}
+                <div className="flex items-center gap-6 border-b pb-6">
                   <Avatar className="h-24 w-24">
                     <AvatarImage src={selectedPlayerDetails.photoUrl} />
-                    <AvatarFallback>{selectedPlayerDetails.name?.[0]}</AvatarFallback>
+                    <AvatarFallback className="text-2xl">
+                      {selectedPlayerDetails.name?.[0] || 'P'}
+                    </AvatarFallback>
                   </Avatar>
-                  <div>
-                    <h2 className="text-2xl font-bold">{selectedPlayerDetails.name}</h2>
-                    <p className="text-muted-foreground text-lg">{selectedPlayerDetails.position}</p>
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-6">
-                  <div>
-                    <h3 className="text-xl font-semibold mb-4">Performance Ratings</h3>
-                    <div className="space-y-4">
-                      <div className="flex justify-between items-center p-3 bg-secondary/50 rounded-lg">
-                        <span className="text-muted-foreground">Overall Rating</span>
-                        <span className="text-2xl font-bold">{selectedPlayerDetails.overallRating}</span>
+                  <div className="flex-1">
+                    <h2 className="text-3xl font-bold">{selectedPlayerDetails.name}</h2>
+                    <p className="text-muted-foreground text-xl capitalize">
+                      {selectedPlayerDetails.position}
+                    </p>
+                    <div className="flex items-center gap-4 mt-3">
+                      <div className="bg-primary/10 px-3 py-1 rounded-full">
+                        <span className="text-sm font-medium">
+                          Age: {selectedPlayerDetails.age} years
+                        </span>
                       </div>
-                      <div className="flex justify-between items-center p-3 bg-secondary/50 rounded-lg">
-                        <span className="text-muted-foreground">Average Performance</span>
-                        <span className="text-2xl font-bold">{selectedPlayerDetails.averagePerformance}</span>
+                      <div className={`px-3 py-1 rounded-full ${
+                        selectedPlayerDetails.status === 'Active'
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-red-100 text-red-800'
+                      }`}>
+                        <span className="text-sm font-medium">
+                          {selectedPlayerDetails.status}
+                        </span>
                       </div>
                     </div>
                   </div>
-                  
-                  <div>
-                    <h3 className="text-xl font-semibold mb-4">Attributes</h3>
-                    <div className="grid grid-cols-2 gap-4">
-                      {Object.entries(selectedPlayerDetails.attributes).map(([key, value]) => (
-                        <div key={key} className="bg-secondary/50 p-3 rounded-lg">
-                          <div className="text-sm text-muted-foreground capitalize">{key}</div>
-                          <div className="text-2xl font-semibold">{Number(value).toFixed(1)}</div>
+                </div>
+
+                <Tabs defaultValue="performance" className="w-full">
+                  <TabsList className="grid w-full grid-cols-3">
+                    <TabsTrigger value="performance">Performance</TabsTrigger>
+                    <TabsTrigger value="personal">Personal Info</TabsTrigger>
+                    <TabsTrigger value="medical">Medical Info</TabsTrigger>
+                  </TabsList>
+
+                  <TabsContent value="performance" className="space-y-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      {/* Performance Ratings */}
+                      <div>
+                        <h3 className="text-xl font-semibold mb-4">Performance Ratings</h3>
+                        <div className="space-y-4">
+                          <div className="flex justify-between items-center p-4 bg-gradient-to-r from-primary/10 to-primary/5 rounded-lg">
+                            <span className="text-muted-foreground font-medium">Overall Rating</span>
+                            <span className="text-3xl font-bold text-primary">
+                              {selectedPlayerDetails.overallRating}
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center p-4 bg-gradient-to-r from-secondary/50 to-secondary/20 rounded-lg">
+                            <span className="text-muted-foreground font-medium">Average Performance</span>
+                            <span className="text-3xl font-bold">
+                              {selectedPlayerDetails.averagePerformance}
+                            </span>
+                          </div>
                         </div>
-                      ))}
+                      </div>
+
+                      {/* Attributes */}
+                      <div>
+                        <h3 className="text-xl font-semibold mb-4">Player Attributes</h3>
+                        <div className="grid grid-cols-2 gap-3">
+                          {Object.entries(selectedPlayerDetails.attributes).map(([key, value]) => (
+                            <div key={key} className="bg-secondary/30 p-3 rounded-lg">
+                              <div className="text-sm text-muted-foreground capitalize">{key}</div>
+                              <div className="text-xl font-semibold">{Number(value).toFixed(1)}</div>
+                              <div className="w-full bg-background rounded-full h-2 mt-2">
+                                <div
+                                  className="bg-primary h-2 rounded-full"
+                                  style={{ width: `${(Number(value) / 10) * 100}%` }}
+                                ></div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
+                  </TabsContent>
+
+                  <TabsContent value="personal" className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      <Card>
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-lg">Basic Information</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                          <div>
+                            <Label className="text-sm text-muted-foreground">Date of Birth</Label>
+                            <p className="font-medium">{selectedPlayerDetails.dob || "Not specified"}</p>
+                          </div>
+                          <div>
+                            <Label className="text-sm text-muted-foreground">Gender</Label>
+                            <p className="font-medium capitalize">{selectedPlayerDetails.gender || "Not specified"}</p>
+                          </div>
+                          <div>
+                            <Label className="text-sm text-muted-foreground">Strong Foot</Label>
+                            <p className="font-medium capitalize">{selectedPlayerDetails.strongFoot || "Not specified"}</p>
+                          </div>
+                          <div>
+                            <Label className="text-sm text-muted-foreground">Age</Label>
+                            <p className="font-medium">{selectedPlayerDetails.age} years</p>
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      <Card>
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-lg">Physical Stats</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                          <div>
+                            <Label className="text-sm text-muted-foreground">Height</Label>
+                            <p className="font-medium">{selectedPlayerDetails.height ? `${selectedPlayerDetails.height} cm` : "Not specified"}</p>
+                          </div>
+                          <div>
+                            <Label className="text-sm text-muted-foreground">Weight</Label>
+                            <p className="font-medium">{selectedPlayerDetails.weight ? `${selectedPlayerDetails.weight} kg` : "Not specified"}</p>
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      <Card>
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-lg">Playing Position</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                          <div>
+                            <Label className="text-sm text-muted-foreground">Primary Position</Label>
+                            <p className="font-medium capitalize">{selectedPlayerDetails.position}</p>
+                          </div>
+                          {selectedPlayerDetails.secondaryPosition && (
+                            <div>
+                              <Label className="text-sm text-muted-foreground">Secondary Position</Label>
+                              <p className="font-medium capitalize">{selectedPlayerDetails.secondaryPosition}</p>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    </div>
+
+                    <Card>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-lg">Contact Information</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        <div>
+                          <Label className="text-sm text-muted-foreground">Email</Label>
+                          <p className="font-medium">{selectedPlayerDetails.email || "Not specified"}</p>
+                        </div>
+                        <div>
+                          <Label className="text-sm text-muted-foreground">Address</Label>
+                          <p className="font-medium">{selectedPlayerDetails.address || "Not specified"}</p>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <Label className="text-sm text-muted-foreground">Primary Guardian</Label>
+                            <p className="font-medium">{selectedPlayerDetails.primaryGuardian || "Not specified"}</p>
+                          </div>
+                          <div>
+                            <Label className="text-sm text-muted-foreground">Primary Phone</Label>
+                            <p className="font-medium">{selectedPlayerDetails.primaryPhone || "Not specified"}</p>
+                          </div>
+                        </div>
+                        {selectedPlayerDetails.secondaryGuardian && (
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <Label className="text-sm text-muted-foreground">Secondary Guardian</Label>
+                              <p className="font-medium">{selectedPlayerDetails.secondaryGuardian}</p>
+                            </div>
+                            <div>
+                              <Label className="text-sm text-muted-foreground">Secondary Phone</Label>
+                              <p className="font-medium">{selectedPlayerDetails.secondaryPhone || "Not specified"}</p>
+                            </div>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+
+                  <TabsContent value="medical" className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <Card>
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-lg">Medical Information</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                          <div>
+                            <Label className="text-sm text-muted-foreground">Blood Group</Label>
+                            <p className="font-medium">{selectedPlayerDetails.bloodGroup || "Not specified"}</p>
+                          </div>
+
+                          <div>
+                            <Label className="text-sm text-muted-foreground">Disability Status</Label>
+                            <p className="font-medium">
+                              {selectedPlayerDetails.hasDisability ? 'Yes' : 'No'}
+                            </p>
+                            {selectedPlayerDetails.hasDisability && selectedPlayerDetails.disabilityType && (
+                              <p className="text-sm text-muted-foreground mt-1">
+                                Type: {selectedPlayerDetails.disabilityType}
+                              </p>
+                            )}
+                          </div>
+
+                          <div>
+                            <Label className="text-sm text-muted-foreground">Enrollment Date</Label>
+                            <p className="font-medium">{selectedPlayerDetails.enrollmentDate || "Not specified"}</p>
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      <Card>
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-lg">Status Information</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                          <div>
+                            <Label className="text-sm text-muted-foreground">Current Status</Label>
+                            <div className="flex items-center gap-2 mt-1">
+                              <div className={`w-3 h-3 rounded-full ${
+                                selectedPlayerDetails.status === 'Active'
+                                  ? 'bg-green-500'
+                                  : 'bg-red-500'
+                              }`}></div>
+                              <p className="font-medium">{selectedPlayerDetails.status}</p>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </div>
+                  </TabsContent>
+                </Tabs>
               </div>
             )}
           </DialogContent>

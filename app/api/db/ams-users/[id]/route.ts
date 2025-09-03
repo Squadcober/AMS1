@@ -108,16 +108,16 @@ export async function DELETE(
       );
     }
 
-    // If the user is a player, also delete from ams-player-info collection
+    // If the user is a player, also delete from ams-player-data collection
     if (existingUser.role === 'player') {
       try {
-        await db.collection('ams-player-info').deleteOne({ 
+        await db.collection('ams-player-data').deleteOne({
           username: existingUser.username,
-          academyId: existingUser.academyId 
+          academyId: existingUser.academyId
         });
       } catch (playerError) {
-        console.warn('Failed to delete player info:', playerError);
-        // Continue even if player info deletion fails
+        console.warn('Failed to delete player data:', playerError);
+        // Continue even if player data deletion fails
       }
     }
 

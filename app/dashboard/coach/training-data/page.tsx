@@ -453,6 +453,8 @@ function SessionsContent() {
   const [lastUpdate, setLastUpdate] = useState<number>(Date.now());
   const [viewDetailsSessionData, setViewDetailsSessionData] = useState<Session | null>(null);// Add this new state for the toggle
   const [showMySessions, setShowMySessions] = useState(false);
+  // Local state to store updated attendance changes
+  const [localAttendanceChanges, setLocalAttendanceChanges] = useState<Map<string, { [playerId: string]: { status: "Present" | "Absent" | "Unmarked"; markedAt: string; markedBy: string } }>>(new Map());
 
   // Define fetchSessions function
   const fetchSessions = useCallback(
@@ -904,13 +906,14 @@ const handleViewDetails = async (sessionId: number | string) => {
     setIsLoading(true);
     console.log('Fetching details for session:', sessionId);
 
-    // Fetch session details (including attendance)
-    const response = await fetch(`/api/db/ams-sessions/${sessionId}?academyId=${user.academyId}`, {
+    // Always fetch fresh data with cache-busting timestamp
+    const response = await fetch(`/api/db/ams-sessions/${sessionId}?academyId=${user.academyId}&t=${Date.now()}`, {
       headers: {
         'Cache-Control': 'no-cache',
         'Pragma': 'no-cache'
       }
     });
+    
     if (!response.ok) throw new Error('Failed to fetch session details');
 
     const result = await response.json();
@@ -918,34 +921,27 @@ const handleViewDetails = async (sessionId: number | string) => {
       throw new Error(result.error || 'Failed to fetch session details');
     }
 
-    const session = result.data;
+    let session = result.data;
 
-    // Log attendance for this session
     console.log(
-      `[ATTENDANCE] Session ID: ${session.id} | Recurring: ${!!session.isRecurring} | Occurrence: ${!!session.isOccurrence}`,
+      `[ATTENDANCE] Fresh fetch - Session ID: ${session.id} | Recurring: ${!!session.isRecurring} | Occurrence: ${!!session.isOccurrence}`,
       session.attendance
     );
 
-    // If recurring occurrence, also fetch parent session attendance
+    // Handle attendance for occurrence sessions
     if (session.isOccurrence && session.parentSessionId) {
-      const parentResponse = await fetch(`/api/db/ams-sessions/${session.parentSessionId}?academyId=${user.academyId}`, {
-        headers: {
-          'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache'
-        }
-      });
-      if (parentResponse.ok) {
-        const parentResult = await parentResponse.json();
-        if (parentResult.success && parentResult.data) {
-          console.log(
-            `[ATTENDANCE] Parent Session ID: ${parentResult.data.id} | Recurring: ${!!parentResult.data.isRecurring}`,
-            parentResult.data.attendance
-          );
-        }
+      if (!session.attendance || Object.keys(session.attendance).length === 0) {
+        console.log(`[ATTENDANCE] Occurrence session ${session.id} has no attendance data, initializing as empty`);
+        session.attendance = {};
       }
     }
 
-    // ...existing code for fetching player details and updating state...
+    // Ensure attendance object exists
+    if (!session.attendance) {
+      session.attendance = {};
+    }
+
+    // Fetch player details
     if (session.assignedPlayers?.length > 0) {
       const playerIds = Array.isArray(session.assignedPlayers) ? session.assignedPlayers : [session.assignedPlayers];
       const playersResponse = await fetch(`/api/db/ams-player-data/batch?ids=${playerIds.join(',')}`);
@@ -973,13 +969,31 @@ const handleViewDetails = async (sessionId: number | string) => {
       session.assignedPlayersData = [];
     }
 
-    setSessions(prev => prev.map(s => 
-      (s.id != null && s.id.toString() === sessionId.toString()) ? session : s
-    ));
+    // Update the local sessions state with the fresh data
+    setSessions(prev => prev.map(s => {
+      if (
+        s._id?.toString() === sessionId.toString() || 
+        s.id?.toString() === sessionId.toString()
+      ) {
+        return {
+          ...s,
+          ...session,
+          attendance: session.attendance // Ensure attendance is updated
+        };
+      }
+      return s;
+    }));
+
+    // Set the view details data with fresh attendance
     setViewDetailsSessionId(Number(sessionId));
     setViewDetailsSessionData(session);
 
-    // ...existing code...
+    console.log(`[ATTENDANCE] Final session data for ${session.id}:`, {
+      attendance: session.attendance,
+      playerCount: session.assignedPlayersData?.length || 0,
+      isOccurrence: session.isOccurrence
+    });
+
   } catch (error) {
     console.error('Error viewing session details:', error);
     toast({
@@ -2030,7 +2044,7 @@ const AttendanceSelector = ({
         return {
           color: "bg-red-500 hover:bg-red-600 text-white border-red-500",
           text: "Absent", 
-          next: "Unmarked"
+          next: "Present"
         };
       case "Unmarked":
       default:
@@ -2415,7 +2429,7 @@ const renderSessionDetails = (session: Session | undefined) => {
             pid,
             {
               ...data,
-              status: data.status === "Present" ? "Present" : "Absent",
+              status: data.status === "Present" ? "Present" : data.status === "Absent" ? "Absent" : "Unmarked",
               markedBy: data.markedBy ?? (user?.id ?? "")
             }
           ])
@@ -2437,8 +2451,8 @@ const renderSessionDetails = (session: Session | undefined) => {
             pid,
             {
               ...data,
-              status: data.status === "Present" ? "Present" : "Absent"
-            } as { status: "Present" | "Absent"; markedAt: string; markedBy: string; }
+              status: data.status === "Present" ? "Present" : data.status === "Absent" ? "Absent" : "Unmarked",
+            } as { status: "Present" | "Absent" | "Unmarked"; markedAt: string; markedBy: string; }
           ])
         ) as { [playerId: string]: { status: "Present" | "Absent"; markedAt: string; markedBy: string; } }
       });
@@ -2448,7 +2462,7 @@ const renderSessionDetails = (session: Session | undefined) => {
     if (typeof toast === "function") {
       toast({
         title: "Updating",
-        description: `Marking as ${newStatus === "Present" ? "Present" : "Absent"}...`,
+        description: `Marking as ${newStatus === "Present" ? "Present" : newStatus === "Absent" ? "Absent" : "Unmarked"}...`,
       });
     }
 
@@ -2478,7 +2492,7 @@ const renderSessionDetails = (session: Session | undefined) => {
       if (!result.success) throw new Error(result.error || 'Failed to update attendance');
 
       // Fetch latest attendance from backend and log it
-      const fetchAttendanceResp = await fetch(`/api/db/ams-sessions/${sessionId}?academyId=${effectiveAcademyId}`, {
+      const fetchAttendanceResp = await fetch(`/api/db/ams-sessions/${sessionId}?academyId=${effectiveAcademyId}&t=${Date.now()}`, {
         headers: {
           'Cache-Control': 'no-cache',
           'Pragma': 'no-cache'
@@ -2799,7 +2813,10 @@ const renderSessionDetails = (session: Session | undefined) => {
         </div>
         <OccurrencesDialog />
         {/* Session Details Dialog */}
-        <Dialog open={viewDetailsSessionId !== null} onOpenChange={() => setViewDetailsSessionId(null)}>
+        <Dialog open={viewDetailsSessionId !== null} onOpenChange={() => {
+          setViewDetailsSessionId(null);
+          setViewDetailsSessionData(null);
+        }}>
           <DialogContent className="max-w-4xl max-h-[100vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Session Details</DialogTitle>
@@ -2912,7 +2929,7 @@ const AttendanceSelector = ({
         return {
           color: "bg-red-500 hover:bg-red-600 text-white border-red-500",
           text: "Absent", 
-          next: "Unmarked"
+          next: "Present"
         };
       case "Unmarked":
       default:
@@ -3034,9 +3051,6 @@ const AttendanceSelector = ({
   );
 };
 
-// Update handleAttendanceChange to handle occurrence sessions correctly
-// Update handleAttendanceChange to handle occurrence sessions correctly and always use the correct id for PATCH
-// Improved handleAttendanceChange: ensures optimistic UI, but always fetches latest attendance from backend after PATCH to avoid stale state
 const handleAttendanceChange = async (
   sessionId: number | string,
   playerId: string,

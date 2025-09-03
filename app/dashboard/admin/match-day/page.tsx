@@ -479,8 +479,15 @@ useEffect(() => {
       // Create a copy of newMatch without _id
       const { _id, ...matchData } = newMatch;
 
+      // Ensure startTime and endTime are set with defaults if not provided
+      const startTime = matchData.startTime || "11:00";
+      const duration = matchData.duration || 90;
+      const endTime = matchData.endTime || calculateEndTime(startTime, duration);
+
       const match = {
         ...matchData,
+        startTime,
+        endTime,
         players: playerIds,
         academyId: user?.academyId,
         createdAt: new Date(),
@@ -666,11 +673,11 @@ useEffect(() => {
         
         if (team1Score !== undefined && team2Score !== undefined) {
           if (team1Score > team2Score) {
-            updates.winner = match.team1 || 'Our Team';
+            updates.winner = match.team1 || 'Team 1';
             updates.loser = match.team2 || match.opponent;
           } else if (team2Score > team1Score) {
             updates.winner = match.team2 || match.opponent;
-            updates.loser = match.team1 || 'Our Team';
+            updates.loser = match.team1 || 'Team 1';
           } else {
             updates.winner = null;
             updates.loser = null;
@@ -1029,7 +1036,7 @@ useEffect(() => {
         <TableHeader>
           <TableRow>
             <TableHead>Match Date</TableHead>
-            <TableHead>Opponent</TableHead>
+            <TableHead>Team 2</TableHead>
             <TableHead>Venue</TableHead>
             <TableHead>Game Plan</TableHead>
             <TableHead>Actions</TableHead>
@@ -1066,7 +1073,7 @@ useEffect(() => {
                     Delete Match
                   </Button>
                 </TableCell>
-                <TableCell>{match.team1 || 'Our Team'}</TableCell>
+                <TableCell>{match.team1 || 'Team 1'}</TableCell>
                 <TableCell>
                   <div className="flex items-center gap-2">
                     <Input
@@ -1164,6 +1171,9 @@ useEffect(() => {
     }
 
     console.log('Found match:', match);
+
+    const matchStatus = calculateMatchStatus(match);
+    const isUpcoming = matchStatus === 'Upcoming';
     
     const matchPlayers = (Array.isArray(match.players) ? match.players : []).map(playerId => {
       const player = players.find(p => p.id?.toString() === playerId?.toString());
@@ -1196,7 +1206,8 @@ useEffect(() => {
             <h3 className="text-lg font-semibold mb-4">Match Information</h3>
             <div className="space-y-2">
               <p><strong>Date:</strong> {format(new Date(match.date), "PP")}</p>
-              <p><strong>Opponent:</strong> {match.opponent}</p>
+              <p><strong>Team 1:</strong> {match.team1}</p>
+              <p><strong>Team 2:</strong> {match.team2}</p>
               <p><strong>Venue:</strong> {match.venue}</p>
               <p><strong>Tournament:</strong> {match.tournamentName}</p>
               <p><strong>Duration:</strong> {match.duration} minutes</p>
@@ -1286,34 +1297,41 @@ useEffect(() => {
                               current: ensureNumber(currentPoints),
                               edited: value
                             })}
+                            disabled={isUpcoming}
                           />
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Input 
-                          type="number" 
-                          min={0} 
+                        <Input
+                          type="number"
+                          min={0}
                           value={stats.goals || 0}
                           onChange={(e) => handleStatsChange(player.id.toString(), 'goals', parseInt(e.target.value) || 0)}
-                          className="w-16" 
+                          className="w-16"
+                          disabled={isUpcoming}
+                          style={{ cursor: isUpcoming ? 'not-allowed' : 'text' }}
                         />
                       </TableCell>
                       <TableCell>
-                        <Input 
-                          type="number" 
-                          min={0} 
+                        <Input
+                          type="number"
+                          min={0}
                           value={stats.assists || 0}
                           onChange={(e) => handleStatsChange(player.id.toString(), 'assists', parseInt(e.target.value) || 0)}
-                          className="w-16" 
+                          className="w-16"
+                          disabled={isUpcoming}
+                          style={{ cursor: isUpcoming ? 'not-allowed' : 'text' }}
                         />
                       </TableCell>
                       <TableCell>
-                        <Input 
-                          type="number" 
-                          min={0} 
+                        <Input
+                          type="number"
+                          min={0}
                           value={stats.cleanSheets || 0}
                           onChange={(e) => handleStatsChange(player.id.toString(), 'cleanSheets', parseInt(e.target.value) || 0)}
-                          className="w-16" 
+                          className="w-16"
+                          disabled={isUpcoming}
+                          style={{ cursor: isUpcoming ? 'not-allowed' : 'text' }}
                         />
                       </TableCell>
                     </TableRow>
@@ -1322,10 +1340,10 @@ useEffect(() => {
             </TableBody>
           </Table>
 
-          <Button 
+          <Button
             onClick={() => handleSaveMatchStats(match._id)}
             className="mt-4"
-            disabled={Object.keys(playerStats).length === 0}
+            disabled={Object.keys(playerStats).length === 0 || isUpcoming}
           >
             Save All Stats
           </Button>
@@ -1543,7 +1561,7 @@ useEffect(() => {
         <Input
           value={newMatch.team1}
           onChange={(e) => setNewMatch({ ...newMatch, team1: e.target.value })}
-          placeholder="Our Team"
+          placeholder="Team 1"
         />
       </div>
       <div>
@@ -1551,7 +1569,7 @@ useEffect(() => {
         <Input
           value={newMatch.team2 || newMatch.opponent}
           onChange={(e) => setNewMatch({ ...newMatch, team2: e.target.value, opponent: e.target.value })}
-          placeholder="Opponent Team"
+          placeholder="Team 2"
         />
       </div>
     </div>

@@ -110,27 +110,100 @@ export default function BatchesPage() {
   }, [user?.academyId]);
 
   useEffect(() => {
-    const fetchBatchPlayers = async (batchId: string) => {
-      try {
-        const response = await fetch(`/api/db/ams-batches/${batchId}/players`);
-        if (!response.ok) throw new Error("Failed to fetch batch players");
-
-        const result = await response.json();
-        if (result.success) {
-          setBatchPlayers((prev) => ({
-            ...prev,
-            [batchId]: result.data,
-          }));
-        }
-      } catch (error) {
-        console.error("Error fetching batch players:", error);
+  const fetchBatchPlayers = async (batchId: string) => {
+    try {
+      // First get the batch data to access player IDs
+      const batch = localBatches.find(b => b._id === batchId);
+      if (!batch?.players?.length) {
+        console.log("No player IDs found for batch:", batchId);
+        setBatchPlayers(prev => ({ ...prev, [batchId]: [] }));
+        return;
       }
-    };
 
-    if (selectedBatch?._id) {
-      fetchBatchPlayers(selectedBatch._id);
+      console.log("Fetching players for batch:", batchId, "Player IDs:", batch.players);
+
+      // Fetch detailed player data for each player ID
+      const playerPromises = batch.players.map(async (playerId: string) => {
+        try {
+          // Use the same endpoint pattern as settings page
+          const response = await fetch(`/api/db/batch-player-details/${playerId}`);
+          
+          if (!response.ok) {
+            console.log(`Failed to fetch player with ID: ${playerId}`);
+            return null;
+          }
+
+          const result = await response.json();
+          if (result.success && result.data) {
+            // Calculate age from DOB if available
+            const calculateAge = (dob: string): number => {
+              if (!dob) return 0;
+              const birthDate = new Date(dob);
+              const today = new Date();
+              let age = today.getFullYear() - birthDate.getFullYear();
+              const monthDiff = today.getMonth() - birthDate.getMonth();
+              if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+                age--;
+              }
+              return age;
+            };
+
+            // Format the player data consistently
+            return {
+              id: result.data.id || playerId,
+              name: result.data.name || "Unknown Player",
+              position: result.data.position || "N/A",
+              secondaryPosition: result.data.secondaryPosition || "",
+              age: result.data.age || calculateAge(result.data.dob || ""),
+              gender: result.data.gender || "",
+              height: result.data.height || "",
+              weight: result.data.weight || "",
+              photoUrl: result.data.photoUrl || "",
+              email: result.data.email || "",
+              primaryGuardian: result.data.primaryGuardian || "",
+              secondaryGuardian: result.data.secondaryGuardian || "",
+              primaryPhone: result.data.primaryPhone || "",
+              secondaryPhone: result.data.secondaryPhone || "",
+              address: result.data.address || "",
+              bloodGroup: result.data.bloodGroup || "",
+              enrollmentDate: result.data.enrollmentDate || "",
+              strongFoot: result.data.strongFoot || "",
+              hasDisability: Boolean(result.data.hasDisability),
+              disabilityType: result.data.disabilityType || "",
+              status: result.data.status || "Active",
+              attributes: result.data.attributes || {},
+              performanceHistory: result.data.performanceHistory || [],
+              dob: result.data.dob || ""
+            };
+          }
+          return null;
+        } catch (error) {
+          console.error(`Error fetching player ${playerId}:`, error);
+          return null;
+        }
+      });
+
+      const playerResults = await Promise.all(playerPromises);
+      const validPlayers = playerResults.filter(Boolean);
+
+      console.log("Found players:", validPlayers);
+
+      setBatchPlayers(prev => ({
+        ...prev,
+        [batchId]: validPlayers
+      }));
+
+    } catch (error) {
+      console.error("Error fetching batch players:", error);
+      setBatchPlayers(prev => ({ ...prev, [batchId]: [] }));
     }
-  }, [selectedBatch]);
+  };
+
+  if (selectedBatch?._id) {
+    fetchBatchPlayers(selectedBatch._id);
+  }
+}, [selectedBatch, localBatches]);
+
 
   useEffect(() => {
     const fetchBatchCoaches = async (batchId: string) => {
@@ -599,43 +672,87 @@ export default function BatchesPage() {
   };
 
   const handleViewPlayerDetails = async (playerId: string) => {
-    try {
-      const response = await fetch(`/api/db/batch-player-details/${playerId}`);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch player details: ${response.statusText}`);
-      }
-
-      const result = await response.json();
-      if (!result.success) {
-        throw new Error(result.error || "Failed to load player details");
-      }
-
-      // Format the data for display and calculate ratings
-      const playerData = {
-        ...result.data,
-        attributes: {
-          Attack: result.data.attributes?.Attack || 0,
-          pace: result.data.attributes?.pace || 0,
-          Physicality: result.data.attributes?.Physicality || 0,
-          Defense: result.data.attributes?.Defense || 0,
-          passing: result.data.attributes?.passing || 0,
-          Technique: result.data.attributes?.Technique || 0
-        },
-        overallRating: calculateOverallRating(result.data.attributes)*10,
-        averagePerformance: calculateAveragePerformance(result.data)
-      };
-
-      setSelectedPlayerDetails(playerData);
-      setIsPlayerDetailsOpen(true);
-    } catch (error) {
-      console.error("Error fetching player details:", error);
-      toast({
-        title: "Error",
-        description: "Failed to load player details",
-        variant: "destructive",
-      });
+  try {
+    const response = await fetch(`/api/db/batch-player-details/${playerId}`);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch player details: ${response.statusText}`);
     }
-  };
+
+    const result = await response.json();
+    if (!result.success) {
+      throw new Error(result.error || "Failed to load player details");
+    }
+
+    // Calculate age from DOB if available
+    const calculateAge = (dob: string): number => {
+      if (!dob) return 0;
+      const birthDate = new Date(dob);
+      const today = new Date();
+      let age = today.getFullYear() - birthDate.getFullYear();
+      const monthDiff = today.getMonth() - birthDate.getMonth();
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+        age--;
+      }
+      return age;
+    };
+
+    // Format date for display
+    const formatDate = (dateString: string): string => {
+      if (!dateString) return "Not specified";
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return "Invalid date";
+      return date.toLocaleDateString('en-GB'); // DD/MM/YYYY format
+    };
+
+    // Format the essential player data only - mapping actual database fields
+    const playerData = {
+      id: result.data.id || result.data.pid,
+      name: result.data.name || "Unknown Player",
+      position: result.data.position || result.data.primaryPosition || "Not specified",
+      photoUrl: result.data.photoUrl || "",
+      
+      // Basic Information
+      dob: formatDate(result.data.dob),
+      gender: result.data.gender || "Not specified",
+      strongFoot: result.data.strongFoot || "Not specified",
+      age: result.data.age || calculateAge(result.data.dob || ""),
+      
+      // Physical Stats
+      height: result.data.height ? `${result.data.height} cm` : "Not specified",
+      weight: result.data.weight ? `${result.data.weight} kg` : "Not specified",
+      
+      // Medical Info
+      bloodGroup: result.data.bloodGroup || "Not specified",
+      hasDisability: result.data.hasDisability || false,
+      disabilityType: result.data.disabilityType || "",
+      injuryStatus: result.data.status === 'active' ? "Fit" : "Injured", // Map from status field
+      
+      // Performance data (keep for the performance tab)
+      attributes: result.data.attributes || {
+        Attack: 0,
+        pace: 0,
+        Physicality: 0,
+        Defense: 0,
+        passing: 0,
+        Technique: 0
+      },
+      overallRating: result.data.overallRating || (calculateOverallRating(result.data.attributes) * 10),
+      averagePerformance: result.data.averagePerformance || calculateAveragePerformance(result.data)
+    };
+
+    setSelectedPlayerDetails(playerData);
+    setIsPlayerDetailsOpen(true);
+  } catch (error) {
+    console.error("Error fetching player details:", error);
+    toast({
+      title: "Error",
+      description: "Failed to load player details",
+      variant: "destructive",
+    });
+  }
+};
+
+
 
   const handleViewCoachDetails = async (coachId: string) => {
     try {
@@ -815,42 +932,60 @@ export default function BatchesPage() {
                   </div>
                   <Separator className="my-4" />
                   <div>
-                    <h3 className="text-lg font-semibold mb-4">Players</h3>
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Name</TableHead>
-                          <TableHead>Position</TableHead>
-                          <TableHead>Actions</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {batchPlayers[selectedBatch.id]?.map((player: any) => (
-                          <TableRow key={player.id}>
-                            <TableCell>
-                              <div className="flex items-center gap-2">
-                                <Avatar className="h-8 w-8">
-                                  <AvatarImage src={player.photoUrl} />
-                                  <AvatarFallback>{player.name[0]}</AvatarFallback>
-                                </Avatar>
-                                {player.name}
-                              </div>
-                            </TableCell>
-                            <TableCell>{player.position}</TableCell>
-                            <TableCell>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleViewPlayerDetails(player.id)}
-                              >
-                                View Details
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
+  <h3 className="text-lg font-semibold mb-4">Players</h3>
+  {batchPlayers[selectedBatch._id]?.length > 0 ? (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Name</TableHead>
+          <TableHead>Position</TableHead>
+          <TableHead>Age</TableHead>
+          <TableHead>Status</TableHead>
+          <TableHead>Actions</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {batchPlayers[selectedBatch._id].map((player: any) => (
+          <TableRow key={player.id}>
+            <TableCell>
+              <div className="flex items-center gap-2">
+                <Avatar className="h-8 w-8">
+                  <AvatarImage src={player.photoUrl} />
+                  <AvatarFallback>{player.name?.[0] || 'P'}</AvatarFallback>
+                </Avatar>
+                {player.name}
+              </div>
+            </TableCell>
+            <TableCell className="capitalize">{player.position}</TableCell>
+            <TableCell>{player.age} years</TableCell>
+            <TableCell>
+              <span className={`px-2 py-1 rounded-full text-xs ${
+                player.status === 'Active' 
+                  ? 'bg-green-100 text-green-800' 
+                  : 'bg-red-100 text-red-800'
+              }`}>
+                {player.status}
+              </span>
+            </TableCell>
+            <TableCell>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleViewPlayerDetails(player.id)}
+              >
+                View Details
+              </Button>
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  ) : (
+    <div className="text-center py-8 text-muted-foreground">
+      <p>No players found in this batch</p>
+    </div>
+  )}
+</div>
                 </div>
               ) : (
                 <div className="text-center py-8">
@@ -1069,54 +1204,200 @@ export default function BatchesPage() {
         </Dialog>
 
         <Dialog open={isPlayerDetailsOpen} onOpenChange={setIsPlayerDetailsOpen}>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Player Details</DialogTitle>
-            </DialogHeader>
-            {selectedPlayerDetails && (
-              <div className="space-y-6 p-4">
-                <div className="flex items-center gap-4 border-b pb-4">
-                  <Avatar className="h-24 w-24">
-                    <AvatarImage src={selectedPlayerDetails.photoUrl} />
-                    <AvatarFallback>{selectedPlayerDetails.name?.[0]}</AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <h2 className="text-2xl font-bold">{selectedPlayerDetails.name}</h2>
-                    <p className="text-muted-foreground text-lg">{selectedPlayerDetails.position}</p>
+  <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+    <DialogHeader>
+      <DialogTitle>Player Details</DialogTitle>
+    </DialogHeader>
+    {selectedPlayerDetails && (
+      <div className="space-y-6 p-4">
+        {/* Player Header Section */}
+        <div className="flex items-center gap-6 border-b pb-6">
+          <Avatar className="h-24 w-24">
+            <AvatarImage src={selectedPlayerDetails.photoUrl} />
+            <AvatarFallback className="text-2xl">
+              {selectedPlayerDetails.name?.[0] || 'P'}
+            </AvatarFallback>
+          </Avatar>
+          <div className="flex-1">
+            <h2 className="text-3xl font-bold">{selectedPlayerDetails.name}</h2>
+            <p className="text-muted-foreground text-xl capitalize">
+              {selectedPlayerDetails.position}
+            </p>
+            <div className="flex items-center gap-4 mt-3">
+              <div className="bg-primary/10 px-3 py-1 rounded-full">
+                <span className="text-sm font-medium">
+                  Age: {selectedPlayerDetails.age} years
+                </span>
+              </div>
+              <div className={`px-3 py-1 rounded-full ${
+                selectedPlayerDetails.injuryStatus === 'Fit' 
+                  ? 'bg-green-100 text-green-800' 
+                  : 'bg-red-100 text-red-800'
+              }`}>
+                <span className="text-sm font-medium">
+                  {selectedPlayerDetails.injuryStatus}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <Tabs defaultValue="performance" className="w-full">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="performance">Performance</TabsTrigger>
+            <TabsTrigger value="personal">Personal Info</TabsTrigger>
+            <TabsTrigger value="medical">Medical Info</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="performance" className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Performance Ratings */}
+              <div>
+                <h3 className="text-xl font-semibold mb-4">Performance Ratings</h3>
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center p-4 bg-gradient-to-r from-primary/10 to-primary/5 rounded-lg">
+                    <span className="text-muted-foreground font-medium">Overall Rating</span>
+                    <span className="text-3xl font-bold text-primary">
+                      {selectedPlayerDetails.overallRating}
+                    </span>
                   </div>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-6">
-                  <div>
-                    <h3 className="text-xl font-semibold mb-4">Performance Ratings</h3>
-                    <div className="space-y-4">
-                      <div className="flex justify-between items-center p-3 bg-secondary/50 rounded-lg">
-                        <span className="text-muted-foreground">Overall Rating</span>
-                        <span className="text-2xl font-bold">{selectedPlayerDetails.overallRating}</span>
-                      </div>
-                      <div className="flex justify-between items-center p-3 bg-secondary/50 rounded-lg">
-                        <span className="text-muted-foreground">Average Performance</span>
-                        <span className="text-2xl font-bold">{selectedPlayerDetails.averagePerformance}</span>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <h3 className="text-xl font-semibold mb-4">Attributes</h3>
-                    <div className="grid grid-cols-2 gap-4">
-                      {Object.entries(selectedPlayerDetails.attributes).map(([key, value]) => (
-                        <div key={key} className="bg-secondary/50 p-3 rounded-lg">
-                          <div className="text-sm text-muted-foreground capitalize">{key}</div>
-                          <div className="text-2xl font-semibold">{Number(value).toFixed(1)}</div>
-                        </div>
-                      ))}
-                    </div>
+                  <div className="flex justify-between items-center p-4 bg-gradient-to-r from-secondary/50 to-secondary/20 rounded-lg">
+                    <span className="text-muted-foreground font-medium">Average Performance</span>
+                    <span className="text-3xl font-bold">
+                      {selectedPlayerDetails.averagePerformance}
+                    </span>
                   </div>
                 </div>
               </div>
-            )}
-          </DialogContent>
-        </Dialog>
+
+              {/* Attributes */}
+              <div>
+                <h3 className="text-xl font-semibold mb-4">Player Attributes</h3>
+                <div className="grid grid-cols-2 gap-3">
+                  {Object.entries(selectedPlayerDetails.attributes).map(([key, value]) => (
+                    <div key={key} className="bg-secondary/30 p-3 rounded-lg">
+                      <div className="text-sm text-muted-foreground capitalize">{key}</div>
+                      <div className="text-xl font-semibold">{Number(value).toFixed(1)}</div>
+                      <div className="w-full bg-background rounded-full h-2 mt-2">
+                        <div 
+                          className="bg-primary h-2 rounded-full" 
+                          style={{ width: `${(Number(value) / 10) * 100}%` }}
+                        ></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="personal" className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg">Basic Information</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div>
+                    <Label className="text-sm text-muted-foreground">Date of Birth</Label>
+                    <p className="font-medium">{selectedPlayerDetails.dob}</p>
+                  </div>
+                  <div>
+                    <Label className="text-sm text-muted-foreground">Gender</Label>
+                    <p className="font-medium capitalize">{selectedPlayerDetails.gender}</p>
+                  </div>
+                  <div>
+                    <Label className="text-sm text-muted-foreground">Strong Foot</Label>
+                    <p className="font-medium capitalize">{selectedPlayerDetails.strongFoot}</p>
+                  </div>
+                  <div>
+                    <Label className="text-sm text-muted-foreground">Age</Label>
+                    <p className="font-medium">{selectedPlayerDetails.age} years</p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg">Physical Stats</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div>
+                    <Label className="text-sm text-muted-foreground">Height</Label>
+                    <p className="font-medium">{selectedPlayerDetails.height}</p>
+                  </div>
+                  <div>
+                    <Label className="text-sm text-muted-foreground">Weight</Label>
+                    <p className="font-medium">{selectedPlayerDetails.weight}</p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg">Playing Position</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div>
+                    <Label className="text-sm text-muted-foreground">Primary Position</Label>
+                    <p className="font-medium capitalize">{selectedPlayerDetails.position}</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="medical" className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg">Medical Information</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <Label className="text-sm text-muted-foreground">Blood Group</Label>
+                    <p className="font-medium">{selectedPlayerDetails.bloodGroup}</p>
+                  </div>
+                  
+                  <div>
+                    <Label className="text-sm text-muted-foreground">Disability Status</Label>
+                    <p className="font-medium">
+                      {selectedPlayerDetails.hasDisability ? 'Yes' : 'No'}
+                    </p>
+                    {selectedPlayerDetails.hasDisability && selectedPlayerDetails.disabilityType && (
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Type: {selectedPlayerDetails.disabilityType}
+                      </p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg">Injury Status</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <Label className="text-sm text-muted-foreground">Current Status</Label>
+                    <div className="flex items-center gap-2 mt-1">
+                      <div className={`w-3 h-3 rounded-full ${
+                        selectedPlayerDetails.injuryStatus === 'Fit' 
+                          ? 'bg-green-500' 
+                          : 'bg-red-500'
+                      }`}></div>
+                      <p className="font-medium">{selectedPlayerDetails.injuryStatus}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+        </Tabs>
+      </div>
+    )}
+  </DialogContent>
+</Dialog>
 
         <Dialog open={isCoachDetailsOpen} onOpenChange={setIsCoachDetailsOpen}>
           <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">

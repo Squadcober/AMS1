@@ -1321,7 +1321,7 @@ const handleViewOccurrences = async (parentId: number) => {
     console.log('Fetching parent session:', parentId);
 
     // Fetch parent session
-    const parentResponse = await fetch(`/api/db/ams-sessions/${parentId}`);
+    const parentResponse = await fetch(`/api/db/ams-sessions/${parentId}?t=${Date.now()}`);
     if (!parentResponse.ok) throw new Error('Failed to fetch parent session');
     const parentResult = await parentResponse.json();
 
@@ -1331,7 +1331,7 @@ const handleViewOccurrences = async (parentId: number) => {
 
     // Fetch occurrences
     const occurrencesResponse = await fetch(
-      `/api/db/ams-sessions/occurrences?parentId=${parentId}&academyId=${user.academyId}`,
+      `/api/db/ams-sessions/occurrences?parentId=${parentId}&academyId=${user.academyId}&t=${Date.now()}`,
       {
         headers: {
           'Cache-Control': 'no-cache',
@@ -1413,7 +1413,7 @@ const handleViewDetails = async (sessionId: number | string) => {
     console.log('Fetching details for session:', sessionId);
 
     // Fetch session details (including attendance)
-    const response = await fetch(`/api/db/ams-sessions/${sessionId}?academyId=${user.academyId}`, {
+    const response = await fetch(`/api/db/ams-sessions/${sessionId}?academyId=${user.academyId}&t=${Date.now()}`, {
       headers: {
         'Cache-Control': 'no-cache',
         'Pragma': 'no-cache'
@@ -1456,7 +1456,7 @@ const handleViewDetails = async (sessionId: number | string) => {
     // ...existing code for fetching player details and updating state...
     if (session.assignedPlayers?.length > 0) {
       const playerIds = Array.isArray(session.assignedPlayers) ? session.assignedPlayers : [session.assignedPlayers];
-      const playersResponse = await fetch(`/api/db/ams-player-data/batch?ids=${playerIds.join(',')}`);
+      const playersResponse = await fetch(`/api/db/ams-player-data/batch?ids=${playerIds.join(',')}&t=${Date.now()}`);
       if (playersResponse.ok) {
         const playersResult = await playersResponse.json();
         if (playersResult.success && Array.isArray(playersResult.data)) {
@@ -1923,7 +1923,7 @@ const handleViewFinishedOccurrences = async (
     console.log('Fetching parent session:', parentId);
 
     // Fetch parent session
-    const parentResponse = await fetch(`/api/db/ams-sessions/${parentId}`);
+    const parentResponse = await fetch(`/api/db/ams-sessions/${parentId}?t=${Date.now()}`);
     if (!parentResponse.ok) throw new Error('Failed to fetch parent session');
     const parentResult = await parentResponse.json();
 
@@ -1933,7 +1933,7 @@ const handleViewFinishedOccurrences = async (
 
     // Fetch all occurrences
     const occurrencesResponse = await fetch(
-      `/api/db/ams-sessions/occurrences?parentId=${parentId}&academyId=${user.academyId}`
+      `/api/db/ams-sessions/occurrences?parentId=${parentId}&academyId=${user.academyId}&t=${Date.now()}`
     );
     if (!occurrencesResponse.ok) throw new Error('Failed to fetch occurrences');
     const occurrencesResult = await occurrencesResponse.json();
@@ -3281,8 +3281,8 @@ const renderSessionDetails = (session: Session | undefined) => {
       const result = await response.json();
       if (!result.success) throw new Error(result.error || 'Failed to update attendance');
 
-      // Fetch latest attendance from backend and log it
-      const fetchAttendanceResp = await fetch(`/api/db/ams-sessions/${sessionId}?academyId=${effectiveAcademyId}`, {
+      // Fetch latest attendance from backend and log it with cache busting
+      const fetchAttendanceResp = await fetch(`/api/db/ams-sessions/${sessionId}?academyId=${effectiveAcademyId}&t=${Date.now()}`, {
         headers: {
           'Cache-Control': 'no-cache',
           'Pragma': 'no-cache'

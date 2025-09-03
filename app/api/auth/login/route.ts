@@ -48,6 +48,13 @@ export async function POST(request: NextRequest) {
         { status: 401, headers: { 'Content-Type': 'application/json' } }
       );
     }
+    if (user.status !== 'active') {
+  return NextResponse.json({ 
+    success: false,
+    error: 'inactive',
+    message: 'Your account is currently inactive'
+  }, { status: 401 });
+}
 
     const token = sign({ username: user.username, role: user.role }, JWT_SECRET);
     cookies().set('token', token, {

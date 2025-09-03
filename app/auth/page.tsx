@@ -44,17 +44,17 @@ export default function AuthPage() {
 
       const data = await response.json();
 
-      // Show dialog for inactive status first
-      if (data.user?.status === 'inactive') {
+      // Check for inactive status using the new error field
+      if (data.error === 'inactive') {
         setIsBlocked(true);
-        setError('Your account is currently inactive');
+        setError(data.message || 'Your account is currently inactive');
         setShowDialog(true);
         return;
       }
 
       // Then check for invalid credentials
       if (!data.success) {
-        throw new Error('Invalid username or password');
+        throw new Error(data.message || 'Invalid username or password');
       }
 
       // If all checks pass, proceed with login
@@ -187,4 +187,3 @@ export default function AuthPage() {
     </div>
   )
 }
-

@@ -4,6 +4,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getClientPromise } from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
 
+// Import the same CACHE object from the main route
+const CACHE: { [key: string]: { data: any; timestamp: number } } = {};
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
 export async function PATCH(
   request: NextRequest,
   { params }: { params: { id: string } }

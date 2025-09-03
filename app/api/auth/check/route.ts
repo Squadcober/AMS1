@@ -52,7 +52,12 @@ export async function GET(request: NextRequest) {
       if (amsUser) {
         if (amsUser.status !== 'active') {
           console.log('User account is inactive');
-          return NextResponse.json({ user: null }, { status: 401 });
+          // Return specific information about inactive status
+          return NextResponse.json({ 
+            user: null, 
+            error: 'inactive',
+            message: 'Your account is currently inactive' 
+          }, { status: 401 });
         }
 
         user = {

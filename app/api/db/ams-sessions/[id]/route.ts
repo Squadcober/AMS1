@@ -12,12 +12,15 @@ export async function GET(
 ) {
   try {
     const id = params.id;
-    console.log('API: Fetching session with ID:', id);
+    const { searchParams } = new URL(request.url);
+    const cacheBust = searchParams.get('t'); // Check for cache-busting parameter
 
-    // Check cache first
+    console.log('API: Fetching session with ID:', id, 'Cache bust:', cacheBust);
+
+    // Check cache first, but skip if cache-busting is requested
     const now = Date.now();
     const cached = CACHE[id];
-    if (cached && (now - cached.timestamp) < CACHE_DURATION) {
+    if (cached && (now - cached.timestamp) < CACHE_DURATION && !cacheBust) {
       console.log('API: Returning cached session data');
       return NextResponse.json(cached.data);
     }
@@ -106,7 +109,13 @@ export async function GET(
       timestamp: now
     };
 
-    return NextResponse.json(responseData);
+    return NextResponse.json(responseData, {
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      }
+    });
 
   } catch (error) {
     console.error('API Error:', error);
@@ -153,10 +162,16 @@ export async function PATCH(
     );
 
     if (!updateResult.modifiedCount) {
-      return NextResponse.json({ 
-        success: false, 
-        error: 'Session not found or no changes made' 
+      return NextResponse.json({
+        success: false,
+        error: 'Session not found or no changes made'
       }, { status: 404 });
+    }
+
+    // Clear cache for this session to ensure fresh data on next fetch
+    if (CACHE[id]) {
+      delete CACHE[id];
+      console.log('API: Cleared cache for session ID:', id);
     }
 
     // If playerMetrics are updated, update the player's performanceHistory

@@ -503,6 +503,45 @@ export default function SearchPage() {
     }
   };
 
+  const calculateAveragePerformance = (performanceHistory: any[]): number => {
+  if (!Array.isArray(performanceHistory) || performanceHistory.length === 0) {
+    return 0;
+  }
+
+  // Filter for training entries that have valid session ratings or attributes
+  const trainingEntries = performanceHistory.filter((entry: any) => 
+    entry.type === 'training' && (
+      (entry.sessionRating && entry.sessionRating > 0) ||
+      (entry.attributes && Object.keys(entry.attributes).length > 0)
+    )
+  );
+
+  if (trainingEntries.length === 0) return 0;
+
+  let totalScore = 0;
+  let validEntries = 0;
+
+  trainingEntries.forEach((entry: any) => {
+    if (entry.sessionRating && entry.sessionRating > 0) {
+      // Use session rating if available
+      totalScore += entry.sessionRating;
+      validEntries++;
+    } else if (entry.attributes && Object.keys(entry.attributes).length > 0) {
+      // Calculate average from attributes if no session rating
+      const attrValues = Object.values(entry.attributes).filter((v: any): v is number => 
+        typeof v === 'number' && v > 0
+      );
+      if (attrValues.length > 0) {
+        const avgAttr = attrValues.reduce((sum, val) => sum + val, 0) / attrValues.length;
+        totalScore += avgAttr;
+        validEntries++;
+      }
+    }
+  });
+
+  return validEntries > 0 ? Number((totalScore / validEntries).toFixed(1)) : 0;
+};
+
   const getFilteredUsers = () => {
     if (!Array.isArray(users)) {
       console.error('Users is not an array:', users);
@@ -745,26 +784,26 @@ export default function SearchPage() {
               </Card>
 
               <Card className="w-full">
-                <CardHeader>
-                  <CardTitle>Training Performance</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex justify-around items-center">
-                    <div className="text-center">
-                      <div className="text-3xl font-bold">
-                        {calculateAveragePerformance(playerData?.performanceHistory)}/10
-                      </div>
-                      <div className="text-sm text-gray-400">AVERAGE PERFORMANCE</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-xl font-bold">
-                        {calculateSessionsAttended(playerData?.performanceHistory) || 0}
-                      </div>
-                      <div className="text-sm text-gray-400">SESSIONS ATTENDED</div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+  <CardHeader>
+    <CardTitle>Training Performance</CardTitle>
+  </CardHeader>
+  <CardContent>
+    <div className="flex justify-around items-center">
+      <div className="text-center">
+        <div className="text-3xl font-bold">
+          {calculateAveragePerformance(playerData?.performanceHistory || [])}/10
+        </div>
+        <div className="text-sm text-gray-400">AVERAGE PERFORMANCE</div>
+      </div>
+      <div className="text-center">
+        <div className="text-xl font-bold">
+          {calculateSessionsAttended(playerData?.performanceHistory) || 0}
+        </div>
+        <div className="text-sm text-gray-400">SESSIONS ATTENDED</div>
+      </div>
+    </div>
+  </CardContent>
+</Card>
             </TabsContent>
 
             <TabsContent value="performance" className="space-y-6">

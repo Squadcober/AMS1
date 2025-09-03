@@ -9,6 +9,7 @@ import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSam
 import { useAuth } from "@/contexts/AuthContext"
 import { cn } from "@/lib/utils"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { toast } from "@/components/ui/use-toast"
 
 interface ScheduleEvent {
   date: string
@@ -19,6 +20,11 @@ interface ScheduleEvent {
   description?: string
   venue?: string
   opponent?: string
+}
+
+interface PlayerData {
+  id: string;
+  name: string;
 }
 
 const renderEventDetailContent = (event: any) => {
@@ -106,12 +112,42 @@ export default function Schedule() {
   const [currentDate, setCurrentDate] = useState(new Date())
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [playerData, setPlayerData] = useState<PlayerData | null>(null)
+
+  // Fetch player data using the same method as profile page
+  useEffect(() => {
+    const fetchPlayerData = async () => {
+      try {
+        if (!user?.username) return;
+
+        const response = await fetch(`/api/db/ams-player-data/user/${encodeURIComponent(user.username)}`, {
+          credentials: 'include',
+        });
+
+        if (!response.ok) {
+          const data = await response.json();
+          throw new Error(data.error || 'Failed to load player data');
+        }
+
+        const data = await response.json();
+        setPlayerData(data);
+      } catch (error) {
+        console.error('Error fetching player data:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load player data",
+          variant: "destructive",
+        });
+      }
+    };
+
+    fetchPlayerData();
+  }, [user]);
 
   useEffect(() => {
     const fetchScheduleData = async () => {
       try {
-        if (!user?.academyId) {
-          setError("Academy ID not found");
+        if (!user?.academyId || !playerData) {
           setLoading(false);
           return;
         }
@@ -132,9 +168,16 @@ export default function Schedule() {
         console.log('Matches data:', matchesData);
         console.log('Sessions data:', sessionsData);
 
+        // Filter sessions to only include those assigned to the player
+        const playerSessions = (sessionsData.data || []).filter((session: any) =>
+          session.assignedPlayers.includes(playerData.id)
+        );
+        // Filter out parent sessions (recurring sessions that are not occurrences)
+        const filteredPlayerSessions = playerSessions.filter((s: any) => !(s.isRecurring && !s.isOccurrence));
+
         // Format and combine all events
         const formattedEvents = [
-          ...(sessionsData.data || []).map((session: any) => ({
+          ...filteredPlayerSessions.map((session: any) => ({
             date: session.date,
             title: session.name || 'Training Session',
             type: 'session',
@@ -166,7 +209,7 @@ export default function Schedule() {
     };
 
     fetchScheduleData();
-  }, [user?.academyId]);
+  }, [user?.academyId, playerData]);
 
   const monthStart = startOfMonth(currentDate)
   const monthEnd = endOfMonth(currentDate)

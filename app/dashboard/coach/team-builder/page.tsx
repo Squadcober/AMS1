@@ -545,51 +545,61 @@ export default function TeamBuilder() {
   }
 
   const exportToPDF = async (
-    formationRef: React.RefObject<HTMLDivElement>,
-    gamePlan: GamePlan,
-    players: Player[],
-    batches: any[],
-  ) => {
-    try {
-      const pdf = new jsPDF("p", "mm", "a4")
+  formationRef: React.RefObject<HTMLDivElement>,
+  gamePlan: GamePlan,
+  players: Player[],
+  batches: any[],
+) => {
+  try {
+    const pdf = new jsPDF("p", "mm", "a4")
 
-      // Page 1: Formation Map
-      // Add title
-      pdf.setFontSize(24)
-      pdf.text(gamePlan.name, 105, 20, { align: "center" })
-      pdf.setFontSize(16)
-      pdf.text("Formation", 105, 30, { align: "center" })
+    // Page 1: Formation Map
+    pdf.setFontSize(20)
+    pdf.text(gamePlan.name, 105, 20, { align: "center" })
+    pdf.setFontSize(10)
+    pdf.text("Formation", 105, 30, { align: "center" })
 
-      // Add formation image with maximum size while maintaining aspect ratio
-      if (formationRef.current) {
-        const canvas = await html2canvas(formationRef.current, {
-          backgroundColor: null,
-          scale: 2,
-        })
-        const formationImage = canvas.toDataURL("image/png")
+    if (formationRef.current) {
+      // Create a temporary container for the high-res canvas
+      const tempDiv = formationRef.current.cloneNode(true) as HTMLDivElement;
+      tempDiv.style.width = '800px'; // Set a fixed width for the high-res capture
+      tempDiv.style.height = '1000px'; // Set a fixed height
+      tempDiv.style.position = 'absolute';
+      tempDiv.style.left = '-9999px'; // Move off-screen
+      document.body.appendChild(tempDiv);
 
-        // Calculate dimensions to fill most of the page while maintaining aspect ratio
-        const pageWidth = 210 // A4 width in mm
-        const pageHeight = 297 // A4 height in mm
-        const maxWidth = 190 // Leave margins
-        const maxHeight = 230 // Leave space for title and margins
+      const canvas = await html2canvas(tempDiv, {
+        backgroundColor: null,
+        scale: 2, // Use a higher scale for better quality
+      });
+      const formationImage = canvas.toDataURL("image/png");
 
-        const imgRatio = canvas.width / canvas.height
-        let finalWidth = maxWidth
-        let finalHeight = maxWidth / imgRatio
+      // Clean up the temporary element
+      document.body.removeChild(tempDiv);
 
-        if (finalHeight > maxHeight) {
-          finalHeight = maxHeight
-          finalWidth = maxHeight * imgRatio
-        }
+      const pageWidth = 210;
+      const pageHeight = 297;
+      const maxWidth = 180;
+      const maxHeight = 200;
 
-        // Center the image horizontally
-        const leftMargin = (pageWidth - finalWidth) / 2
-        // Position below title with some spacing
-        const topMargin = 40
+      const imgWidth = canvas.width;
+      const imgHeight = canvas.height;
 
-        pdf.addImage(formationImage, "PNG", leftMargin, topMargin, finalWidth, finalHeight)
-      }
+      const imgRatio = imgWidth / imgHeight;
+      let finalWidth = maxWidth;
+      let finalHeight = finalWidth / imgRatio;
+
+      if (finalHeight > maxHeight) {
+        finalHeight = maxHeight;
+        finalWidth = finalHeight * imgRatio;
+      }
+
+      const leftMargin = (pageWidth - finalWidth) / 2;
+      const topMargin = 50;
+
+      pdf.addImage(formationImage, "PNG", leftMargin, topMargin, finalWidth, finalHeight);
+    }
+
 
       // Page 2: Details
       pdf.addPage()
@@ -1610,8 +1620,8 @@ const lineOptions = {
   }
 
   const getPositionColor = (positionName: string): string => {
-    if (positionName.includes("Goalkeeper")) return "text-cyan-600" // Gold color for GK
-    if (positionName.includes("Back")) return "text-lime-200" // Deep red for defenders
+    if (positionName.includes("Goalkeeper")) return "text-White-600" // White color for GK
+    if (positionName.includes("Back")) return "text-lime-200" // Deep lime for defenders
     if (positionName.includes("Midfielder")) return "text-yellow-200" // Deep purple for midfielders
     if (positionName.includes("Striker")) return "text-rose-500" // Deep orange for strikers
     return "text-white"
@@ -1662,91 +1672,119 @@ const lineOptions = {
   }
 
   // Add this helper function to count positions and goalkeepers
-  const countPositions = (currentPositions: Position[]) => {
-    const totalCount = currentPositions.length
-    const goalkeeperCount = currentPositions.filter((pos) => pos.type === "gk" || pos.shortName === "GK").length
-    return { totalCount, goalkeeperCount }
+  const countPositions = (selectedGamePlan: GamePlan | null) => {
+  if (!selectedGamePlan || !selectedGamePlan.positions) {
+    return { totalCount: 0, goalkeeperCount: 0 };
   }
 
-  // Modify handleAddCustomPosition to include position validation
+  // Count actual positions that exist in the game plan's positions object
+  // This represents what's actually on the field
+  const actualPositionIds = Object.keys(selectedGamePlan.positions);
+  const totalCount = actualPositionIds.length;
+
+  // Count goalkeepers by checking the position data
+  const goalkeeperCount = actualPositionIds.filter(positionId => {
+    // Check if it's a goalkeeper position by ID or by looking up position type
+    if (positionId === 'gk' || positionId.startsWith('gk')) {
+      return true;
+    }
+    
+    // Check in the positions array (default positions)
+    const defaultPosition = positions.find(p => p.id === positionId);
+    if (defaultPosition && (defaultPosition.type === 'gk' || defaultPosition.shortName === 'GK')) {
+      return true;
+    }
+    
+    // Check in custom positions
+    const customPosition = customPositions.find(p => p.id === positionId);
+    if (customPosition && (customPosition.type === 'gk' || customPosition.shortName === 'GK')) {
+      return true;
+    }
+    
+    return false;
+  }).length;
+
+  return { totalCount, goalkeeperCount };
+};
+
+  // Modify handleAddCustomPosition to include position validation and size update
   const handleAddCustomPosition = () => {
-    if (!selectedGamePlan) return
+  if (!selectedGamePlan) return;
 
-    // Get current positions
-    const currentPositions = [...positions.filter((p) => !deletedPositions.includes(p.id)), ...customPositions]
+  // Get current count from what's actually on the field
+  const { totalCount, goalkeeperCount } = countPositions(selectedGamePlan);
 
-    const { totalCount, goalkeeperCount } = countPositions(currentPositions)
-
-    // Check total positions
-    if (totalCount >= 11) {
-      toast({
-        title: "Maximum players reached",
-        description: "Delete an existing position before adding a new one",
-        variant: "destructive",
-      })
-      return
-    }
-
-    // Check goalkeeper position
-    if (selectedPositionType === "gk" && goalkeeperCount > 0) {
-      toast({
-        title: "Goalkeeper already exists",
-        description: "Only one goalkeeper is allowed in the formation",
-        variant: "destructive",
-      })
-      return
-    }
-
-    const type = POSITION_TYPES.find((t) => t.id === selectedPositionType) || POSITION_TYPES[4]
-    const newPosition: Position = {
-      id: `custom${Date.now()}`,
-      name: `Custom ${type.name}`,
-      shortName: type.shortName,
-      type: type.id,
-    }
-
-    // Add the new position to customPositions state
-    setCustomPositions((prev) => [...prev, newPosition])
-
-    // Also add it to the selected game plan's positions
-    if (selectedGamePlan) {
-      const defaultCoordinates = getDefaultPositionStyle(type.id)
-      setSelectedGamePlan({
-        ...selectedGamePlan,
-        positions: {
-          [newPosition.id]: {
-            playerId: "",
-            top: defaultCoordinates.top,
-            left: defaultCoordinates.left,
-          },
-        },
-      })
-
-      // Update gamePlans state
-      setGamePlans((prev) =>
-        prev.map((gp) =>
-          gp.id === selectedGamePlan._id
-            ? {
-                ...gp,
-                positions: {
-                  [newPosition.id]: {
-                    playerId: "",
-                    top: defaultCoordinates.top,
-                    left: defaultCoordinates.left,
-                  },
-                },
-              }
-            : gp,
-        ),
-      )
-    }
-
-    // Show success toast
+  // Check total positions - limit to 11
+  if (totalCount >= 11) {
     toast({
-      title: "Position Added",
-      description: `Added new ${type.name} position`,
-    })
+      title: "Maximum players reached",
+      description: "Cannot add more than 11 players",
+      variant: "destructive",
+    });
+    return;
   }
+
+  // Check goalkeeper position
+  if (selectedPositionType === "gk" && goalkeeperCount > 0) {
+    toast({
+      title: "Goalkeeper already exists",
+      description: "Only one goalkeeper is allowed in the formation",
+      variant: "destructive",
+    });
+    return;
+  }
+
+  const type = POSITION_TYPES.find((t) => t.id === selectedPositionType) || POSITION_TYPES[4];
+  const newPosition: Position = {
+    id: `custom${Date.now()}`,
+    name: `Custom ${type.name}`,
+    shortName: type.shortName,
+    type: type.id,
+  };
+
+  // Add the new position to customPositions state
+  setCustomPositions((prev) => [...prev, newPosition]);
+
+  // Calculate new size based on actual positions + 1
+  const newSize = Math.min(totalCount + 1, 11);
+  const newTeamSize = totalCount + 1;
+
+  // Add it to the selected game plan's positions
+  if (selectedGamePlan) {
+    const defaultCoordinates = getDefaultPositionStyle(type.id, newSize);
+    const updatedPositions = {
+      ...selectedGamePlan.positions,
+      [newPosition.id]: {
+        playerId: "",
+        top: defaultCoordinates.top,
+        left: defaultCoordinates.left,
+      },
+    };
+
+    const updatedGamePlan = {
+      ...selectedGamePlan,
+      size: newSize.toString(),
+      teamSize: newTeamSize,
+      positions: updatedPositions,
+    };
+
+    setSelectedGamePlan(updatedGamePlan);
+
+    // Update gamePlans state
+    setGamePlans((prev) =>
+      prev.map((gp) =>
+        gp._id === selectedGamePlan._id ? updatedGamePlan : gp,
+      ),
+    );
+  }
+
+  // Show success toast
+  toast({
+    title: "Position Added",
+    description: `Added new ${type.name} position. Team size increased to ${newSize}`,
+  });
+};
+
 
   const handleRemoveCustomPosition = (positionId: string) => {
     setCustomPositions(customPositions.filter((pos) => pos.id !== positionId))
@@ -1763,40 +1801,36 @@ const lineOptions = {
   }
 
   const handleRemovePosition = (positionId: string) => {
-    if (!selectedGamePlan) return
+  if (!selectedGamePlan) return;
 
-    // Add to deleted positions if it's a default position
-    if (!positionId.startsWith("custom")) {
-      setDeletedPositions((prev) => [...prev, positionId])
-    }
+  // Remove position from custom positions array
+  setCustomPositions((prev) => prev.filter((pos) => pos.id !== positionId));
 
-    // Remove position from both custom positions and game plan
-    setCustomPositions((prev) => prev.filter((pos) => pos.id !== positionId))
+  // Remove position from game plan positions object
+  const updatedPositions = { ...selectedGamePlan.positions };
+  delete updatedPositions[positionId];
 
-    const updatedPositions = { ...selectedGamePlan.positions }
-    delete updatedPositions[positionId]
+  // Calculate new counts based on remaining positions
+  const remainingPositionCount = Object.keys(updatedPositions).length;
 
-    setSelectedGamePlan({
-      ...selectedGamePlan,
-      positions: updatedPositions,
-    })
+  const updatedGamePlan = {
+    ...selectedGamePlan,
+    positions: updatedPositions,
+    size: remainingPositionCount.toString(),
+    teamSize: remainingPositionCount,
+  };
 
-    setGamePlans((prev) =>
-      prev.map((gp) => (gp.id === selectedGamePlan._id ? { ...gp, positions: updatedPositions } : gp)),
-    )
+  setSelectedGamePlan(updatedGamePlan);
 
-    // Show remaining slots after removal
-    const currentPositions = [...positions.filter((p) => !deletedPositions.includes(p.id)), ...customPositions].filter(
-      (p) => p.id !== positionId,
-    )
+  setGamePlans((prev) =>
+    prev.map((gp) => (gp._id === selectedGamePlan._id ? updatedGamePlan : gp)),
+  );
 
-    const { totalCount } = countPositions(currentPositions)
-
-    toast({
-      title: "Position removed",
-      description: `${11 - totalCount} position slots available`,
-    })
-  }
+  toast({
+    title: "Position removed",
+    description: `${11 - remainingPositionCount} position slots available`,
+  });
+};
 
   const handleResetFormation = () => {
     if (!selectedGamePlan) return
@@ -1922,7 +1956,7 @@ const lineOptions = {
 
               const canvas = await html2canvas(fieldRef.current, {
                 backgroundColor: null,
-                scale: 2,
+                scale: 1,
               })
 
               const image = canvas.toDataURL("image/png")
@@ -1967,7 +2001,8 @@ const lineOptions = {
   // Add a component to show position count in customize menu
   const PositionCounter = () => {
     const currentPositions = [...positions.filter((p) => !deletedPositions.includes(p.id)), ...customPositions]
-    const { totalCount, goalkeeperCount } = countPositions(currentPositions)
+    const { totalCount, goalkeeperCount } = countPositions(selectedGamePlan)
+    const currentSize = selectedGamePlan?.teamSize || Number.parseInt(selectedGamePlan?.size || "11")
 
     return (
       <div className="flex justify-between items-center text-sm text-muted-foreground">
@@ -1976,6 +2011,8 @@ const lineOptions = {
       </div>
     )
   }
+
+  // Function to change gameplan size by adding/removing positions
 
   // Add this useEffect to fetch players when component mounts
   useEffect(() => {

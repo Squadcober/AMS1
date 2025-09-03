@@ -888,7 +888,7 @@ export default function InjuryRehab({ playerData }: InjuryRehabProps) {
             
             {/* X-ray Images Upload Section */}
             <div className="space-y-3">
-              <Label>X-ray Images</Label>
+              <Label>Medical Images</Label>
               <div className="grid grid-cols-3 gap-4">
                 {[0, 1, 2].map((imageIndex) => (
                   <div key={imageIndex} className="space-y-2">
@@ -1008,7 +1008,7 @@ export default function InjuryRehab({ playerData }: InjuryRehabProps) {
               onClick={handleViewXray}
             >
               <Eye className="w-4 h-4 mr-2" />
-              View X-ray Images
+              View Medical Images
             </Button>
             <Button
               className="w-full justify-start"
@@ -1026,7 +1026,7 @@ export default function InjuryRehab({ playerData }: InjuryRehabProps) {
       <Dialog open={showXrayViewer} onOpenChange={setShowXrayViewer}>
         <DialogContent className="max-w-6xl w-full h-[90vh]">
           <DialogHeader>
-            <DialogTitle>X-ray Images - {currentViewInjury?.type}</DialogTitle>
+            <DialogTitle>Medical Images - {currentViewInjury?.type}</DialogTitle>
           </DialogHeader>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 h-[calc(90vh-8rem)] overflow-y-auto">
             {currentViewInjury?.xrayImages?.map((image, index) => (
@@ -1044,7 +1044,7 @@ export default function InjuryRehab({ playerData }: InjuryRehabProps) {
                   />
                 </div>
                 <p className="text-center text-sm text-muted-foreground">
-                  X-ray {index + 1}
+                  Medical {index + 1}
                 </p>
               </div>
             ))}

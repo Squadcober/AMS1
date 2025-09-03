@@ -20,6 +20,7 @@ const getBaseUrl = () => {
 
 interface Session {
   _id: string;
+  id: number | string;
   name: string;
   date: string;
   startTime: string;
@@ -27,6 +28,9 @@ interface Session {
   coachNames: string[];
   status: string;
   assignedPlayers: string[];
+  parentSessionId?: number;
+  isRecurring?: boolean;
+  isOccurrence?: boolean;
   attendance: {
     [key: string]: {
       status: string;
@@ -100,11 +104,18 @@ export default function Training() {
 
         const result = await response.json();
         if (result.success) {
+          // Map sessions to add id
+          const sessionsWithId: Session[] = result.data.map((session: any) => ({
+            ...session,
+            id: session._id.toString()
+          }));
           // Filter sessions to only include those assigned to the player
-          const playerSessions = result.data.filter((session: Session) => 
+          const playerSessions = sessionsWithId.filter((session: Session) =>
             session.assignedPlayers.includes(playerData.id)
           );
-          setSessions(playerSessions);
+          // Filter out parent sessions (recurring sessions that are not occurrences)
+          const filteredPlayerSessions = playerSessions.filter((s: Session) => !(s.isRecurring && !s.isOccurrence));
+          setSessions(filteredPlayerSessions);
         } else {
           toast({
             title: "Error",
