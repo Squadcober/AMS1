@@ -71,6 +71,27 @@ export default function InjuryRehab({ playerData }: InjuryRehabProps) {
   const [showImageEnlarged, setShowImageEnlarged] = useState(false);
   const [enlargedImageUrl, setEnlargedImageUrl] = useState<string>("");
   const [enlargedImageTitle, setEnlargedImageTitle] = useState<string>("");
+  const [dateError, setDateError] = useState<string>("");
+
+  // Validation function for injury date
+  const validateInjuryDate = (injuryDate: string): string => {
+    if (!injuryDate) return "";
+
+    const playerDOB = playerData?.dob;
+    if (!playerDOB) {
+      // If no DOB is present, any date is allowed
+      return "";
+    }
+
+    const injuryDateObj = new Date(injuryDate);
+    const dobObj = new Date(playerDOB);
+
+    if (injuryDateObj < dobObj) {
+      return "Injury date cannot be before the player's date of birth";
+    }
+
+    return "";
+  };
 
   useEffect(() => {
     const loadPlayerData = async () => {
@@ -350,6 +371,7 @@ export default function InjuryRehab({ playerData }: InjuryRehabProps) {
       otherDocs: injury.otherDocs || [],
       pdfFiles: injury.pdfFiles || []
     })
+    setDateError("")
     setIsEditDialogOpen(true)
   }
 
@@ -365,6 +387,7 @@ export default function InjuryRehab({ playerData }: InjuryRehabProps) {
       prescription: "/placeholder.svg",
       otherDocs: []
     })
+    setDateError("")
     setIsEditDialogOpen(true)
   }
 
@@ -406,6 +429,16 @@ export default function InjuryRehab({ playerData }: InjuryRehabProps) {
 
   const handleSaveInjury = async () => {
     try {
+      // Check for validation errors
+      if (dateError) {
+        toast({
+          title: "Validation Error",
+          description: dateError,
+          variant: "destructive",
+        });
+        return;
+      }
+
       if (!user?.username || !user?.academyId) return;
 
       const injuryToSave = {
@@ -850,8 +883,17 @@ export default function InjuryRehab({ playerData }: InjuryRehabProps) {
                 id="date"
                 type="date"
                 value={newInjury.date}
-                onChange={(e) => setNewInjury(prev => ({ ...prev, date: e.target.value }))}
+                onChange={(e) => {
+                  const newDate = e.target.value;
+                  setNewInjury(prev => ({ ...prev, date: newDate }));
+                  const error = validateInjuryDate(newDate);
+                  setDateError(error);
+                }}
+                className={dateError ? "border-red-500" : ""}
               />
+              {dateError && (
+                <p className="text-sm text-red-500 mt-1">{dateError}</p>
+              )}
             </div>
             <div>
               <Label htmlFor="treatment">Treatment</Label>
