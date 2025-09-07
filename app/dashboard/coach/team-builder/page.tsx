@@ -136,7 +136,7 @@ const LOCAL_STORAGE_KEY = "team-builder-gameplans"
 const checkPositionOverlap = (
   pos1: { top: string; left: string },
   pos2: { top: string; left: string },
-  minDistancePercent: number = 15 // Minimum distance between centers as percentage
+  minDistancePercent: number = 5 // Minimum distance between centers as percentage
 ): boolean => {
   const top1 = parseFloat(pos1.top)
   const left1 = parseFloat(pos1.left)
@@ -155,47 +155,108 @@ const findNonOverlappingPosition = (
   targetPos: { top: string; left: string },
   existingPositions: { [key: string]: { playerId: string; top: string; left: string } | null },
   excludePositionId: string,
-  minDistancePercent: number = 15
+  minDistancePercent: number = 12
 ): { top: string; left: string } => {
-  let newTop = parseFloat(targetPos.top)
-  let newLeft = parseFloat(targetPos.left)
+  const targetTop = parseFloat(targetPos.top)
+  const targetLeft = parseFloat(targetPos.left)
 
-  // Try small adjustments in a spiral pattern
-  const adjustments = [
-    { top: 0, left: 0 }, // Original position
-    { top: 0, left: minDistancePercent }, // Right
-    { top: 0, left: -minDistancePercent }, // Left
-    { top: minDistancePercent, left: 0 }, // Down
-    { top: -minDistancePercent, left: 0 }, // Up
-    { top: minDistancePercent, left: minDistancePercent }, // Down-right
-    { top: minDistancePercent, left: -minDistancePercent }, // Down-left
-    { top: -minDistancePercent, left: minDistancePercent }, // Up-right
-    { top: -minDistancePercent, left: -minDistancePercent }, // Up-left
-  ]
-
-  for (const adjustment of adjustments) {
-    const testTop = Math.max(5, Math.min(95, newTop + adjustment.top))
-    const testLeft = Math.max(5, Math.min(95, newLeft + adjustment.left))
-    const testPos = { top: `${testTop}%`, left: `${testLeft}%` }
-
-    let hasOverlap = false
+  // Check if target position is already valid
+  const isPositionValid = (testPos: { top: string; left: string }) => {
     for (const [posId, posData] of Object.entries(existingPositions)) {
       if (posId === excludePositionId || !posData) continue
       if (checkPositionOverlap(testPos, { top: posData.top, left: posData.left }, minDistancePercent)) {
-        hasOverlap = true
-        break
+        return false
       }
     }
+    return true
+  }
 
-    if (!hasOverlap) {
+  if (isPositionValid(targetPos)) {
+    return targetPos
+  }
+
+  // Use very small increments for precise positioning
+  const maxSearchRadius = 25 // Keep search radius reasonable
+  const angleStep = 10 // Smaller angle steps for more precision
+  const radiusStep = 0.5 // Very small radius increments
+  
+  // Search in expanding circles with very small increments
+  for (let radius = radiusStep; radius <= maxSearchRadius; radius += radiusStep) {
+    const positions = []
+    
+    // Generate all positions at this radius
+    for (let angle = 0; angle < 360; angle += angleStep) {
+      const radians = (angle * Math.PI) / 180
+      const offsetTop = radius * Math.cos(radians)
+      const offsetLeft = radius * Math.sin(radians)
+      
+      const testTop = Math.max(5, Math.min(95, targetTop + offsetTop))
+      const testLeft = Math.max(5, Math.min(95, targetLeft + offsetLeft))
+      const testPos = { top: `${testTop}%`, left: `${testLeft}%` }
+      
+      // Calculate actual distance from target for sorting
+      const actualDistance = Math.sqrt(
+        Math.pow(testTop - targetTop, 2) + Math.pow(testLeft - targetLeft, 2)
+      )
+      
+      positions.push({ pos: testPos, distance: actualDistance })
+    }
+    
+    // Sort by actual distance to target (closest first)
+    positions.sort((a, b) => a.distance - b.distance)
+    
+    // Test each position starting with the closest
+    for (const { pos } of positions) {
+      if (isPositionValid(pos)) {
+        return pos
+      }
+    }
+  }
+
+  // If still no position found, try the absolute minimum distance in each cardinal direction
+  const cardinalDirections = [
+    { top: 0, left: minDistancePercent + 1 }, // Right
+    { top: 0, left: -(minDistancePercent + 1) }, // Left  
+    { top: minDistancePercent + 1, left: 0 }, // Down
+    { top: -(minDistancePercent + 1), left: 0 }, // Up
+  ]
+
+  for (const direction of cardinalDirections) {
+    const testTop = Math.max(5, Math.min(95, targetTop + direction.top))
+    const testLeft = Math.max(5, Math.min(95, targetLeft + direction.left))
+    const testPos = { top: `${testTop}%`, left: `${testLeft}%` }
+    
+    if (isPositionValid(testPos)) {
       return testPos
     }
   }
 
-  // If no good position found, return original clamped to boundaries
-  return {
-    top: `${Math.max(5, Math.min(95, newTop))}%`,
-    left: `${Math.max(5, Math.min(95, newLeft))}%`
+  // Final fallback - find the closest valid position in any direction
+  let closestValidPosition = null
+  let minDistance = Infinity
+
+  // Check a grid around the target position with fine granularity
+  for (let topOffset = -20; topOffset <= 20; topOffset += 1) {
+    for (let leftOffset = -20; leftOffset <= 20; leftOffset += 1) {
+      if (topOffset === 0 && leftOffset === 0) continue // Skip the target position
+      
+      const testTop = Math.max(5, Math.min(95, targetTop + topOffset))
+      const testLeft = Math.max(5, Math.min(95, targetLeft + leftOffset))
+      const testPos = { top: `${testTop}%`, left: `${testLeft}%` }
+      
+      if (isPositionValid(testPos)) {
+        const distance = Math.sqrt(topOffset * topOffset + leftOffset * leftOffset)
+        if (distance < minDistance) {
+          minDistance = distance
+          closestValidPosition = testPos
+        }
+      }
+    }
+  }
+
+  return closestValidPosition || {
+    top: `${Math.max(5, Math.min(95, targetTop))}%`,
+    left: `${Math.max(5, Math.min(95, targetLeft))}%`
   }
 }
 

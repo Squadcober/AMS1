@@ -81,9 +81,24 @@ interface GamePlan {
   };
   substitutes?: Array<{ playerId: string }>;
   formation: string;
+  strategy?: string;
 }
 
 const LOCAL_STORAGE_KEY = "match-day-matches"
+
+// Helper function to format date as YYYY-MM-DD string (timezone-safe)
+const formatDateForStorage = (date: Date): string => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+// Helper function to parse YYYY-MM-DD string as local date (timezone-safe)
+const parseDateFromStorage = (dateString: string): Date => {
+  const [year, month, day] = dateString.split('-').map(Number);
+  return new Date(year, month - 1, day);
+};
 
 const getFormattedValue = (value: any): string => {
   if (typeof value === 'number') {
@@ -255,7 +270,7 @@ export default function MatchDay() {
     academyId: user?.academyId || ""
   })
   const [isGamePlanDialogOpen, setIsGamePlanDialogOpen] = useState(false)
-  const [selectedGamePlan, setSelectedGamePlan] = useState<string | null>(null)
+  const [selectedGamePlan, setSelectedGamePlan] = useState<GamePlan | null>(null)
   const [activeLog, setActiveLog] = useState<"All" | "Finished" | "On-going" | "Upcoming">("All")
   const [viewDetailsMatchId, setViewDetailsMatchId] = useState<string | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -479,6 +494,9 @@ useEffect(() => {
       // Create a copy of newMatch without _id
       const { _id, ...matchData } = newMatch;
 
+      // Format the date as YYYY-MM-DD string to avoid timezone issues
+      const formattedDate = formatDateForStorage(new Date(matchData.date));
+
       // Ensure startTime and endTime are set with defaults if not provided
       const startTime = matchData.startTime || "11:00";
       const duration = matchData.duration || 90;
@@ -486,6 +504,7 @@ useEffect(() => {
 
       const match = {
         ...matchData,
+        date: formattedDate,
         startTime,
         endTime,
         players: playerIds,
@@ -650,9 +669,14 @@ useEffect(() => {
     }
   }
 
-  const handleGamePlanClick = (gamePlan: string) => {
-    setSelectedGamePlan(gamePlan)
-    setIsGamePlanDialogOpen(true)
+  const handleGamePlanClick = (gamePlanName: string, openDialog: boolean = true) => {
+    const gamePlan = gamePlansData.find(gp => gp.name === gamePlanName);
+    if (gamePlan) {
+      setSelectedGamePlan(gamePlan);
+      if (openDialog) {
+        setIsGamePlanDialogOpen(true);
+      }
+    }
   }
 
   const handleViewDetails = (matchId: string) => {
@@ -1053,7 +1077,7 @@ useEffect(() => {
             console.log('Processing match:', match.id, 'with players:', match.players);
             return (
               <TableRow key={match._id}>
-                <TableCell>{format(new Date(match.date), "PP")}</TableCell>
+                <TableCell>{match.date && match.date instanceof Date && !isNaN(match.date.getTime()) ? format(match.date, "PP") : "Invalid Date"}</TableCell>
                 <TableCell>{match.opponent}</TableCell>
                 <TableCell>{match.venue}</TableCell>
                 <TableCell>
@@ -1205,7 +1229,7 @@ useEffect(() => {
           <div>
             <h3 className="text-lg font-semibold mb-4">Match Information</h3>
             <div className="space-y-2">
-              <p><strong>Date:</strong> {format(new Date(match.date), "PP")}</p>
+              <p><strong>Date:</strong> {match.date && match.date instanceof Date && !isNaN(match.date.getTime()) ? format(match.date, "PP") : "Invalid Date"}</p>
               <p><strong>Team 1:</strong> {match.team1}</p>
               <p><strong>Team 2:</strong> {match.team2}</p>
               <p><strong>Venue:</strong> {match.venue}</p>
@@ -1471,7 +1495,7 @@ useEffect(() => {
       }));
     }
     
-    if (value) handleGamePlanClick(value);
+    if (value) handleGamePlanClick(value, false);
   }}
 >
             <SelectTrigger>
@@ -1681,10 +1705,51 @@ useEffect(() => {
         <Dialog open={isGamePlanDialogOpen} onOpenChange={setIsGamePlanDialogOpen}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Game Plan: {selectedGamePlan}</DialogTitle>
+              <DialogTitle>Game Plan: {selectedGamePlan?.name || "No game plan selected"}</DialogTitle>
             </DialogHeader>
-            <div className="p-4">
-              <p>Details for game plan: {selectedGamePlan}</p>
+            <div className="p-4 space-y-4">
+              {selectedGamePlan ? (
+                <>
+                  <div>
+                    <h4 className="font-semibold">Formation: {selectedGamePlan.formation}</h4>
+                    <p>Size: {selectedGamePlan.size} players</p>
+                    {selectedGamePlan.strategy && (
+                      <p>Strategy: {selectedGamePlan.strategy}</p>
+                    )}
+                  </div>
+                  <div>
+                    <h4 className="font-semibold">Positions:</h4>
+                    <ul className="list-disc list-inside space-y-1">
+                      {Object.entries(selectedGamePlan.positions).map(([pos, data]) => {
+                        if (!data || !data.playerId) return null;
+                        const player = players.find(p => p.id === data.playerId);
+                        return (
+                          <li key={pos}>
+                            {pos.toUpperCase()}: {player?.name || 'Unknown Player'}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                  {selectedGamePlan.substitutes && selectedGamePlan.substitutes.length > 0 && (
+                    <div>
+                      <h4 className="font-semibold">Substitutes:</h4>
+                      <ul className="list-disc list-inside space-y-1">
+                        {selectedGamePlan.substitutes.map((sub, index) => {
+                          const player = players.find(p => p.id === sub.playerId);
+                          return (
+                            <li key={index}>
+                              {player?.name || 'Unknown Player'}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <p>No game plan selected.</p>
+              )}
             </div>
             <div className="flex justify-end pt-4">
               <Button variant="default" onClick={() => setIsGamePlanDialogOpen(false)}>Close</Button>
