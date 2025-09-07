@@ -51,7 +51,7 @@ export default function FinancesPage() {
     transactionId: "",
     description: "",
     amount: 0,
-    quantity: 1,
+    quantity: 0,
     type: "expense",
     date: today,
   })
@@ -130,7 +130,7 @@ export default function FinancesPage() {
       transactionId: "",
       description: "",
       amount: 0,
-      quantity: 1,
+      quantity: 0,
       type: "expense",
       date: today,
     })
@@ -518,9 +518,12 @@ export default function FinancesPage() {
                           <Input
                             id="quantity"
                             type="number"
-                            min="1"
-                            value={newRecord.quantity}
-                            onChange={(e) => setNewRecord({ ...newRecord, quantity: parseInt(e.target.value) || 1 })}
+                            min="0"
+                            value={newRecord.quantity === 0 ? '' : newRecord.quantity}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setNewRecord({ ...newRecord, quantity: val === '' ? 0 : parseInt(val) || 0 });
+                            }}
                             className="col-span-3"
                           />
                         </div>

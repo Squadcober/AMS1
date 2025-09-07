@@ -72,6 +72,8 @@ export default function InjuryRehab({ playerData }: InjuryRehabProps) {
   const [enlargedImageUrl, setEnlargedImageUrl] = useState<string>("");
   const [enlargedImageTitle, setEnlargedImageTitle] = useState<string>("");
   const [dateError, setDateError] = useState<string>("");
+  const [playerMatch, setPlayerMatch] = useState<any>(null);
+  const [playerId, setPlayerId] = useState<string | null>(null);
 
   // Validation function for injury date
   const validateInjuryDate = (injuryDate: string): string => {
@@ -111,6 +113,7 @@ export default function InjuryRehab({ playerData }: InjuryRehabProps) {
             );
 
             if (playerMatch) {
+              setPlayerId(playerMatch.id);
               setIsLoading(false);
             } else {
               console.error("No matching player found for username:", user.username);
@@ -139,11 +142,11 @@ export default function InjuryRehab({ playerData }: InjuryRehabProps) {
 
   useEffect(() => {
     const fetchInjuries = async () => {
-      if (!user?.username || !user?.academyId) return;
+      if (!playerId || !user?.academyId) return;
 
       try {
         const response = await fetch(
-          `/api/db/ams-injury?playerId=${user.username}&academyId=${user.academyId}`,
+          `/api/db/ams-injury?playerId=${playerId}&academyId=${user.academyId}`,
           { credentials: 'include' }
         );
 
@@ -165,10 +168,10 @@ export default function InjuryRehab({ playerData }: InjuryRehabProps) {
       }
     };
 
-    if (user) {
+    if (playerId && user?.academyId) {
       fetchInjuries();
     }
-  }, [user]);
+  }, [playerId, user?.academyId]);
 
   const compressImage = async (base64String: string): Promise<string> => {
     return new Promise((resolve) => {
@@ -337,16 +340,16 @@ export default function InjuryRehab({ playerData }: InjuryRehabProps) {
   };
   
   const refreshInjuries = async () => {
-    if (!user?.username || !user?.academyId) return;
-    
+    if (!playerId || !user?.academyId) return;
+
     try {
       const response = await fetch(
-        `/api/db/ams-injury?playerId=${user.username}&academyId=${user.academyId}`,
+        `/api/db/ams-injury?playerId=${playerId}&academyId=${user.academyId}`,
         { credentials: 'include' }
       );
-  
+
       if (!response.ok) throw new Error('Failed to fetch injuries');
-  
+
       const result = await response.json();
       if (result.success) {
         setInjuries(result.data);
@@ -396,7 +399,7 @@ export default function InjuryRehab({ playerData }: InjuryRehabProps) {
       const method = injury._id ? 'PUT' : 'POST';
       const payload = {
         ...injury,
-        playerId: user?.username,
+        playerId: playerId,
         academyId: user?.academyId,
         xrayImages: injury.xrayImages && injury.xrayImages.length === 3
           ? injury.xrayImages
@@ -444,7 +447,7 @@ export default function InjuryRehab({ playerData }: InjuryRehabProps) {
       const injuryToSave = {
         ...newInjury,
         _id: editingInjury?._id,
-        playerId: user.username,
+        playerId: playerId,
         academyId: user.academyId,
         xrayImages: newInjury.xrayImages && newInjury.xrayImages.length === 3
           ? newInjury.xrayImages
@@ -495,11 +498,11 @@ export default function InjuryRehab({ playerData }: InjuryRehabProps) {
     input.multiple = true;
     input.onchange = async (e) => {
       const files = (e.target as HTMLInputElement).files;
-      if (!files || !user?.username || !user?.academyId) return;
-  
+      if (!files || !playerId || !user?.academyId) return;
+
       const filesArray = Array.from(files);
       const oversizedFiles = filesArray.filter(file => file.size > MAX_FILE_SIZE);
-      
+
       if (oversizedFiles.length > 0) {
         toast({
           title: "Error",
@@ -507,29 +510,29 @@ export default function InjuryRehab({ playerData }: InjuryRehabProps) {
         });
         return;
       }
-  
+
       try {
         const formData = new FormData();
         filesArray.forEach(file => formData.append('files', file));
         formData.append('data', JSON.stringify({
-          playerId: user.username,
+          playerId: playerId,
           academyId: user.academyId,
           type: 'pdf',
           injuryId: injuries[0]?._id
         }));
-  
+
         const response = await fetch('/api/db/ams-injury', {
           method: 'POST',
           body: formData,
           credentials: 'include'
         });
-  
+
         if (!response.ok) throw new Error('Failed to upload PDFs');
-  
+
         const result = await response.json();
         if (result.success) {
           await refreshInjuries();
-          
+
           toast({
             title: "Success",
             description: "PDFs uploaded successfully"

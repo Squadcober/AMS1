@@ -259,6 +259,13 @@ export default function playerSettings() {
 
       setIsSaving(true);
 
+      // Validate date of birth is not after current date
+      const today = new Date();
+      const dobDate = new Date(playerInfo.dob);
+      if (dobDate > today) {
+        throw new Error("Date of birth cannot be after the current date");
+      }
+
       // Calculate age from DOB
       const calculatedAge = calculateAge(playerInfo.dob);
 
@@ -501,6 +508,7 @@ export default function playerSettings() {
                   type="date"
                   value={playerInfo.dob}
                   onChange={handleDOBChange}
+                  max={new Date().toISOString().split('T')[0]}
                   {...inputProps}
                 />
               </div>

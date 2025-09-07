@@ -319,21 +319,21 @@ export default function MatchDay() {
         setFilteredGamePlans(filtered);
       }
 
-      if (playersData.success && Array.isArray(playersData.data)) {
-        const formattedPlayers = playersData.data.map((player: any) => ({
-          ...player,
-          id: player._id || player.id,
-          name: player.name || player.username || 'Unknown Player',
-          academyId: player.academyId || user.academyId,
-          position: player.position || player.attributes?.position || ""
-        }));
-        
-        console.log('Setting players:', formattedPlayers.length);
-        debugPlayerData(formattedPlayers);
-        setPlayers(formattedPlayers);
-      } else {
-        console.error('Invalid player data format:', playersData);
-      }
+if (playersData.success && Array.isArray(playersData.data)) {
+  const formattedPlayers = playersData.data.map((player: any) => ({
+    ...player,
+    id: player.id && player.id.startsWith('player_') ? player.id : player._id,
+    name: player.name || player.username || 'Unknown Player',
+    academyId: player.academyId || user.academyId,
+    position: player.position || player.attributes?.position || ""
+  }));
+  
+  console.log('Setting players:', formattedPlayers.length);
+  debugPlayerData(formattedPlayers);
+  setPlayers(formattedPlayers);
+} else {
+  console.error('Invalid player data format:', playersData);
+}
 
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -1428,49 +1428,52 @@ useEffect(() => {
         </div>
         <div>
           <Label>Gameplan</Label>
-          <Select
-            value={newMatch.gameplan}
-            onValueChange={(value) => {
-              console.log('Selected gameplan value:', value);
-              const selectedGamePlan = filteredGamePlans.find(gp => gp.name === value);
-              console.log('Found gameplan data:', selectedGamePlan);
+<Select
+  value={newMatch.gameplan}
+  onValueChange={(value) => {
+    console.log('Selected gameplan value:', value);
+    const selectedGamePlan = filteredGamePlans.find(gp => gp.name === value);
+    console.log('Found gameplan data:', selectedGamePlan);
 
-              if (selectedGamePlan?.positions) {
-                // Extract player IDs from positions and substitutes
-                const positionPlayerIds = Object.values(selectedGamePlan.positions)
-                  .filter(pos => pos && pos.playerId)
-                  .map(pos => pos.playerId)
-                  .filter(id => id.startsWith('player_'));
+    if (selectedGamePlan?.positions) {
+      // Extract player IDs from positions and substitutes
+      const positionPlayerIds = Object.values(selectedGamePlan.positions)
+        .filter(pos => pos && pos.playerId)
+        .map(pos => pos.playerId);
 
-                const substitutePlayerIds = (selectedGamePlan.substitutes || [])
-                  .map(sub => sub.playerId)
-                  .filter(id => id && id.startsWith('player_'));
+      const substitutePlayerIds = (selectedGamePlan.substitutes || [])
+        .map(sub => sub.playerId)
+        .filter(id => id);
 
-                // Combine all player IDs
-                const allPlayerIds = [...new Set([...positionPlayerIds, ...substitutePlayerIds])];
-                
-                console.log('Extracted player IDs:', allPlayerIds);
+      // Combine all player IDs
+      const allPlayerIds = [...new Set([...positionPlayerIds, ...substitutePlayerIds])];
+      
+      console.log('Extracted player IDs:', allPlayerIds);
 
-                // Update match with gameplan and its players
-                setNewMatch(prev => ({
-                  ...prev,
-                  gameplan: value,
-                  players: allPlayerIds
-                }));
+      // Update match with gameplan and its players
+      setNewMatch(prev => {
+        const updated = {
+          ...prev,
+          gameplan: value,
+          players: allPlayerIds
+        };
+        console.log('Inside setNewMatch, updated players:', updated.players);
+        return updated;
+      });
 
-                // Log the update
-                console.log('Updated match players:', allPlayerIds);
-              } else {
-                console.log('No positions found in gameplan');
-                setNewMatch(prev => ({
-                  ...prev,
-                  gameplan: value
-                }));
-              }
-              
-              if (value) handleGamePlanClick(value);
-            }}
-          >
+      // Log the update
+      console.log('Updated match players:', allPlayerIds);
+    } else {
+      console.log('No positions found in gameplan');
+      setNewMatch(prev => ({
+        ...prev,
+        gameplan: value
+      }));
+    }
+    
+    if (value) handleGamePlanClick(value);
+  }}
+>
             <SelectTrigger>
               <SelectValue placeholder={
                 filteredGamePlans.length === 0 
@@ -1503,37 +1506,43 @@ useEffect(() => {
     <div>
       <Label>Players</Label>
       <div className="grid grid-cols-2 gap-2 border rounded-md p-4 max-h-[200px] overflow-y-auto">
-        {players
-          .filter((player) => player.academyId === user?.academyId)
-          .map((player) => {
-            const playerId = player.id.toString();
-            const isSelected = newMatch.players.includes(playerId);
+{players
+  .filter((player) => player.academyId === user?.academyId)
+  .map((player) => {
+    const playerId = player.id.toString();
+    const isSelected = newMatch.players.includes(playerId);
+    
+    console.log('Rendering player checkbox:', {
+      playerId,
+      isSelected,
+      newMatchPlayers: newMatch.players
+    });
+    
+    return (
+      <div key={playerId} className="flex items-center space-x-2">
+        <input
+          type="checkbox"
+          checked={isSelected}
+          onChange={(e) => {
+            console.log('Player selection change:', {
+              player: player.name,
+              id: playerId,
+              checked: e.target.checked,
+              currentPlayers: newMatch.players
+            });
             
-            return (
-              <div key={playerId} className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  checked={isSelected}
-                  onChange={(e) => {
-                    console.log('Player selection change:', {
-                      player: player.name,
-                      id: playerId,
-                      checked: e.target.checked,
-                      currentPlayers: newMatch.players
-                    });
-                    
-                    setNewMatch(prev => ({
-                      ...prev,
-                      players: e.target.checked
-                        ? [...prev.players, playerId]
-                        : prev.players.filter(id => id !== playerId)
-                    }));
-                  }}
-                />
-                <span>{player.name}</span>
-              </div>
-            );
-          })}
+            setNewMatch(prev => ({
+              ...prev,
+              players: e.target.checked
+                ? [...prev.players, playerId]
+                : prev.players.filter(id => id !== playerId)
+            }));
+          }}
+        />
+        <span>{player.name}</span>
+      </div>
+    );
+  })}
       </div>
     </div>
     <div>

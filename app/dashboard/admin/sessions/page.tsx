@@ -839,6 +839,7 @@ function SessionsContent() {
   const [showExportAlert, setShowExportAlert] = useState(false);
   const [dateLimits] = useState(getDateLimits());
   const [detailsPlayerSearchQuery, setDetailsPlayerSearchQuery] = useState("");
+  const [timeValidationError, setTimeValidationError] = useState("");
   const DAYS_OF_WEEK = [
     { label: "Sun", value: "sunday" },
     { label: "Mon", value: "monday" },
@@ -1029,6 +1030,19 @@ const handleAddSession = async () => {
         return;
       }
 
+      // Check if end time is earlier than start time (next day scenario)
+      const recurringStartTime = newSession.startTime;
+      const recurringEndTime = newSession.endTime;
+      const isNextDay = recurringEndTime <= recurringStartTime;
+
+      if (isNextDay) {
+        toast({
+          title: "Warning",
+          description: "End time is earlier than start time. End time will be considered as next day.",
+          variant: "default",
+        });
+      }
+
       // Apply trimming if needed
       const finalDateRange = trimDates
         ? calculateTrimmedDates(dateRange.from, dateRange.to, selectedDays)
@@ -1129,11 +1143,11 @@ const handleAddSession = async () => {
 
     if (sessionEnd <= sessionStart) {
       toast({
-        title: "Error",
-        description: "End time must be later than start time",
-        variant: "destructive",
+        title: "Warning",
+        description: "End time is earlier than start time. End time will be considered as next day.",
+        variant: "default",
       });
-      return;
+      // Allow saving overnight session instead of returning error
     }
 
     // Get coach data
@@ -3860,12 +3874,24 @@ const handleSaveChanges = async () => {
                     <Label htmlFor="endTime" className="text-right">
                       End Time
                     </Label>
-                    <TimePicker
-                      id="endTime"
-                      value={newSession.endTime}
-                      onChange={(time) => setNewSession({ ...newSession, endTime: time })}
-                      className="col-span-3 bg-black text-white border-gray-600 [&>button>svg]:text-white" // Add the icon styling
-                    />
+                  <TimePicker
+                    id="endTime"
+                    value={newSession.endTime}
+                    onChange={(time) => setNewSession({ ...newSession, endTime: time })}
+                    className="col-span-3 bg-black text-white border-gray-600 [&>button>svg]:text-white" // Add the icon styling
+                  />
+                  {(() => {
+                    const start = newSession.startTime;
+                    const end = newSession.endTime;
+                    if (start && end && end <= start) {
+                      return (
+                        <p className="col-span-3 text-sm text-yellow-400 mt-1 ml-4">
+                          Warning: End time is earlier than or equal to start time. End time will be considered as next day.
+                        </p>
+                      );
+                    }
+                    return null;
+                  })()}
                   </div>
                   <div className="grid grid-cols-4 items-center gap-4">
                     <Label htmlFor="duration" className="text-right">
@@ -4304,440 +4330,4 @@ const convertToCSV = (data: any[]) => {
 // ...rest of existing code remains unchanged...
 
 // Update DialogContent component to fix hydration error
-// Add this helper function for status calculation before renderSessionDetails
-const calculateSessionStatus = (session: Session) => {
-  const now = new Date();
-  const sessionDate = new Date(session.date);
-  const [startHour, startMinute] = session.startTime.split(':').map(Number);
-  const [endHour, endMinute] = session.endTime.split(':').map(Number);
 
-  const sessionStart = new Date(sessionDate);
-  sessionStart.setHours(startHour, startMinute, 0);
-
-  const sessionEnd = new Date(sessionDate);
-  sessionEnd.setHours(endHour, endMinute, 0);
-
-  if (now < sessionStart) {
-    return "Upcoming" as const;
-  } else if (now >= sessionStart && now <= sessionEnd) {
-    return "On-going" as const;
-  } else {
-    return "Finished" as const;
-  }
-};
-
-const renderSessionDetails = (
-  session: Session | undefined,
-  detailsPlayerSearchQuery: string = "",
-  handleMetricsClickParam?: (playerId: string, playerName: string, sessionId: number | string) => void,
-  viewDetailsSessionData?: Session | null,
-  setViewDetailsSessionData?: (session: Session | null) => void,
-  user?: { academyId?: string; id?: string } | null,
-  sessions: Session[] = [],
-  setSessions?: React.Dispatch<React.SetStateAction<Session[]>>
-) => {
-  if (!session) return null;
-
-  console.log('Rendering session details:', session);
-
-  const currentStatus = calculateSessionStatus(session);
-  const filteredPlayers = (session.assignedPlayersData || []).filter(player => 
-    player.name.toLowerCase().includes(detailsPlayerSearchQuery.toLowerCase())
-  );
-
-  // AttendanceSelector component for three-state attendance
-const AttendanceSelector = ({ 
-  currentStatus, 
-  onStatusChange, 
-  disabled = false,
-  playerId,
-  sessionStatus 
-}: {
-  currentStatus?: "Present" | "Absent" | "Unmarked";
-  onStatusChange: (status: "Present" | "Absent" | "Unmarked") => void;
-  disabled?: boolean;
-  playerId: string;
-  sessionStatus: string;
-}) => {
-  const status = currentStatus || "Unmarked";
-  
-  const getStatusConfig = (status: string) => {
-    switch (status) {
-      case "Present":
-        return {
-          color: "bg-green-500 hover:bg-green-600 text-white border-green-500",
-          text: "Present",
-          next: "Absent"
-        };
-      case "Absent":
-        return {
-          color: "bg-red-500 hover:bg-red-600 text-white border-red-500",
-          text: "Absent", 
-          next: "Present" // ✅ Goes back to Present instead of Unmarked
-        };
-      case "Unmarked":
-      default:
-        return {
-          color: "bg-gray-500 hover:bg-gray-600 text-white border-gray-500",
-          text: "Unmarked",
-          next: "Present"
-        };
-    }
-  };
-
-  const config = getStatusConfig(status);
-
-  const handleClick = () => {
-    if (disabled) return;
-    onStatusChange(config.next as "Present" | "Absent" | "Unmarked");
-  };
-
-  return (
-    <div className="flex items-center space-x-2">
-      <Button
-        size="sm"
-        variant="outline"
-        onClick={handleClick}
-        disabled={disabled}
-        className={`min-w-[90px] text-xs transition-colors ${config.color} ${
-          disabled ? 'opacity-50 cursor-not-allowed' : ''
-        }`}
-      >
-        {config.text}
-      </Button>
-      {!disabled && (
-        <span className="text-xs text-gray-400">
-          Click → {config.next}
-        </span>
-      )}
-    </div>
-  );
-};
-
-  // Use the passed-in function or fallback to a no-op to avoid errors
-  const handleMetricsClickSafe =
-    handleMetricsClickParam ||
-    (() => {
-      // Optionally log a warning if not provided
-      console.warn("handleMetricsClick not provided to renderSessionDetails");
-    });
-
-  return (
-    <div className="space-y-4">
-      {/* Other session details */}
-      <div className="border rounded-md p-4 mt-2 max-h-[400px] overflow-y-auto">
-        {filteredPlayers.map((player) => {
-          const attendanceStatus = session.attendance?.[player.id]?.status;
-          const isPresent = attendanceStatus === "Present";
-          
-          return (
-            <div key={player.id} className="flex items-center justify-between py-2 border-b last:border-0">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-200">
-                  <img
-                    src={player.photoUrl || DEFAULT_AVATAR}
-                    alt={player.name}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-                <div className="flex flex-col">
-                  <span className="font-medium">{player.name || "Unknown Player"}</span>
-                  {player.position && (
-                    <span className="text-sm text-gray-500">{player.position}</span>
-                  )}
-                </div>
-              </div>
-              <div className="flex items-center space-x-4">
-                  <AttendanceSelector
-                    currentStatus={session.attendance?.[player.id]?.status || "Unmarked"}
-                    onStatusChange={async (newStatus) => {
-                      if (!user?.academyId) {
-                        toast({
-                          title: "Error",
-                          description: "No academy ID available. Please contact administrator.",
-                          variant: "destructive",
-                        });
-                        return;
-                      }
-                      if (setSessions && setViewDetailsSessionData) {
-                        await handleAttendanceChange(
-                          Number(session.id),
-                          player.id,
-                          newStatus, // ✅ Now Defense string instead of boolean
-                          viewDetailsSessionData ?? null,
-                          setViewDetailsSessionData,
-                          user ?? null,
-                          sessions,
-                          setSessions,
-                          user?.academyId ?? ""
-                        );
-                      }
-                    }}
-                    disabled={currentStatus === "Upcoming"}
-                    playerId={player.id}
-                    sessionStatus={currentStatus}
-                  />
-                  {(session.attendance?.[player.id]?.status === "Present") && currentStatus === "Finished" && (
-                    <Button
-                      size="sm"
-                      variant="outline" 
-                      onClick={() => handleMetricsClickSafe(player.id, player.name, session.id)}
-                    >
-                      Input Metrics
-                    </Button>
-                  )}
-                </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-};
-
-
-const handleAttendanceChange = async (
-  sessionId: number | string,
-  playerId: string,
-  newStatus: string,
-  viewDetailsSessionData: Session | null,
-  setViewDetailsSessionData: (session: Session | null) => void,
-  user: { academyId?: string; id?: string } | null,
-  sessions: Session[],
-  setSessions: React.Dispatch<React.SetStateAction<Session[]>>,
-  academyId?: string
-) => {
-  const effectiveAcademyId = academyId || user?.academyId;
-  if (!effectiveAcademyId) {
-    if (typeof toast === "function") {
-      toast({ title: "Error", description: "No academy ID available", variant: "destructive" });
-    }
-    return;
-  }
-
-  // Find session in local state
-  const session = sessions.find(
-    s => s._id?.toString() === sessionId.toString() || s.id?.toString() === sessionId.toString()
-  );
-  if (!session) {
-    if (typeof toast === "function") toast({ title: "Error", description: "Session not found", variant: "destructive" });
-    return;
-  }
-
-  // Snapshot original attendance to revert on error
-  const originalAttendance = session.attendance ? { ...session.attendance } : {};
-
-  const timestamp = new Date().toISOString();
-  const newEntry = {
-    status: newStatus,
-    markedAt: timestamp,
-    markedBy: user?.id || ''
-  };
-
-  // Optimistic UI update
-  setSessions(prev =>
-    prev.map(s => {
-      if (s._id?.toString() === sessionId.toString() || s.id?.toString() === sessionId.toString()) {
-        return {
-          ...s,
-          attendance: {
-            ...s.attendance,
-            [playerId]: {
-              ...newEntry,
-              status: newStatus === "Present" ? "Present" : newStatus === "Absent" ? "Absent" : "Unmarked"
-            }
-          }
-        };
-      }
-      return s;
-    })
-  );
-  if (
-    viewDetailsSessionData &&
-    (viewDetailsSessionData._id?.toString() === sessionId.toString() || viewDetailsSessionData.id?.toString() === sessionId.toString())
-  ) {
-    setViewDetailsSessionData({
-      ...viewDetailsSessionData,
-      attendance: {
-        ...viewDetailsSessionData.attendance,
-        [playerId]: { 
-          ...newEntry, 
-          status: (newStatus === "Present" ? "Present" : newStatus === "Absent" ? "Absent" : "Unmarked") as "Present" | "Absent" | "Unmarked"
-        }
-      }
-    });
-  }
-
-  if (typeof toast === "function") {
-    toast({ title: "Updating", description: `Marking as ${newStatus === "Present" ? "Present" : newStatus === "Absent" ? "Absent" : "Unmarked"}...` });
-  }
-
-  // Find correct API id
-  let apiId: string | number | undefined = session._id ?? session.id;
-  if (session.isOccurrence && !session._id && session.parentSessionId) {
-    try {
-      const occResp = await fetch(
-        `/api/db/ams-sessions/occurrences?parentId=${encodeURIComponent(String(session.parentSessionId))}&academyId=${encodeURIComponent(effectiveAcademyId)}`,
-        { headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' } }
-      );
-      if (occResp.ok) {
-        const occJson = await occResp.json();
-        const occArray: Session[] = Array.isArray(occJson.data) ? occJson.data : [];
-        const matched = occArray.find(o => {
-          if (!o) return false;
-          const oDate = (o.date || '').split('T')[0];
-          const sDate = (session.date || '').split('T')[0];
-          const timeMatch = (o.startTime || '') === (session.startTime || '') || (o.endTime || '') === (session.endTime || '');
-          return oDate === sDate && timeMatch;
-        }) || occArray.find(o => (o.date || '').split('T')[0] === (session.date || '').split('T')[0]);
-        if (matched) apiId = matched._id ?? matched.id;
-      }
-    } catch {}
-  }
-  if (!apiId) {
-    setSessions(prev => prev.map(s => (s._id?.toString() === sessionId.toString() || s.id?.toString() === sessionId.toString() ? { ...s, attendance: originalAttendance } : s)));
-    if (viewDetailsSessionData) setViewDetailsSessionData({ ...viewDetailsSessionData, attendance: originalAttendance });
-    if (typeof toast === "function") toast({ title: "Error", description: "Unable to determine session id for saving attendance", variant: "destructive" });
-    return;
-  }
-
-  const apiIdStr = encodeURIComponent(String(apiId));
-  const payload = {
-    attendance: {
-      ...session.attendance,
-      [playerId]: newEntry
-    },
-    academyId: effectiveAcademyId,
-    isOccurrence: !!session.isOccurrence,
-    parentSessionId: session.parentSessionId,
-    lastUpdated: new Date().toISOString()
-  };
-
-  try {
-    const patchResp = await fetch(`/api/db/ams-sessions/${apiIdStr}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' },
-      body: JSON.stringify(payload)
-    });
-
-    if (!patchResp.ok) throw new Error('PATCH failed');
-
-    // Always fetch latest session from backend after PATCH to avoid stale state
-    const refetch = await fetch(`/api/db/ams-sessions/${apiIdStr}?academyId=${encodeURIComponent(effectiveAcademyId)}`, { headers: { 'Cache-Control': 'no-cache' } });
-    let savedSession: Session | undefined;
-    if (refetch.ok) {
-      const refJson = await refetch.json();
-      if (refJson.success && refJson.data) savedSession = refJson.data;
-    }
-
-    if (savedSession) {
-      const savedIdKey = savedSession._id ?? savedSession.id ?? apiId;
-      setSessions(prev => prev.map(s => {
-        if (
-          s._id?.toString() === String(savedIdKey) ||
-          s.id?.toString() === String(savedIdKey) ||
-          s._id?.toString() === sessionId.toString() ||
-          s.id?.toString() === sessionId.toString()
-        ) {
-          return { ...s, ...savedSession, attendance: savedSession.attendance };
-        }
-        return s;
-      }));
-      if (
-        viewDetailsSessionData &&
-        (viewDetailsSessionData._id?.toString() === String(savedIdKey) ||
-          viewDetailsSessionData.id?.toString() === String(savedIdKey) ||
-          viewDetailsSessionData._id?.toString() === sessionId.toString() ||
-          viewDetailsSessionData.id?.toString() === sessionId.toString())
-      ) {
-        setViewDetailsSessionData({ ...viewDetailsSessionData, ...savedSession, attendance: savedSession.attendance });
-      }
-    }
-
-    if (typeof toast === "function") {
-      toast({ title: "Success", description: `Attendance saved as ${newStatus === "Present" ? 'Present' : newStatus === "Absent" ? 'Absent' : 'Unmarked'}`, variant: "default" });
-    }
-  } catch (error) {
-    // Revert optimistic update on error
-    setSessions(prev => prev.map(s => (s._id?.toString() === sessionId.toString() || s.id?.toString() === sessionId.toString() ? { ...s, attendance: originalAttendance } : s)));
-    if (viewDetailsSessionData) setViewDetailsSessionData({ ...viewDetailsSessionData, attendance: originalAttendance });
-    if (typeof toast === "function") {
-      toast({ title: "Error", description: "Failed to save attendance. Changes reverted.", variant: "destructive" });
-    }
-  }
-};
-
-// Add this new function to render match details
-const renderRecurringSessionDetails = (
-  sessions: Session[],
-  viewDetailsSessionId: number | null,
-  handleViewDetailsParam: (id: number | string) => void
-) => {
-  const parentSession = sessions.find(s => s.id === viewDetailsSessionId);
-  if (!parentSession) return null;
-
-  // Find all occurrences for this session
-  const occurrences = sessions.filter((s: Session) => 
-    s.parentSessionId === parentSession.id || 
-    (s.isOccurrence && s.id.toString().startsWith(parentSession.id.toString()))
-  );
-
-  return (
-    <div className="space-y-6">
-      {/* Parent Session Details */}
-      <div className="border-b pb-4">
-        <h3 className="text-lg font-semibold mb-4">Parent Session</h3>
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <p><strong>Date:</strong> {format(new Date(parentSession.date), "PP")}</p>
-            <p><strong>Time:</strong> {parentSession.startTime} - {parentSession.endTime}</p>
-            <p><strong>Status:</strong> {parentSession.status}</p>
-          </div>
-          <div>
-            <p><strong>Total Occurrences:</strong> {parentSession.totalOccurrences}</p>
-            <p><strong>Recurring Until:</strong> {format(new Date(parentSession.recurringEndDate ?? parentSession.date), "PP")}</p>
-            <p><strong>Repeat on:</strong> {parentSession.selectedDays?.join(", ")}</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Occurrences */}
-      <div>
-        <h3 className="text-lg font-semibold mb-4">Session Occurrences</h3>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Date</TableHead>
-              <TableHead>Time</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Attendance</TableHead>
-              <TableHead>Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {occurrences.map((occurrence: Session) => (
-              <TableRow key={occurrence.id}>
-                <TableCell>{format(new Date(occurrence.date), "PP")}</TableCell>
-                <TableCell>{occurrence.startTime} - {occurrence.endTime}</TableCell>
-                <TableCell>
-                  <Badge>{occurrence.status}</Badge>
-                </TableCell>
-                <TableCell>
-                  {Object.keys(occurrence.attendance || {}).length} attended
-                </TableCell>
-                <TableCell>
-                  <Button variant="ghost" onClick={() => handleViewDetailsParam(occurrence.id)}>
-                    View Details
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
-
-      {/* Rest of existing session details */}
-      {renderSessionDetails(parentSession)}
-    </div>
-  );
-};

@@ -62,6 +62,7 @@
     "d3": "^7.9.0",
     "date-fns": "^2.30.0",
     "dayjs": "^1.11.18",
+    "dom-to-image": "^2.6.0",
     "embla-carousel-react": "^8.0.0-rc17",
     "file-saver": "^2.0.5",
     "firebaseui": "^6.1.0",
@@ -107,6 +108,7 @@
     "zod": "^3.24.1"
   },
   "devDependencies": {
+    "@types/dom-to-image": "^2.6.7",
     "@types/file-saver": "^2.0.7",
     "@types/js-cookie": "^3.0.6",
     "@types/jsonwebtoken": "^9.0.8",

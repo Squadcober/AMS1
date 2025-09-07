@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Separator } from "@/components/ui/separator"
 import { usePlayers } from "@/contexts/PlayerContext"
 import { CustomTooltip } from "@/components/custom-tooltip"
+import html2canvas from "html2canvas"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { X, ChevronLeft, ChevronRight } from "lucide-react"
@@ -33,7 +34,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useAuth } from "@/contexts/AuthContext"
 import Sidebar from "@/components/Sidebar"
 import { exportToDoc, exportMultipleToDoc } from "@/lib/doc-export"
-import html2canvas from "html2canvas"
+import domtoimage from "dom-to-image"
+// Removed html2canvas import as it will no longer be used
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import jsPDF from "jspdf"
 interface Player {
@@ -130,6 +132,73 @@ const positions: Position[] = [
 
 const LOCAL_STORAGE_KEY = "team-builder-gameplans"
 
+// Utility function to check if two positions overlap
+const checkPositionOverlap = (
+  pos1: { top: string; left: string },
+  pos2: { top: string; left: string },
+  minDistancePercent: number = 15 // Minimum distance between centers as percentage
+): boolean => {
+  const top1 = parseFloat(pos1.top)
+  const left1 = parseFloat(pos1.left)
+  const top2 = parseFloat(pos2.top)
+  const left2 = parseFloat(pos2.left)
+
+  const distance = Math.sqrt(
+    Math.pow(top1 - top2, 2) + Math.pow(left1 - left2, 2)
+  )
+
+  return distance < minDistancePercent
+}
+
+// Function to find a non-overlapping position near the target
+const findNonOverlappingPosition = (
+  targetPos: { top: string; left: string },
+  existingPositions: { [key: string]: { playerId: string; top: string; left: string } | null },
+  excludePositionId: string,
+  minDistancePercent: number = 15
+): { top: string; left: string } => {
+  let newTop = parseFloat(targetPos.top)
+  let newLeft = parseFloat(targetPos.left)
+
+  // Try small adjustments in a spiral pattern
+  const adjustments = [
+    { top: 0, left: 0 }, // Original position
+    { top: 0, left: minDistancePercent }, // Right
+    { top: 0, left: -minDistancePercent }, // Left
+    { top: minDistancePercent, left: 0 }, // Down
+    { top: -minDistancePercent, left: 0 }, // Up
+    { top: minDistancePercent, left: minDistancePercent }, // Down-right
+    { top: minDistancePercent, left: -minDistancePercent }, // Down-left
+    { top: -minDistancePercent, left: minDistancePercent }, // Up-right
+    { top: -minDistancePercent, left: -minDistancePercent }, // Up-left
+  ]
+
+  for (const adjustment of adjustments) {
+    const testTop = Math.max(5, Math.min(95, newTop + adjustment.top))
+    const testLeft = Math.max(5, Math.min(95, newLeft + adjustment.left))
+    const testPos = { top: `${testTop}%`, left: `${testLeft}%` }
+
+    let hasOverlap = false
+    for (const [posId, posData] of Object.entries(existingPositions)) {
+      if (posId === excludePositionId || !posData) continue
+      if (checkPositionOverlap(testPos, { top: posData.top, left: posData.left }, minDistancePercent)) {
+        hasOverlap = true
+        break
+      }
+    }
+
+    if (!hasOverlap) {
+      return testPos
+    }
+  }
+
+  // If no good position found, return original clamped to boundaries
+  return {
+    top: `${Math.max(5, Math.min(95, newTop))}%`,
+    left: `${Math.max(5, Math.min(95, newLeft))}%`
+  }
+}
+
 interface AvailablePosition {
   value: string
   label: string
@@ -206,6 +275,45 @@ export default function TeamBuilder() {
   const [attributeFilterState, setAttributeFilterState] = useState<"latest" | "overall">("latest")
   const [isSaving, setIsSaving] = useState(false)
   const [showSaved, setShowSaved] = useState(false)
+
+  // Initialize customPositions and deletedPositions from selectedGamePlan on load
+  useEffect(() => {
+    if (!selectedGamePlan) return;
+
+    // Extract default position IDs
+    const defaultPositionIds = positions.map((pos) => pos.id);
+
+    // Extract formationPositions IDs if available
+    const formationPositionIds = (selectedGamePlan.formationPositions || []).map((pos) => pos.id);
+
+    // Identify custom positions: those in selectedGamePlan.positions but not in default or formationPositions
+    const customPosIds = Object.keys(selectedGamePlan.positions || {}).filter(
+      (posId) => !defaultPositionIds.includes(posId) && !formationPositionIds.includes(posId)
+    );
+
+    // Build customPositions array from these IDs
+    const customPosArray: Position[] = customPosIds.map((posId) => {
+      // Try to get position details from selectedGamePlan.formationPositions or fallback to minimal info
+      const formationPos = (selectedGamePlan.formationPositions || []).find((pos) => pos.id === posId);
+      return (
+        formationPos || {
+          id: posId,
+          name: "Custom Position",
+          shortName: "CUST",
+          type: "any",
+        }
+      );
+    });
+
+    setCustomPositions(customPosArray);
+
+    // Identify deleted original positions: those in default or formationPositions but missing in selectedGamePlan.positions
+    const deletedPosArray = [...defaultPositionIds, ...formationPositionIds].filter(
+      (posId) => !(posId in (selectedGamePlan.positions || {}))
+    );
+
+    setDeletedPositions(deletedPosArray);
+  }, [selectedGamePlan]);
 
   // Replace localStorage useEffect with MongoDB fetch
   useEffect(() => {
@@ -383,15 +491,28 @@ export default function TeamBuilder() {
     setIsSaving(true)
     setTimeout(() => setShowSaved(false), 2000)
 
+    // Count the current number of player position circles
+    const { totalCount } = countPositions(selectedGamePlan)
+
+    // Update the game plan with the current size and teamSize
+    const updatedGamePlan = {
+      ...selectedGamePlan,
+      size: totalCount.toString(),
+      teamSize: totalCount,
+    }
+
     // Save the current game plan to the database
     const response = await fetch(`/api/db/ams-gameplan/${selectedGamePlan._id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        positions: selectedGamePlan.positions,
+        positions: updatedGamePlan.positions,
         formation: selectedFormation,
         strategy: newGamePlanStrategy,
-        substitutes: selectedGamePlan.substitutes || [],
+        substitutes: updatedGamePlan.substitutes || [],
+        size: updatedGamePlan.size,
+        teamSize: updatedGamePlan.teamSize,
+        formationPositions: updatedGamePlan.formationPositions,
         updatedAt: new Date().toISOString(),
       }),
     })
@@ -404,9 +525,9 @@ export default function TeamBuilder() {
 
     if (result.success) {
       // Update the specific gameplan in the local state without refetching all
-      setGamePlans((prev) => 
-        prev.map((gp) => 
-          gp._id === selectedGamePlan._id 
+      setGamePlans((prev) =>
+        prev.map((gp) =>
+          gp._id === selectedGamePlan._id
             ? { ...gp, ...result.data, updatedAt: new Date().toISOString() }
             : gp
         )
@@ -417,7 +538,7 @@ export default function TeamBuilder() {
 
       toast({
         title: "Success",
-        description: "Game plan saved successfully",
+        description: `Game plan saved successfully with ${totalCount} players`,
       })
     }
   } catch (error) {
@@ -544,177 +665,213 @@ export default function TeamBuilder() {
     })
   }
 
-  const exportToPDF = async (
-  formationRef: React.RefObject<HTMLDivElement>,
-  gamePlan: GamePlan,
-  players: Player[],
-  batches: any[],
+      const exportToPDF = async (
+  formationRef: React.RefObject<HTMLDivElement>,
+  gamePlan: GamePlan,
+  players: Player[],
+  batches: any[],
 ) => {
-  try {
-    const pdf = new jsPDF("p", "mm", "a4")
+  try {
+    const pdf = new jsPDF("p", "mm", "a4")
 
-    // Page 1: Formation Map
-    pdf.setFontSize(20)
-    pdf.text(gamePlan.name, 105, 20, { align: "center" })
-    pdf.setFontSize(10)
-    pdf.text("Formation", 105, 30, { align: "center" })
+    // Page 1: Formation Map
+    pdf.setFontSize(20)
+    pdf.text(gamePlan.name, 105, 20, { align: "center" })
+    pdf.setFontSize(10)
+    pdf.text("Formation", 105, 30, { align: "center" })
 
-    if (formationRef.current) {
-      // Create a temporary container for the high-res canvas
-      const tempDiv = formationRef.current.cloneNode(true) as HTMLDivElement;
-      tempDiv.style.width = '800px'; // Set a fixed width for the high-res capture
-      tempDiv.style.height = '1000px'; // Set a fixed height
-      tempDiv.style.position = 'absolute';
-      tempDiv.style.left = '-9999px'; // Move off-screen
-      document.body.appendChild(tempDiv);
+    if (formationRef.current) {
+      // Temporarily modify the container to ensure full capture with margins
+      const originalStyle = formationRef.current.style.cssText
+      
+      // Add margins to ensure all absolutely positioned elements are captured
+      formationRef.current.style.margin = '60px'
+      formationRef.current.style.padding = '20px'
+      formationRef.current.style.overflow = 'visible'
+      formationRef.current.style.boxSizing = 'content-box'
+      formationRef.current.style.position = 'relative'
+      
+      // Wait for layout to update
+      await new Promise(resolve => setTimeout(resolve, 150))
+      
+      // Get dimensions after margins and padding are applied
+      const containerWidth = formationRef.current.offsetWidth + 120 // 60px margin on each side
+      const containerHeight = formationRef.current.offsetHeight + 120
+      
+      // Use domtoimage since PNG export is working fine
+      const formationImage = await domtoimage.toPng(formationRef.current, {
+        quality: 1,
+        bgcolor: '#16a34a', // Green field background
+        width: containerWidth,
+        height: containerHeight,
+        style: {
+          margin: '60px',
+          padding: '20px',
+          overflow: 'visible',
+          boxSizing: 'content-box',
+          position: 'relative'
+        },
+        filter: (node) => {
+          // Ensure all nodes are visible
+          if (node.nodeType === Node.ELEMENT_NODE) {
+            const element = node as HTMLElement;
+            if (element.style.display === 'none' || element.style.visibility === 'hidden') {
+              return false;
+            }
+          }
+          return true;
+        }
+      })
+      
+      // Restore original styles immediately after capture
+      formationRef.current.style.cssText = originalStyle
 
-      const canvas = await html2canvas(tempDiv, {
-        backgroundColor: null,
-        scale: 2, // Use a higher scale for better quality
-      });
-      const formationImage = canvas.toDataURL("image/png");
+      const pageWidth = 210
+      const pageHeight = 297
+      const maxWidth = 180
+      const maxHeight = 200
 
-      // Clean up the temporary element
-      document.body.removeChild(tempDiv);
+      // Create a temporary image to get dimensions
+      const img = new Image()
+      img.src = formationImage
+      
+      await new Promise((resolve) => {
+        img.onload = resolve
+      })
 
-      const pageWidth = 210;
-      const pageHeight = 297;
-      const maxWidth = 180;
-      const maxHeight = 200;
+      const imgWidth = img.width
+      const imgHeight = img.height
+      const imgRatio = imgWidth / imgHeight
+      
+      let finalWidth = maxWidth
+      let finalHeight = finalWidth / imgRatio
 
-      const imgWidth = canvas.width;
-      const imgHeight = canvas.height;
-
-      const imgRatio = imgWidth / imgHeight;
-      let finalWidth = maxWidth;
-      let finalHeight = finalWidth / imgRatio;
-
-      if (finalHeight > maxHeight) {
-        finalHeight = maxHeight;
-        finalWidth = finalHeight * imgRatio;
-      }
-
-      const leftMargin = (pageWidth - finalWidth) / 2;
-      const topMargin = 50;
-
-      pdf.addImage(formationImage, "PNG", leftMargin, topMargin, finalWidth, finalHeight);
-    }
-
-
-      // Page 2: Details
-      pdf.addPage()
-
-      // Add Strategy section with adjusted spacing
-      pdf.setFontSize(18)
-      pdf.text("Strategy", 20, 20)
-      pdf.setFontSize(12)
-      const splitStrategy = pdf.splitTextToSize(gamePlan.strategy || "No strategy defined", 170)
-      pdf.text(splitStrategy, 20, 30)
-
-      // Add Team Composition section with more spacing
-      let yPosition = 60
-
-      // Add Starting lineup header
-      pdf.setFontSize(16)
-      pdf.text("Starting Lineup", 20, yPosition)
-      yPosition += 15 // Increased from 10
-      pdf.setFontSize(12)
-
-      // Draw lineup table headers with more space
-      pdf.setFont("helvetica", "bold")
-      pdf.text("Position", 20, yPosition)
-      pdf.text("Player", 80, yPosition)
-      pdf.setFont("helvetica", "normal")
-      yPosition += 10 // Increased from 8
-
-      // Group and sort positions (unchanged)
-      const positionOrder = {
-        GK: 1,
-        LB: 2,
-        CB: 3,
-        RB: 4,
-        LM: 5,
-        CM: 6,
-        RM: 7,
-        ST: 8,
+      if (finalHeight > maxHeight) {
+        finalHeight = maxHeight
+        finalWidth = finalHeight * imgRatio
       }
 
-      const allPositions = [...positions, ...customPositions]
-      const orderedEntries = Object.entries(gamePlan.positions)
-        .filter(([_, data]) => data?.playerId)
-        .map(([positionId, data]) => {
-          const position = allPositions.find((p) => p.id === positionId)
-          const player = players.find((p) => p.id.toString() === data?.playerId)
-          return {
-            position,
-            player,
-            order:
-              position?.shortName && position.shortName in positionOrder
-                ? positionOrder[position.shortName as keyof typeof positionOrder]
-                : 99,
-          }
-        })
-        .sort((a, b) => a.order - b.order)
+      const leftMargin = (pageWidth - finalWidth) / 2
+      const topMargin = 50
 
-      // Add lineup entries with increased spacing
-      orderedEntries.forEach(({ position, player }) => {
-        if (position && player) {
-          // Check if we need to add a new page
-          if (yPosition > 250) {
-            pdf.addPage()
-            yPosition = 20
-          }
-          pdf.text(position.name, 20, yPosition)
-          pdf.text(player.name, 80, yPosition)
-          yPosition += 12 // Increased from 6
-        }
-      })
-
-      // Add Substitutes section with proper spacing
-      yPosition += 15 // Increased spacing before substitutes section
-      pdf.setFontSize(16)
-      pdf.text("Substitutes", 20, yPosition)
-      yPosition += 15 // Increased from 10
-      pdf.setFontSize(12)
-
-      // Draw substitutes table headers
-      pdf.setFont("helvetica", "bold")
-      pdf.text("Position", 20, yPosition)
-      pdf.text("Player", 80, yPosition)
-      pdf.setFont("helvetica", "normal")
-      yPosition += 20 // Increased from 8
-
-      // Add substitute entries with increased spacing
-      ;(gamePlan.substitutes || []).forEach((sub) => {
-        const player = players.find((p) => p.id.toString() === sub.playerId)
-        if (player) {
-          // Check if we need to add a new page
-          if (yPosition > 250) {
-            pdf.addPage()
-            yPosition = 20
-          }
-          pdf.text(sub.position, 20, yPosition)
-          pdf.text(player.name, 80, yPosition)
-          yPosition += 12 // Increased from 6
-        }
-      })
-
-      // Save the PDF
-      pdf.save(`${gamePlan.name}_formation.pdf`)
-
-      toast({
-        title: "Export Successful",
-        description: "Formation and team details have been exported as PDF",
-      })
-    } catch (error) {
-      console.error("Error exporting to PDF:", error)
-      toast({
-        title: "Export Failed",
-        description: "Failed to export formation and team details",
-        variant: "destructive",
-      })
+      pdf.addImage(formationImage, "PNG", leftMargin, topMargin, finalWidth, finalHeight)
     }
+
+    // Page 2: Details
+    pdf.addPage()
+
+    // Add Strategy section with adjusted spacing
+    pdf.setFontSize(18)
+    pdf.text("Strategy", 20, 20)
+    pdf.setFontSize(12)
+    const splitStrategy = pdf.splitTextToSize(gamePlan.strategy || "No strategy defined", 170)
+    pdf.text(splitStrategy, 20, 30)
+
+    // Add Team Composition section with more spacing
+    let yPosition = 60
+
+    // Add Starting lineup header
+    pdf.setFontSize(16)
+    pdf.text("Starting Lineup", 20, yPosition)
+    yPosition += 15 // Increased from 10
+    pdf.setFontSize(12)
+
+    // Draw lineup table headers with more space
+    pdf.setFont("helvetica", "bold")
+    pdf.text("Position", 20, yPosition)
+    pdf.text("Player", 80, yPosition)
+    pdf.setFont("helvetica", "normal")
+    yPosition += 10 // Increased from 8
+
+    // Group and sort positions (unchanged)
+    const positionOrder = {
+      GK: 1,
+      LB: 2,
+      CB: 3,
+      RB: 4,
+      LM: 5,
+      CM: 6,
+      RM: 7,
+      ST: 8,
+    }
+
+    const allPositions = [...positions, ...customPositions]
+    const orderedEntries = Object.entries(gamePlan.positions)
+      .filter(([_, data]) => data?.playerId)
+      .map(([positionId, data]) => {
+        const position = allPositions.find((p) => p.id === positionId)
+        const player = players.find((p) => p.id.toString() === data?.playerId)
+        return {
+          position,
+          player,
+          order:
+            position?.shortName && position.shortName in positionOrder
+              ? positionOrder[position.shortName as keyof typeof positionOrder]
+              : 99,
+        }
+      })
+      .sort((a, b) => a.order - b.order)
+
+    // Add lineup entries with increased spacing
+    orderedEntries.forEach(({ position, player }) => {
+      if (position && player) {
+        // Check if we need to add a new page
+        if (yPosition > 250) {
+          pdf.addPage()
+          yPosition = 20
+        }
+        pdf.text(position.name, 20, yPosition)
+        pdf.text(player.name, 80, yPosition)
+        yPosition += 12 // Increased from 6
+      }
+    })
+
+    // Add Substitutes section with proper spacing
+    yPosition += 15 // Increased spacing before substitutes section
+    pdf.setFontSize(16)
+    pdf.text("Substitutes", 20, yPosition)
+    yPosition += 15 // Increased from 10
+    pdf.setFontSize(12)
+
+    // Draw substitutes table headers
+    pdf.setFont("helvetica", "bold")
+    pdf.text("Position", 20, yPosition)
+    pdf.text("Player", 80, yPosition)
+    pdf.setFont("helvetica", "normal")
+    yPosition += 10 // Increased from 8
+
+    // Add substitute entries with increased spacing
+    ;(gamePlan.substitutes || []).forEach((sub) => {
+      const player = players.find((p) => p.id.toString() === sub.playerId)
+      if (player) {
+        // Check if we need to add a new page
+        if (yPosition > 250) {
+          pdf.addPage()
+          yPosition = 20
+        }
+        pdf.text(sub.position, 20, yPosition)
+        pdf.text(player.name, 80, yPosition)
+        yPosition += 12 // Increased from 6
+      }
+    })
+
+    // Save the PDF
+    pdf.save(`${gamePlan.name}_formation.pdf`)
+
+    toast({
+      title: "Export Successful",
+      description: "Formation and team details have been exported as PDF",
+    })
+  } catch (error) {
+    console.error("Error exporting to PDF:", error)
+    toast({
+      title: "Export Failed",
+      description: "Failed to export formation and team details",
+      variant: "destructive",
+    })
   }
+}
+  
 
   const handleExportField = async () => {
     if (!fieldRef.current || !selectedGamePlan) return
@@ -954,12 +1111,26 @@ export default function TeamBuilder() {
 
     const currentPosition = selectedGamePlan.positions[positionId]
 
-    const updatedPosition = {
+    // First, try the target position
+    let targetPosition = {
       ...(typeof currentPosition === "object" && currentPosition !== null
         ? currentPosition
         : { playerId: currentPosition || "" }),
       top: `${top}%`,
       left: `${left}%`,
+    }
+
+    // Check for overlap and find non-overlapping position if needed
+    const nonOverlappingPos = findNonOverlappingPosition(
+      { top: targetPosition.top, left: targetPosition.left },
+      selectedGamePlan.positions,
+      positionId
+    )
+
+    const updatedPosition = {
+      ...targetPosition,
+      top: nonOverlappingPos.top,
+      left: nonOverlappingPos.left,
     }
 
     const updatedPositions = {
@@ -1637,7 +1808,7 @@ const lineOptions = {
     if (player) {
       return (
         <div className="text-white text-center w-full h-full relative flex flex-col items-center justify-center gap-1">
-          <Avatar className={`w-[70px] h-[70px] border-100 ${positionColor.replace("text-", "border-")}`}>
+          <Avatar data-player-avatar className={`w-[4.375rem] h-[4.375rem] border-100 ${positionColor.replace("text-", "border-")}`}>
             <AvatarImage
               src={player.photoUrl || "/placeholder.svg"}
               alt={player.name.toUpperCase()}
@@ -1648,10 +1819,26 @@ const lineOptions = {
             </AvatarFallback>
           </Avatar>
           {/* Added padding bottom to ensure text has enough space */}
-          <div className="absolute w-[120px] text-center" style={{ bottom: "-24px" }}>
-            <span className={`text-sm font-semibold whitespace-nowrap px-1 rounded ${positionColor}`}>
-              {player.name.toUpperCase()}
-            </span>
+          <div className="absolute w-[5rem] text-center" style={{ bottom: "-2rem" }}>
+            <div className={`text-xs font-semibold px-1 rounded ${positionColor} truncate`}>
+              {(() => {
+                const nameParts = player.name.split(' ');
+                if (nameParts.length >= 2) {
+                  // Has both first and last name
+                  const firstName = nameParts[0].toUpperCase();
+                  const lastName = nameParts.slice(1).join(' ').toUpperCase();
+                  return (
+                    <div className="flex flex-col leading-tight">
+                      <span className="truncate">{firstName}</span>
+                      <span className="truncate">{lastName}</span>
+                    </div>
+                  );
+                } else {
+                  // Single name or no space
+                  return <span className="whitespace-nowrap truncate">{player.name.toUpperCase()}</span>;
+                }
+              })()}
+            </div>
           </div>
           <Button
             variant="ghost"
@@ -1737,7 +1924,7 @@ const lineOptions = {
   const type = POSITION_TYPES.find((t) => t.id === selectedPositionType) || POSITION_TYPES[4];
   const newPosition: Position = {
     id: `custom${Date.now()}`,
-    name: `Custom ${type.name}`,
+    name: type.name,
     shortName: type.shortName,
     type: type.id,
   };
@@ -1749,7 +1936,7 @@ const lineOptions = {
   const newSize = Math.min(totalCount + 1, 11);
   const newTeamSize = totalCount + 1;
 
-  // Add it to the selected game plan's positions
+  // Add it to the selected game plan's positions and formationPositions
   if (selectedGamePlan) {
     const defaultCoordinates = getDefaultPositionStyle(type.id, newSize);
     const updatedPositions = {
@@ -1761,11 +1948,18 @@ const lineOptions = {
       },
     };
 
+    // Update formationPositions to include the new custom position
+    const updatedFormationPositions = [
+      ...(selectedGamePlan.formationPositions || []),
+      newPosition,
+    ];
+
     const updatedGamePlan = {
       ...selectedGamePlan,
       size: newSize.toString(),
       teamSize: newTeamSize,
       positions: updatedPositions,
+      formationPositions: updatedFormationPositions,
     };
 
     setSelectedGamePlan(updatedGamePlan);
@@ -1801,36 +1995,46 @@ const lineOptions = {
   }
 
   const handleRemovePosition = (positionId: string) => {
-  if (!selectedGamePlan) return;
+    if (!selectedGamePlan) return;
 
-  // Remove position from custom positions array
-  setCustomPositions((prev) => prev.filter((pos) => pos.id !== positionId));
+    // Check if position is original or custom
+    const isOriginalPosition =
+      positions.some((pos) => pos.id === positionId) ||
+      (selectedGamePlan.formationPositions || []).some((pos) => pos.id === positionId);
 
-  // Remove position from game plan positions object
-  const updatedPositions = { ...selectedGamePlan.positions };
-  delete updatedPositions[positionId];
+    if (isOriginalPosition) {
+      // Add to deletedPositions to filter out from rendering
+      setDeletedPositions((prev) => [...prev, positionId]);
+    } else {
+      // Remove from customPositions state
+      setCustomPositions((prev) => prev.filter((pos) => pos.id !== positionId));
+    }
 
-  // Calculate new counts based on remaining positions
-  const remainingPositionCount = Object.keys(updatedPositions).length;
+    // Remove position from game plan positions object
+    const updatedPositions = { ...selectedGamePlan.positions };
+    delete updatedPositions[positionId];
 
-  const updatedGamePlan = {
-    ...selectedGamePlan,
-    positions: updatedPositions,
-    size: remainingPositionCount.toString(),
-    teamSize: remainingPositionCount,
+    // Calculate new counts based on remaining positions
+    const remainingPositionCount = Object.keys(updatedPositions).length;
+
+    const updatedGamePlan = {
+      ...selectedGamePlan,
+      positions: updatedPositions,
+      size: remainingPositionCount.toString(),
+      teamSize: remainingPositionCount,
+    };
+
+    setSelectedGamePlan(updatedGamePlan);
+
+    setGamePlans((prev) =>
+      prev.map((gp) => (gp._id === selectedGamePlan._id ? updatedGamePlan : gp)),
+    );
+
+    toast({
+      title: "Position removed",
+      description: `${11 - remainingPositionCount} position slots available`,
+    });
   };
-
-  setSelectedGamePlan(updatedGamePlan);
-
-  setGamePlans((prev) =>
-    prev.map((gp) => (gp._id === selectedGamePlan._id ? updatedGamePlan : gp)),
-  );
-
-  toast({
-    title: "Position removed",
-    description: `${11 - remainingPositionCount} position slots available`,
-  });
-};
 
   const handleResetFormation = () => {
     if (!selectedGamePlan) return
@@ -1949,32 +2153,119 @@ const lineOptions = {
           <DialogTitle>Export Options</DialogTitle>
         </DialogHeader>
         <div className="space-y-4 pt-4">
+<Button
+  className="w-full"
+  onClick={async () => {
+    if (!fieldRef.current || !selectedGamePlan) return
+
+    try {
+      // First, temporarily increase the minimum distance between overlapping positions
+      const originalStyles: { element: Element; styles: string }[] = []
+      
+      // Find all position circles and ensure they don't overlap visually
+      const playerCircles = fieldRef.current.querySelectorAll('.absolute.w-16.h-16')
+      const positions: { element: HTMLElement; rect: DOMRect }[] = []
+      
+      // Get all position rectangles
+      playerCircles.forEach((circle) => {
+        const element = circle as HTMLElement
+        const rect = element.getBoundingClientRect()
+        positions.push({ element, rect })
+      })
+      
+      // Check for overlaps and adjust positions slightly for export
+      positions.forEach((pos, index) => {
+        const element = pos.element
+        originalStyles.push({
+          element: element,
+          styles: element.style.cssText || ''
+        })
+        
+        // Check if this position overlaps with any other
+      const overlapping = positions.slice(index + 1).find(otherPos => {
+        const centerX1 = pos.rect.left + pos.rect.width / 3
+        const centerY1 = pos.rect.top + pos.rect.height / 3
+        const centerX2 = otherPos.rect.left + otherPos.rect.width / 2.3
+        const centerY2 = otherPos.rect.top + otherPos.rect.height / 3
+        const distance = Math.sqrt(
+          Math.pow(centerX1 - centerX2, 2) + 
+          Math.pow(centerY1 - centerY2, 2)
+        )
+        return distance < 70 // If centers are less than 70px apart
+      })
+        
+        if (overlapping) {
+          // Slightly adjust position to prevent overlap during capture
+          const currentLeft = parseFloat(element.style.left || '50%')
+          const currentTop = parseFloat(element.style.top || '50%')
+          
+          // Small adjustment to ensure separation
+          const adjustment = index % 2 === 0 ? -3 : 3 // Alternate left/right adjustment
+          element.style.left = `${currentLeft + adjustment}%`
+        }
+      })
+      
+      // Wait for DOM to update
+      await new Promise(resolve => setTimeout(resolve, 200))
+
+      // Capture with domtoimage
+      const image = await domtoimage.toPng(fieldRef.current)
+
+      // Restore all original positions
+      originalStyles.forEach(({ element, styles }) => {
+        (element as HTMLElement).style.cssText = styles
+      })
+
+      // Download the image
+      const link = document.createElement("a")
+      link.href = image
+      link.download = `${selectedGamePlan.name}_formation.png`
+      link.click()
+
+      setShowExportDialog(false)
+      
+      toast({
+        title: "Export Successful", 
+        description: "Formation exported as PNG image"
+      })
+
+    } catch (error) {
+      console.error("Error exporting formation:", error)
+      
+      toast({
+        title: "Export Failed",
+        description: "Failed to export formation as PNG",
+        variant: "destructive",
+      })
+    }
+  }}
+>
+  Export as Image (PNG)
+</Button>
           <Button
             className="w-full"
             onClick={async () => {
-              if (!fieldRef.current || !selectedGamePlan) return
+              if (!fieldRef.current) {
+                toast({
+                  title: "Export Failed",
+                  description: "Formation field is not ready. Please try again.",
+                  variant: "destructive",
+                })
+                setShowExportDialog(false)
+                return
+              }
 
-              const canvas = await html2canvas(fieldRef.current, {
-                backgroundColor: null,
-                scale: 1,
-              })
+              if (!selectedGamePlan) {
+                toast({
+                  title: "Export Failed",
+                  description: "No game plan selected for export.",
+                  variant: "destructive",
+                })
+                setShowExportDialog(false)
+                return
+              }
 
-              const image = canvas.toDataURL("image/png")
-              const link = document.createElement("a")
-              link.href = image
-              link.download = `${selectedGamePlan.name}_formation.png`
-              link.click()
-
-              setShowExportDialog(false)
-            }}
-          >
-            Export as Image (PNG)
-          </Button>
-          <Button
-            className="w-full"
-            onClick={() => {
-              if (!fieldRef.current || !selectedGamePlan) return
-              exportToPDF(fieldRef, selectedGamePlan, players, batches)
+              await exportToPDF(fieldRef, selectedGamePlan, players, batches)
               setShowExportDialog(false)
             }}
           >
@@ -2540,7 +2831,7 @@ const lineOptions = {
                   <ScrollArea className="w-full max-h-[800px] overflow-y-auto">
                     <div
                       ref={fieldRef}
-                      className={`relative w-full max-w-[500px] aspect-[0.68] bg-green-700 rounded-md mb-4 mx-auto ${
+                      className={`relative w-full max-w-[600px] aspect-[0.68] bg-green-700 rounded-md mb-4 mx-auto ${
                         showCustomizeMenu ? "border-4 border-dashed border-yellow-500/50" : ""
                       }`}
                       style={{ minWidth: "300px" }}

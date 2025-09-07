@@ -65,6 +65,7 @@ export default function BatchesPage() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [isPlayerDetailsOpen, setIsPlayerDetailsOpen] = useState(false)
   const [selectedPlayerDetails, setSelectedPlayerDetails] = useState<any>(null)
+  const [playerInjuries, setPlayerInjuries] = useState<any[]>([])
   const [newBatchName, setNewBatchName] = useState("")
   const [selectedPlayers, setSelectedPlayers] = useState<string[]>([])
   const [players, setPlayers] = useState<any[]>([])
@@ -72,6 +73,14 @@ export default function BatchesPage() {
   const [editingBatch, setEditingBatch] = useState<any>(null)
   const [batchNameError, setBatchNameError] = useState("")
   const [allPlayersSelected, setAllPlayersSelected] = useState(false)
+  const [showPdfViewer, setShowPdfViewer] = useState(false)
+  const [selectedPdfUrl, setSelectedPdfUrl] = useState<string | null>(null)
+  const [showImageViewer, setShowImageViewer] = useState(false)
+  const [selectedImageUrl, setSelectedImageUrl] = useState<string>("")
+  const [selectedImageTitle, setSelectedImageTitle] = useState<string>("")
+  const [currentViewInjury, setCurrentViewInjury] = useState<any>(null)
+  const [showViewOptions, setShowViewOptions] = useState(false)
+  const [showXrayViewer, setShowXrayViewer] = useState(false)
 
   useEffect(() => {
     const fetchBatchesForCoach = async () => {
@@ -525,12 +534,75 @@ export default function BatchesPage() {
       };
 
       setSelectedPlayerDetails(playerData);
+
+      // Fetch injuries for the player
+      try {
+        const injuriesResponse = await fetch(`/api/db/ams-injury?playerId=${playerId}&academyId=${user?.academyId}`);
+        if (injuriesResponse.ok) {
+          const injuriesResult = await injuriesResponse.json();
+          console.log("Injuries API response:", injuriesResult);
+          if (injuriesResult.success) {
+            setPlayerInjuries(injuriesResult.data || []);
+            console.log("Player injuries set:", injuriesResult.data);
+          } else {
+            setPlayerInjuries([]);
+          }
+        } else {
+          console.error("Injuries API failed:", injuriesResponse.status);
+          setPlayerInjuries([]);
+        }
+      } catch (injuriesError) {
+        console.error("Error fetching injuries:", injuriesError);
+        setPlayerInjuries([]);
+      }
+
       setIsPlayerDetailsOpen(true);
     } catch (error) {
       console.error("Error fetching player details:", error);
       toast({
         title: "Error",
         description: "Failed to load player details",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Handler functions for PDF and Image viewers
+  const handleViewPdf = (pdfUrl: string) => {
+    setSelectedPdfUrl(pdfUrl);
+    setShowPdfViewer(true);
+  };
+
+  const handleClosePdfViewer = () => {
+    setShowPdfViewer(false);
+    setSelectedPdfUrl(null);
+  };
+
+  const handleViewImage = (imageUrl: string, title: string) => {
+    setSelectedImageUrl(imageUrl);
+    setSelectedImageTitle(title);
+    setShowImageViewer(true);
+  };
+
+  const handleCloseImageViewer = () => {
+    setShowImageViewer(false);
+    setSelectedImageUrl("");
+    setSelectedImageTitle("");
+  };
+
+  const handleViewInjuryDocuments = (injury: any) => {
+    setCurrentViewInjury(injury);
+    // Check if there are any documents to view
+    const hasXrayImages = injury.xrayImages && injury.xrayImages.some((img: string) => img && img !== '/placeholder.svg');
+    const hasPrescription = injury.prescription && injury.prescription !== '/placeholder.svg';
+    const hasPdfFiles = injury.pdfFiles && injury.pdfFiles.length > 0;
+
+    if (hasXrayImages || hasPrescription || hasPdfFiles) {
+      setShowViewOptions(true);
+    } else {
+      toast({
+        title: "No Documents Found",
+        description: "No documents are available for this injury",
         variant: "destructive",
       });
     }
@@ -1073,10 +1145,189 @@ export default function BatchesPage() {
                         </CardContent>
                       </Card>
                     </div>
+
+                    {/* Injury Status Section */}
+                    <Card>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-lg">Injury Status</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        {playerInjuries.length > 0 ? (
+                          <div className="space-y-4">
+                            <div className="text-sm text-muted-foreground mb-4">
+                              Injury records found for this player:
+                            </div>
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead>Injury</TableHead>
+                                  <TableHead>Date</TableHead>
+                                  <TableHead>Treatment</TableHead>
+                                  <TableHead>POC</TableHead>
+                                  <TableHead>Status</TableHead>
+                                  <TableHead>Actions</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {playerInjuries.map((injury: any) => (
+                                  <TableRow key={injury._id}>
+                                    <TableCell>{injury.injuryType || injury.type || "Not specified"}</TableCell>
+                                    <TableCell>{injury.date ? new Date(injury.date).toLocaleDateString() : "Not specified"}</TableCell>
+                                    <TableCell>{injury.treatment || "Not specified"}</TableCell>
+                                    <TableCell>{injury.poc || "Not specified"}</TableCell>
+                                    <TableCell>{injury.status || "Not specified"}</TableCell>
+                                    <TableCell>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => handleViewInjuryDocuments(injury)}
+                                      >
+                                        View Docs
+                                      </Button>
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </div>
+                        ) : (
+                          <div className="text-center py-8">
+                            <p className="text-muted-foreground">
+                              {selectedPlayerDetails.status === 'Active'
+                                ? "Player is fit and active - no injury records"
+                                : "No injury records found for this player"
+                              }
+                            </p>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
                   </TabsContent>
                 </Tabs>
               </div>
             )}
+          </DialogContent>
+        </Dialog>
+
+        {/* PDF Viewer Dialog */}
+        <Dialog open={showPdfViewer} onOpenChange={setShowPdfViewer}>
+          <DialogContent className="max-w-4xl max-h-[90vh]">
+            <DialogHeader>
+              <DialogTitle>Document Viewer</DialogTitle>
+            </DialogHeader>
+            <div className="flex-1 min-h-[600px]">
+              {selectedPdfUrl && (
+                <iframe
+                  src={selectedPdfUrl}
+                  className="w-full h-full border-0"
+                  title="PDF Viewer"
+                />
+              )}
+            </div>
+            <DialogFooter>
+              <Button onClick={handleClosePdfViewer}>Close</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Image Viewer Dialog */}
+        <Dialog open={showImageViewer} onOpenChange={setShowImageViewer}>
+          <DialogContent className="max-w-4xl max-h-[90vh]">
+            <DialogHeader>
+              <DialogTitle>{selectedImageTitle}</DialogTitle>
+            </DialogHeader>
+            <div className="flex justify-center items-center min-h-[400px]">
+              {selectedImageUrl && (
+                <img
+                  src={selectedImageUrl}
+                  alt={selectedImageTitle}
+                  className="max-w-full max-h-full object-contain"
+                />
+              )}
+            </div>
+            <DialogFooter>
+              <Button onClick={handleCloseImageViewer}>Close</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* X-ray Viewer Dialog */}
+        <Dialog open={showXrayViewer} onOpenChange={setShowXrayViewer}>
+          <DialogContent className="max-w-4xl max-h-[90vh]">
+            <DialogHeader>
+              <DialogTitle>X-ray Images</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              {currentViewInjury?.xrayImages?.filter((img: string) => img && img !== '/placeholder.svg').map((imageUrl: string, index: number) => (
+                <div key={index} className="border rounded-lg p-4">
+                  <h4 className="text-sm font-medium mb-2">X-ray Image {index + 1}</h4>
+                  <img
+                    src={imageUrl}
+                    alt={`X-ray ${index + 1}`}
+                    className="w-full max-h-96 object-contain rounded"
+                  />
+                </div>
+              ))}
+            </div>
+            <DialogFooter>
+              <Button onClick={() => setShowXrayViewer(false)}>Close</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* View Options Dialog */}
+        <Dialog open={showViewOptions} onOpenChange={setShowViewOptions}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>View Documents</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              {currentViewInjury?.xrayImages?.some((img: string) => img && img !== '/placeholder.svg') && (
+                <Button
+                  onClick={() => {
+                    setShowViewOptions(false);
+                    setShowXrayViewer(true);
+                  }}
+                  className="w-full"
+                >
+                  View X-ray Images
+                </Button>
+              )}
+              {currentViewInjury?.prescription && currentViewInjury.prescription !== '/placeholder.svg' && (
+                <Button
+                  onClick={() => {
+                    setShowViewOptions(false);
+                    handleViewPdf(currentViewInjury.prescription);
+                  }}
+                  className="w-full"
+                >
+                  View Prescription
+                </Button>
+              )}
+              {currentViewInjury?.pdfFiles?.length > 0 && (
+                <div className="space-y-2">
+                  <Label>Medical Reports</Label>
+                  {currentViewInjury.pdfFiles.map((pdfUrl: string, index: number) => (
+                    <Button
+                      key={index}
+                      onClick={() => {
+                        setShowViewOptions(false);
+                        handleViewPdf(pdfUrl);
+                      }}
+                      variant="outline"
+                      className="w-full"
+                    >
+                      View Report {index + 1}
+                    </Button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowViewOptions(false)}>
+                Cancel
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>
