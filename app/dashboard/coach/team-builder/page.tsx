@@ -2909,7 +2909,13 @@ const lineOptions = {
                         <div className="absolute left-0 right-0 top-1/2 h-0.5 bg-white/50" />
                         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[30%] h-[15%] rounded-full border-2 border-white/50" />
                         <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[60%] h-[15%] border-2 border-b-0 border-white/50" />
-                        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[60%] h-[15%] border-2 border-t-0 border-white/50" />
+                        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[60%] h-[15%] border-2 border-t-0 border-white/50"  />
+{showCustomizeMenu && (
+  <>
+    <div className="absolute left-0 right-0 top-[28.33%] border-t-4 border-dashed border-yellow-500/50" />
+    <div className="absolute left-0 right-0 top-[66.66%] border-t-4 border-dashed border-yellow-500/50" />
+  </>
+)}
                       </div>
 
                       {/* Player positions */}
