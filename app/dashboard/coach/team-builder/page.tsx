@@ -336,6 +336,8 @@ export default function TeamBuilder() {
   const [attributeFilterState, setAttributeFilterState] = useState<"latest" | "overall">("latest")
   const [isSaving, setIsSaving] = useState(false)
   const [showSaved, setShowSaved] = useState(false)
+  const [isTouchDragging, setIsTouchDragging] = useState(false)
+  const [touchDraggedPosition, setTouchDraggedPosition] = useState<string | null>(null)
 
   // Initialize customPositions and deletedPositions from selectedGamePlan on load
   useEffect(() => {
@@ -1072,6 +1074,78 @@ export default function TeamBuilder() {
     e.dataTransfer.setData("playerId", playerId)
   }
 
+  const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>, positionId: string) => {
+    if (!showCustomizeMenu) return
+    e.stopPropagation()
+    setDraggedPosition(positionId)
+  }
+
+  const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (!showCustomizeMenu || !draggedPosition || !selectedGamePlan) return
+    e.preventDefault()
+  }
+
+  const handleTouchEnd = async (e: React.TouchEvent<HTMLDivElement>) => {
+    if (!showCustomizeMenu || !draggedPosition || !selectedGamePlan) return
+    e.preventDefault()
+
+    const touch = e.changedTouches[0]
+    const fieldElement = fieldRef.current
+    if (!fieldElement) return
+
+    const rect = fieldElement.getBoundingClientRect()
+    let top = ((touch.clientY - rect.top) / rect.height) * 100
+    let left = ((touch.clientX - rect.left) / rect.width) * 100
+
+    // Clamp values between 0 and 100 to avoid overflow
+    top = Math.min(100, Math.max(0, top))
+    left = Math.min(100, Math.max(0, left))
+
+    const currentPosition = selectedGamePlan.positions[draggedPosition]
+
+    // First, try the target position
+    let targetPosition = {
+      ...(typeof currentPosition === "object" && currentPosition !== null
+        ? currentPosition
+        : { playerId: currentPosition || "" }),
+      top: `${top}%`,
+      left: `${left}%`,
+    }
+
+    // Check for overlap and find non-overlapping position if needed
+    const nonOverlappingPos = findNonOverlappingPosition(
+      { top: targetPosition.top, left: targetPosition.left },
+      selectedGamePlan.positions,
+      draggedPosition
+    )
+
+    const updatedPosition = {
+      ...targetPosition,
+      top: nonOverlappingPos.top,
+      left: nonOverlappingPos.left,
+    }
+
+    const updatedPositions = {
+      ...selectedGamePlan.positions,
+      [draggedPosition]: updatedPosition,
+    }
+
+    // Update selectedGamePlan
+    const updatedGamePlan = {
+      ...selectedGamePlan,
+      positions: updatedPositions,
+    }
+
+    setSelectedGamePlan(updatedGamePlan)
+
+    // Update gamePlans
+    setGamePlans((prevGamePlans) =>
+      prevGamePlans.map((gp) => (gp._id === selectedGamePlan._id ? updatedGamePlan : gp))
+    )
+
+    setDraggedPosition(null)
+  }
+
   const handlePositionDrop = async (e: React.DragEvent<HTMLDivElement>, positionId: string) => {
     e.preventDefault()
     const playerId = e.dataTransfer.getData("playerId")
@@ -1154,6 +1228,8 @@ export default function TeamBuilder() {
     e.dataTransfer.effectAllowed = "move"
     setDraggedPosition(positionId) // Set dragged position state
   }
+
+  
 
   const handlePositionDropOnMap = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault()
@@ -2932,6 +3008,9 @@ const lineOptions = {
                             onDragOver={handleDragOver}
                             onDrop={(e) => handlePositionDrop(e, position.id)}
                             onClick={() => handlePositionClick(position)}
+                            onTouchStart={(e) => handleTouchStart(e, position.id)}
+                            onTouchMove={(e) => handleTouchMove(e)}
+                            onTouchEnd={(e) => handleTouchEnd(e)}
                           >
                             {renderPositionContent(position, selectedGamePlan)}
                             {showCustomizeMenu && (
