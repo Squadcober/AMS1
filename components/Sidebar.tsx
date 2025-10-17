@@ -129,8 +129,9 @@ const ownerRoutes = [
 
 export const Sidebar = ({ className }: { className?: string }) => {
   const pathname = usePathname()
-  const { user, logout } = useAuth()  // Add logout from useAuth
+  const { user, logout } = useAuth()
   const [isCollapsed, setIsCollapsed] = useState(false)
+  const [isMobileOpen, setIsMobileOpen] = useState(false)
 
   if (!user) return null
 
@@ -145,7 +146,7 @@ export const Sidebar = ({ className }: { className?: string }) => {
       <Button
         variant="ghost"
         size="icon"
-        onClick={() => setIsCollapsed(false)}
+        onClick={() => setIsMobileOpen(true)}
         className="fixed top-4 left-4 z-20 md:hidden"
       >
         <Menu className="h-6 w-6" />
@@ -159,7 +160,9 @@ export const Sidebar = ({ className }: { className?: string }) => {
         }}
         className={`${
           isCollapsed ? 'w-20' : 'w-64'
-        } p-4 fixed left-0 top-0 bottom-0 bg-background hidden md:block z-30 ${className || ''}`}
+        } p-4 fixed left-0 top-0 bottom-0 bg-background z-30 ${className || ''} ${
+          isMobileOpen ? 'block' : 'hidden md:block'
+        }`}
       >
         <Card className="h-full relative">
           {/* Collapse toggle button */}
@@ -216,6 +219,7 @@ export const Sidebar = ({ className }: { className?: string }) => {
                     ) : (
                       <Link
                         href={item.href}
+                        onClick={() => setIsMobileOpen(false)}
                         className={`block rounded-md transition-all duration-200
                           ${pathname === item.href 
                             ? "bg-primary text-primary-foreground" 
@@ -252,10 +256,10 @@ export const Sidebar = ({ className }: { className?: string }) => {
       </div>
 
       {/* Mobile backdrop */}
-      {!isCollapsed && (
+      {isMobileOpen && (
         <div 
           className="fixed inset-0 bg-black/50 z-20 md:hidden"
-          onClick={() => setIsCollapsed(true)}
+          onClick={() => setIsMobileOpen(false)}
         />
       )}
     </>
@@ -264,4 +268,3 @@ export const Sidebar = ({ className }: { className?: string }) => {
 
 // Keep the default export
 export default Sidebar
-
