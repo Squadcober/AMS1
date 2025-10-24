@@ -153,16 +153,15 @@ export const Sidebar = ({ className }: { className?: string }) => {
       </Button>
 
       <motion.aside
-        initial={{ x: -256 }}
+        initial={{ width: 256 }}
         animate={{ 
-          x: isMobileOpen ? 0 : -256,
           width: isCollapsed ? 80 : 256,
-          transition: { duration: 0.3 }
+          transition: { duration: 0.2 }
         }}
         className={`${
           isCollapsed ? 'w-20' : 'w-64'
-        } p-4 fixed left-0 top-0 bottom-0 bg-background z-30 md:translate-x-0 ${className || ''} ${
-          isMobileOpen ? 'block' : 'block md:block'
+        } p-4 fixed left-0 top-0 bottom-0 bg-background z-30 ${className || ''} ${
+          isMobileOpen ? 'block' : 'hidden md:block'
         }`}
       >
         <Card className="h-full relative">
