@@ -1959,20 +1959,20 @@ const lineOptions = {
 
     if (player) {
       return (
-        <div className="text-white text-center w-full h-full relative flex flex-col items-center justify-center gap-1">
-          <Avatar data-player-avatar className={`w-[4.375rem] h-[4.375rem] border-100 ${positionColor.replace("text-", "border-")}`}>
+        <div className="text-white text-center w-full h-full relative flex flex-col items-center justify-center gap-0.5 sm:gap-1">
+          <Avatar data-player-avatar className={`w-10 h-10 sm:w-[4.375rem] sm:h-[4.375rem] border-100 ${positionColor.replace("text-", "border-")}`}>
             <AvatarImage
               src={player.photoUrl || "/placeholder.svg"}
               alt={player.name.toUpperCase()}
               className="object-cover w-full h-full"
             />
-            <AvatarFallback className="text-lg bg-gray-900 w-full h-full flex items-center justify-center rounded-full">
+            <AvatarFallback className="text-sm sm:text-lg bg-gray-900 w-full h-full flex items-center justify-center rounded-full">
               {player.name?.charAt(0).toUpperCase()}
             </AvatarFallback>
           </Avatar>
-          {/* Added padding bottom to ensure text has enough space */}
-          <div className="absolute w-[5rem] text-center" style={{ bottom: "-2rem" }}>
-            <div className={`text-xs font-semibold px-1 rounded ${positionColor} truncate`}>
+          {/* Adjusted text positioning for mobile */}
+          <div className="absolute w-16 sm:w-[5rem] text-center" style={{ bottom: "-1.5rem", fontSize: "0.65rem" }}>
+            <div className={`text-[0.65rem] sm:text-xs font-semibold px-1 rounded ${positionColor} truncate leading-tight`}>
               {(() => {
                 const nameParts = player.name.split(' ');
                 if (nameParts.length >= 2) {
@@ -2007,7 +2007,7 @@ const lineOptions = {
       )
     }
 
-    return <div className={`text-base font-medium ${positionColor}`}>{position.shortName}</div>
+    return <div className={`text-xs sm:text-base font-medium ${positionColor}`}>{position.shortName}</div>
   }
 
   // Add this helper function to count positions and goalkeepers
@@ -2956,10 +2956,10 @@ const lineOptions = {
               </Card>
 
               {/* Formation card */}
-              <Card className="order-1 lg:order-2 min-w-0">
-                <CardHeader className="flex flex-row justify-between items-center">
-                  <div className="space-y-2">
-                    <CardTitle>{selectedGamePlan?.name} - Formation</CardTitle>
+              <Card className="order-1 lg:order-2 min-w-0 w-full max-w-full overflow-hidden">
+                <CardHeader className="flex flex-col space-y-4 sm:flex-row sm:justify-between sm:items-center sm:space-y-0">
+                  <div className="space-y-2 w-full">
+                    <CardTitle className="text-base sm:text-lg">{selectedGamePlan?.name} - Formation</CardTitle>
                     {showCustomizeMenu && (
                       <>
                         <div className="flex items-center gap-2">
@@ -2973,20 +2973,20 @@ const lineOptions = {
                       </>
                     )}
                   </div>
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={() => setShowCustomizeMenu(!showCustomizeMenu)}>
+                  <div className="flex gap-2 w-full sm:w-auto justify-end">
+                    <Button variant="outline" size="sm" onClick={() => setShowCustomizeMenu(!showCustomizeMenu)} className="text-xs sm:text-sm">
                       {showCustomizeMenu ? "Exit Customize" : "Customize Formation"}
                     </Button>
                   </div>
                 </CardHeader>
-                <CardContent className="flex flex-col items-center">
-                  <ScrollArea className="w-full max-h-[800px] overflow-y-auto">
+                 <CardContent className="flex flex-col items-center p-2 sm:p-6">
+                  <ScrollArea className="w-full max-h-[600px] sm:max-h-[800px] overflow-y-auto">
                     <div
                       ref={fieldRef}
-                      className={`relative w-full max-w-[600px] aspect-[0.68] bg-green-700 rounded-md mb-4 mx-auto ${
+                      className={`relative w-full max-w-[600px] mx-auto aspect-[0.68] bg-green-700 rounded-md mb-4 ${
                         showCustomizeMenu ? "border-4 border-dashed border-yellow-500/50" : ""
                       }`}
-                      style={{ minWidth: "300px" }}
+                      style={{ minWidth: "280px", maxWidth: "100%", height: "auto" }}
                       onDragOver={handleDragOver}
                       onDrop={handlePositionDropOnMap}
                     >
@@ -3016,7 +3016,7 @@ const lineOptions = {
                         .map((position: Position) => (
                           <div
                             key={position.id}
-                            className="absolute w-16 h-16 bg-white/30 hover:bg-white/40 transition-colors rounded-full flex items-center justify-center border-2 border-white/50 cursor-move group"
+                            className="absolute w-12 h-12 sm:w-16 sm:h-16 bg-white/30 hover:bg-white/40 transition-colors rounded-full flex items-center justify-center border-2 border-white/50 cursor-move group"
                             style={getPositionStyle(position.id, selectedGamePlan)}
                             draggable={showCustomizeMenu}
                             onDragStart={(e) => handlePositionDragStart(e, position.id)}
@@ -3053,11 +3053,11 @@ const lineOptions = {
                       <div className="flex justify-between items-center mb-4">
                         <h3 className="text-lg font-semibold">Formation Customization</h3>
                         <PositionCounter />
-                        <div className="flex gap-2">
-                          <Button variant="outline" onClick={() => setShowCustomizeMenu(false)}>
+                        <div className="flex flex-col sm:flex-row gap-2 w-full">
+                          <Button variant="outline" onClick={() => setShowCustomizeMenu(false)} className="w-full sm:w-auto">
                             Cancel
                           </Button>
-                          <Button onClick={handleSaveCustomization}>Save Changes</Button>
+                          <Button onClick={handleSaveCustomization} className="w-full sm:w-auto">Save Changes</Button>
                         </div>
                       </div>
 
@@ -3098,7 +3098,7 @@ const lineOptions = {
           )}
 
           {/* Make other sections scrollable */}
-          <div className="space-y-4 overflow-x-auto">
+          <div className="space-y-4 overflow-x-auto w-full">
             <div className="space-y-4">
               <div className="flex justify-between items-center">
                 <label htmlFor="batch" className="text-white">
@@ -3283,13 +3283,14 @@ const lineOptions = {
 
           {/* Update team table container */}
           {selectedGamePlan && (
-  <div className="space-y-4 overflow-x-auto">
+  <div className="space-y-4 overflow-x-auto w-full">
     <Card>
       <CardHeader>
         <CardTitle>Team</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="min-w-[600px]">
+        <div className="w-full overflow-x-auto">
+          <div className="min-w-[600px]">
           {/* Starting lineup table */}
           <div className="mb-6">
             <h3 className="text-lg font-semibold mb-4">Starting Lineup</h3>
@@ -3407,6 +3408,7 @@ const lineOptions = {
               </TableBody>
             </Table>
           </div>
+        </div>
         </div>
       </CardContent>
     </Card>
