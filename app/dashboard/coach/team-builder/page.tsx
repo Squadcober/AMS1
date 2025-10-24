@@ -336,6 +336,9 @@ export default function TeamBuilder() {
   const [attributeFilterState, setAttributeFilterState] = useState<"latest" | "overall">("latest")
   const [isSaving, setIsSaving] = useState(false)
   const [showSaved, setShowSaved] = useState(false)
+  const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null)
+  const [isLongPressActive, setIsLongPressActive] = useState(false)
+  const [touchStartPos, setTouchStartPos] = useState<{ x: number; y: number } | null>(null)
   const [isTouchDragging, setIsTouchDragging] = useState(false)
   const [touchDraggedPosition, setTouchDraggedPosition] = useState<string | null>(null)
 
@@ -1075,77 +1078,137 @@ export default function TeamBuilder() {
   }
 
   const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>, positionId: string) => {
-    if (!showCustomizeMenu) return
-    e.stopPropagation()
+  if (!showCustomizeMenu) return
+  e.stopPropagation()
+  
+  const touch = e.touches[0]
+  setTouchStartPos({ x: touch.clientX, y: touch.clientY })
+  
+  // Start long press timer (500ms)
+  const timer = setTimeout(() => {
+    setIsLongPressActive(true)
     setDraggedPosition(positionId)
-  }
+    // Optional: Add haptic feedback on mobile
+    if (navigator.vibrate) {
+      navigator.vibrate(50)
+    }
+  }, 500)
+  
+  setLongPressTimer(timer)
+}
 
-  const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
-    if (!showCustomizeMenu || !draggedPosition || !selectedGamePlan) return
+const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+  if (!showCustomizeMenu) return
+  
+  // If not long-pressed yet, check if user moved too much (cancel long press)
+  if (!isLongPressActive && touchStartPos && longPressTimer) {
+    const touch = e.touches[0]
+    const deltaX = Math.abs(touch.clientX - touchStartPos.x)
+    const deltaY = Math.abs(touch.clientY - touchStartPos.y)
+    
+    // If moved more than 10px, cancel long press
+    if (deltaX > 10 || deltaY > 10) {
+      clearTimeout(longPressTimer)
+      setLongPressTimer(null)
+      return
+    }
+  }
+  
+  // Only prevent default and allow dragging if long press is active
+  if (isLongPressActive && draggedPosition && selectedGamePlan) {
     e.preventDefault()
   }
+}
 
-  const handleTouchEnd = async (e: React.TouchEvent<HTMLDivElement>) => {
-    if (!showCustomizeMenu || !draggedPosition || !selectedGamePlan) return
-    e.preventDefault()
+const handleTouchEnd = async (e: React.TouchEvent<HTMLDivElement>) => {
+  // Clear long press timer if it's still running
+  if (longPressTimer) {
+    clearTimeout(longPressTimer)
+    setLongPressTimer(null)
+  }
+  
+  // Only process drop if long press was activated
+  if (!showCustomizeMenu || !isLongPressActive || !draggedPosition || !selectedGamePlan) {
+    setIsLongPressActive(false)
+    setTouchStartPos(null)
+    return
+  }
+  
+  e.preventDefault()
 
-    const touch = e.changedTouches[0]
-    const fieldElement = fieldRef.current
-    if (!fieldElement) return
-
-    const rect = fieldElement.getBoundingClientRect()
-    let top = ((touch.clientY - rect.top) / rect.height) * 100
-    let left = ((touch.clientX - rect.left) / rect.width) * 100
-
-    // Clamp values between 0 and 100 to avoid overflow
-    top = Math.min(100, Math.max(0, top))
-    left = Math.min(100, Math.max(0, left))
-
-    const currentPosition = selectedGamePlan.positions[draggedPosition]
-
-    // First, try the target position
-    let targetPosition = {
-      ...(typeof currentPosition === "object" && currentPosition !== null
-        ? currentPosition
-        : { playerId: currentPosition || "" }),
-      top: `${top}%`,
-      left: `${left}%`,
-    }
-
-    // Check for overlap and find non-overlapping position if needed
-    const nonOverlappingPos = findNonOverlappingPosition(
-      { top: targetPosition.top, left: targetPosition.left },
-      selectedGamePlan.positions,
-      draggedPosition
-    )
-
-    const updatedPosition = {
-      ...targetPosition,
-      top: nonOverlappingPos.top,
-      left: nonOverlappingPos.left,
-    }
-
-    const updatedPositions = {
-      ...selectedGamePlan.positions,
-      [draggedPosition]: updatedPosition,
-    }
-
-    // Update selectedGamePlan
-    const updatedGamePlan = {
-      ...selectedGamePlan,
-      positions: updatedPositions,
-    }
-
-    setSelectedGamePlan(updatedGamePlan)
-
-    // Update gamePlans
-    setGamePlans((prevGamePlans) =>
-      prevGamePlans.map((gp) => (gp._id === selectedGamePlan._id ? updatedGamePlan : gp))
-    )
-
-    setDraggedPosition(null)
+  const touch = e.changedTouches[0]
+  const fieldElement = fieldRef.current
+  if (!fieldElement) {
+    setIsLongPressActive(false)
+    setTouchStartPos(null)
+    return
   }
 
+  const rect = fieldElement.getBoundingClientRect()
+  let top = ((touch.clientY - rect.top) / rect.height) * 100
+  let left = ((touch.clientX - rect.left) / rect.width) * 100
+
+  // Clamp values between 0 and 100 to avoid overflow
+  top = Math.min(100, Math.max(0, top))
+  left = Math.min(100, Math.max(0, left))
+
+  const currentPosition = selectedGamePlan.positions[draggedPosition]
+
+  // First, try the target position
+  let targetPosition = {
+    ...(typeof currentPosition === "object" && currentPosition !== null
+      ? currentPosition
+      : { playerId: currentPosition || "" }),
+    top: `${top}%`,
+    left: `${left}%`,
+  }
+
+  // Check for overlap and find non-overlapping position if needed
+  const nonOverlappingPos = findNonOverlappingPosition(
+    { top: targetPosition.top, left: targetPosition.left },
+    selectedGamePlan.positions,
+    draggedPosition
+  )
+
+  const updatedPosition = {
+    ...targetPosition,
+    top: nonOverlappingPos.top,
+    left: nonOverlappingPos.left,
+  }
+
+  const updatedPositions = {
+    ...selectedGamePlan.positions,
+    [draggedPosition]: updatedPosition,
+  }
+
+  // Update selectedGamePlan
+  const updatedGamePlan = {
+    ...selectedGamePlan,
+    positions: updatedPositions,
+  }
+
+  setSelectedGamePlan(updatedGamePlan)
+
+  // Update gamePlans
+  setGamePlans((prevGamePlans) =>
+    prevGamePlans.map((gp) => (gp._id === selectedGamePlan._id ? updatedGamePlan : gp))
+  )
+
+  setDraggedPosition(null)
+  setIsLongPressActive(false)
+  setTouchStartPos(null)
+}
+
+const handleTouchCancel = () => {
+  // Clean up if touch is cancelled
+  if (longPressTimer) {
+    clearTimeout(longPressTimer)
+    setLongPressTimer(null)
+  }
+  setIsLongPressActive(false)
+  setDraggedPosition(null)
+  setTouchStartPos(null)
+}
   const handlePositionDrop = async (e: React.DragEvent<HTMLDivElement>, positionId: string) => {
     e.preventDefault()
     const playerId = e.dataTransfer.getData("playerId")
@@ -3011,6 +3074,7 @@ const lineOptions = {
                             onTouchStart={(e) => handleTouchStart(e, position.id)}
                             onTouchMove={(e) => handleTouchMove(e)}
                             onTouchEnd={(e) => handleTouchEnd(e)}
+                            onTouchCancel={handleTouchCancel}
                           >
                             {renderPositionContent(position, selectedGamePlan)}
                             {showCustomizeMenu && (
