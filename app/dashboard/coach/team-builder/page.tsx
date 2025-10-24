@@ -336,8 +336,6 @@ export default function TeamBuilder() {
   const [attributeFilterState, setAttributeFilterState] = useState<"latest" | "overall">("latest")
   const [isSaving, setIsSaving] = useState(false)
   const [showSaved, setShowSaved] = useState(false)
-  const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null)
-  const [isLongPressActive, setIsLongPressActive] = useState(false)
   const [touchStartPos, setTouchStartPos] = useState<{ x: number; y: number } | null>(null)
   const [isTouchDragging, setIsTouchDragging] = useState(false)
   const [touchDraggedPosition, setTouchDraggedPosition] = useState<string | null>(null)
@@ -1083,64 +1081,29 @@ export default function TeamBuilder() {
   
   const touch = e.touches[0]
   setTouchStartPos({ x: touch.clientX, y: touch.clientY })
-  
-  // Start long press timer (500ms)
-  const timer = setTimeout(() => {
-    setIsLongPressActive(true)
-    setDraggedPosition(positionId)
-    // Optional: Add haptic feedback on mobile
-    if (navigator.vibrate) {
-      navigator.vibrate(50)
-    }
-  }, 500)
-  
-  setLongPressTimer(timer)
+  setDraggedPosition(positionId)
 }
 
 const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
-  if (!showCustomizeMenu) return
-  
-  // If not long-pressed yet, check if user moved too much (cancel long press)
-  if (!isLongPressActive && touchStartPos && longPressTimer) {
-    const touch = e.touches[0]
-    const deltaX = Math.abs(touch.clientX - touchStartPos.x)
-    const deltaY = Math.abs(touch.clientY - touchStartPos.y)
-    
-    // If moved more than 10px, cancel long press
-    if (deltaX > 10 || deltaY > 10) {
-      clearTimeout(longPressTimer)
-      setLongPressTimer(null)
-      return
-    }
-  }
-  
-  // Only prevent default and allow dragging if long press is active
-  if (isLongPressActive && draggedPosition && selectedGamePlan) {
-    e.preventDefault()
-  }
+  if (!showCustomizeMenu || !draggedPosition || !selectedGamePlan) return
+  e.preventDefault() // Prevent scrolling while dragging
 }
 
 const handleTouchEnd = async (e: React.TouchEvent<HTMLDivElement>) => {
-  // Clear long press timer if it's still running
-  if (longPressTimer) {
-    clearTimeout(longPressTimer)
-    setLongPressTimer(null)
-  }
-  
-  // Only process drop if long press was activated
-  if (!showCustomizeMenu || !isLongPressActive || !draggedPosition || !selectedGamePlan) {
-    setIsLongPressActive(false)
+  if (!showCustomizeMenu || !draggedPosition || !selectedGamePlan) {
     setTouchStartPos(null)
+    setDraggedPosition(null)
     return
   }
   
   e.preventDefault()
+  e.stopPropagation()
 
   const touch = e.changedTouches[0]
   const fieldElement = fieldRef.current
   if (!fieldElement) {
-    setIsLongPressActive(false)
     setTouchStartPos(null)
+    setDraggedPosition(null)
     return
   }
 
@@ -1154,7 +1117,6 @@ const handleTouchEnd = async (e: React.TouchEvent<HTMLDivElement>) => {
 
   const currentPosition = selectedGamePlan.positions[draggedPosition]
 
-  // First, try the target position
   let targetPosition = {
     ...(typeof currentPosition === "object" && currentPosition !== null
       ? currentPosition
@@ -1163,7 +1125,6 @@ const handleTouchEnd = async (e: React.TouchEvent<HTMLDivElement>) => {
     left: `${left}%`,
   }
 
-  // Check for overlap and find non-overlapping position if needed
   const nonOverlappingPos = findNonOverlappingPosition(
     { top: targetPosition.top, left: targetPosition.left },
     selectedGamePlan.positions,
@@ -1181,7 +1142,6 @@ const handleTouchEnd = async (e: React.TouchEvent<HTMLDivElement>) => {
     [draggedPosition]: updatedPosition,
   }
 
-  // Update selectedGamePlan
   const updatedGamePlan = {
     ...selectedGamePlan,
     positions: updatedPositions,
@@ -1189,23 +1149,15 @@ const handleTouchEnd = async (e: React.TouchEvent<HTMLDivElement>) => {
 
   setSelectedGamePlan(updatedGamePlan)
 
-  // Update gamePlans
   setGamePlans((prevGamePlans) =>
     prevGamePlans.map((gp) => (gp._id === selectedGamePlan._id ? updatedGamePlan : gp))
   )
 
-  setDraggedPosition(null)
-  setIsLongPressActive(false)
   setTouchStartPos(null)
+  setDraggedPosition(null)
 }
 
 const handleTouchCancel = () => {
-  // Clean up if touch is cancelled
-  if (longPressTimer) {
-    clearTimeout(longPressTimer)
-    setLongPressTimer(null)
-  }
-  setIsLongPressActive(false)
   setDraggedPosition(null)
   setTouchStartPos(null)
 }
