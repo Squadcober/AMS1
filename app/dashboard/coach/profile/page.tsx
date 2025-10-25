@@ -382,8 +382,76 @@ const saveToCache = (key: string, data: any) => {
   return (
     <div className="flex h-screen overflow-hidden">
       <Sidebar /> {/* Add the Sidebar component here */}
-      <div className="flex-1 p-6 space-y-6 overflow-y-auto">
-        <div className="flex justify-between items-start">
+      <div className="flex-1 p-4 md:p-6 space-y-6 overflow-y-auto">
+        {/* Mobile Layout */}
+        <div className="md:hidden space-y-6">
+          <CustomTooltip content="Your personal information">
+            <div className="flex flex-col items-center text-center space-y-4">
+              <div>
+                {isEditing ? (
+                  <div className="space-y-2">
+                    <Label htmlFor="name">Name</Label>
+                    <Input
+                      id="name"
+                      name="name"
+                      value={coachData.name}
+                      onChange={handleInputChange}
+                      className="mb-2"
+                    />
+                    <Label htmlFor="age">Age</Label>
+                    <Input
+                      id="age"
+                      name="age"
+                      type="number"
+                      value={coachData.age}
+                      onChange={handleInputChange}
+                      className="mb-2"
+                    />
+                    <Label htmlFor="license">License</Label>
+                    <Input
+                      id="license"
+                      name="license"
+                      value={coachData.license}
+                      onChange={handleInputChange}
+                      className="mb-2"
+                    />
+                  </div>
+                ) : (
+                  <>
+                    <h2 className="text-2xl font-bold">{coachData.name.toUpperCase()}</h2>
+                    <p className="text-sm mt-1">Age: {coachData.age}</p>
+                    <p className="text-sm">{coachData.license}</p>
+                  </>
+                )}
+              </div>
+              
+              <div className="flex flex-col items-center space-y-3">
+                {photoDisplaySection}
+                <div className="flex gap-2">
+                  {isEditing ? (
+                    <>
+                      <Button variant="outline" onClick={handleCancelEdit} size="sm">Cancel</Button>
+                      <Button onClick={handleSave} size="sm">Save Changes</Button>
+                    </>
+                  ) : (
+                    <Button onClick={startEditing} size="sm">Edit Profile</Button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </CustomTooltip>
+
+          <CustomTooltip content="Your average rating from players">
+            <div className="text-center">
+              <h1 className="text-3xl font-bold">Rating</h1>
+              <div className="text-6xl font-extrabold mt-2">{averageRating}</div>
+              <p className="text-sm text-gray-400 mt-1">Based on {ratings.length} ratings</p>
+            </div>
+          </CustomTooltip>
+        </div>
+
+        {/* Desktop Layout */}
+        <div className="hidden md:flex justify-between items-start">
           <div>
             <CustomTooltip content="Your average rating from players">
               <div>
