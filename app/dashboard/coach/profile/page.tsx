@@ -382,76 +382,8 @@ const saveToCache = (key: string, data: any) => {
   return (
     <div className="flex h-screen overflow-hidden">
       <Sidebar /> {/* Add the Sidebar component here */}
-      <div className="flex-1 p-4 md:p-6 space-y-6 overflow-y-auto">
-        {/* Mobile Layout */}
-        <div className="md:hidden space-y-6">
-          <CustomTooltip content="Your personal information">
-            <div className="flex flex-col items-center text-center space-y-4">
-              <div>
-                {isEditing ? (
-                  <div className="space-y-2">
-                    <Label htmlFor="name">Name</Label>
-                    <Input
-                      id="name"
-                      name="name"
-                      value={coachData.name}
-                      onChange={handleInputChange}
-                      className="mb-2"
-                    />
-                    <Label htmlFor="age">Age</Label>
-                    <Input
-                      id="age"
-                      name="age"
-                      type="number"
-                      value={coachData.age}
-                      onChange={handleInputChange}
-                      className="mb-2"
-                    />
-                    <Label htmlFor="license">License</Label>
-                    <Input
-                      id="license"
-                      name="license"
-                      value={coachData.license}
-                      onChange={handleInputChange}
-                      className="mb-2"
-                    />
-                  </div>
-                ) : (
-                  <>
-                    <h2 className="text-2xl font-bold">{coachData.name.toUpperCase()}</h2>
-                    <p className="text-sm mt-1">Age: {coachData.age}</p>
-                    <p className="text-sm">{coachData.license}</p>
-                  </>
-                )}
-              </div>
-              
-              <div className="flex flex-col items-center space-y-3">
-                {photoDisplaySection}
-                <div className="flex gap-2">
-                  {isEditing ? (
-                    <>
-                      <Button variant="outline" onClick={handleCancelEdit} size="sm">Cancel</Button>
-                      <Button onClick={handleSave} size="sm">Save Changes</Button>
-                    </>
-                  ) : (
-                    <Button onClick={startEditing} size="sm">Edit Profile</Button>
-                  )}
-                </div>
-              </div>
-            </div>
-          </CustomTooltip>
-
-          <CustomTooltip content="Your average rating from players">
-            <div className="text-center">
-              <h1 className="text-3xl font-bold">Rating</h1>
-              <div className="text-6xl font-extrabold mt-2">{averageRating}</div>
-              <p className="text-sm text-gray-400 mt-1">Based on {ratings.length} ratings</p>
-            </div>
-          </CustomTooltip>
-        </div>
-
-        {/* Desktop Layout */}
-        <div className="hidden md:flex justify-between items-start">
+      <div className="flex-1 p-6 space-y-6 overflow-y-auto">
+        <div className="flex justify-between items-start">
           <div>
             <CustomTooltip content="Your average rating from players">
               <div>
@@ -520,6 +452,107 @@ const saveToCache = (key: string, data: any) => {
             </CustomTooltip>
           </div>
         </div>
+
+        <CustomTooltip content="Your professional background and achievements">
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle>About</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {isEditing ? (
+                <textarea
+                  name="about"
+                  value={coachData.about}
+                  onChange={handleInputChange}
+                  className="w-full h-32 bg-gray-700 text-white rounded-md p-2 mt-2"
+                />
+              ) : (
+                <p className="text-sm mt-2 leading-relaxed">{coachData.about}</p>
+              )}
+            </CardContent>
+          </Card>
+        </CustomTooltip>
+
+        {/* NEW: Experience Section */}
+        <CustomTooltip content="Your coaching experience in years">
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Award className="h-5 w-5" />
+                Experience
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {isEditing ? (
+                <div className="space-y-2">
+                  <Label htmlFor="experience">Years of Experience</Label>
+                  <Input
+                    id="experience"
+                    name="experience"
+                    type="number"
+                    min="0"
+                    max="50"
+                    value={coachData.experience}
+                    onChange={handleInputChange}
+                    className="w-32"
+                    placeholder="0"
+                  />
+                  <p className="text-xs text-gray-400">Enter your total years of coaching experience</p>
+                </div>
+              ) : (
+                <div className="flex items-center gap-4">
+                  <div>
+                    <p className="text-3xl font-bold">{coachData.experience}</p>
+                    <p className="text-sm text-gray-400">Years of Experience</p>
+                  </div>
+                  <div className="h-12 w-12 rounded-full bg-blue-500/10 flex items-center justify-center">
+                    <Award className="h-6 w-6 text-blue-500" />
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </CustomTooltip>
+
+        <CustomTooltip content="Recent feedback from players">
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle>Recent Reviews</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {ratings.slice(-4).map((rating, index) => (
+                  <div key={index} className="bg-gray-700 p-4 rounded-lg">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center">
+                        {rating.playerPhoto ? (
+                          <Image
+                            src={rating.playerPhoto}
+                            alt={rating.playerName || 'player photo'}
+                            width={32}
+                            height={32}
+                            className="rounded-full mr-2"
+                            loading="lazy"
+                          />
+                        ) : (
+                          <div className="w-8 h-8 bg-gray-600 rounded-full mr-2" />
+                        )}
+                        <span className="text-sm font-medium">
+                          {rating.playerName}
+                        </span>
+                      </div>
+                      <span className="text-lg font-bold">{rating.rating}/5</span>
+                    </div>
+                    <p className="text-sm text-gray-300">
+                      {new Date(rating.date).toLocaleDateString()}
+                    </p>
+                    {rating.comment && <p className="mt-2 text-sm">{rating.comment}</p>}
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </CustomTooltip>
 
         <Card className="mt-6">
           <CardHeader>

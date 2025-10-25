@@ -1129,23 +1129,6 @@ export default function TeamBuilder() {
     if (!isLongPressing || !draggedPosition) return
     
     e.preventDefault() // Prevent scrolling while dragging
-    
-    const target = e.currentTarget
-    const fieldElement = fieldRef.current
-    
-    if (!fieldElement) return
-    
-    const rect = fieldElement.getBoundingClientRect()
-    let top = ((touch.clientY - rect.top) / rect.height) * 100
-    let left = ((touch.clientX - rect.left) / rect.width) * 100
-    
-    // Clamp values
-    top = Math.min(95, Math.max(5, top))
-    left = Math.min(95, Math.max(5, left))
-    
-    // Update position in real-time during drag
-    target.style.top = `${top}%`
-    target.style.left = `${left}%`
   }
 
   const handleTouchEnd = async (e: React.TouchEvent<HTMLDivElement>) => {
@@ -1170,6 +1153,10 @@ export default function TeamBuilder() {
       // Let the onClick handler take over for normal taps
       return
     }
+    
+    // Prevent onClick from firing after long press
+    e.preventDefault()
+    e.stopPropagation()
     
     if (!showCustomizeMenu || !draggedPosition || !selectedGamePlan) {
       setTouchStartPos(null)
@@ -1209,7 +1196,8 @@ export default function TeamBuilder() {
     const nonOverlappingPos = findNonOverlappingPosition(
       { top: targetPosition.top, left: targetPosition.left },
       selectedGamePlan.positions,
-      draggedPosition
+      draggedPosition,
+      8  // Reduced minimum distance for mobile
     )
 
     const updatedPosition = {
@@ -1228,11 +1216,19 @@ export default function TeamBuilder() {
       positions: updatedPositions,
     }
 
+    // Update state immediately
     setSelectedGamePlan(updatedGamePlan)
 
     setGamePlans((prevGamePlans) =>
       prevGamePlans.map((gp) => (gp._id === selectedGamePlan._id ? updatedGamePlan : gp))
     )
+
+    // Show toast feedback
+    toast({
+      title: "Position Updated",
+      description: "Player position has been moved",
+      duration: 1500,
+    })
 
     setTouchStartPos(null)
     setIsLongPressing(false)
