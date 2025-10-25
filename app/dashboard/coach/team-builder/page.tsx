@@ -1076,91 +1076,117 @@ export default function TeamBuilder() {
   }
 
   const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>, positionId: string) => {
-  if (!showCustomizeMenu) return
-  e.stopPropagation()
-  
-  const touch = e.touches[0]
-  setTouchStartPos({ x: touch.clientX, y: touch.clientY })
-  setDraggedPosition(positionId)
-}
+    if (!showCustomizeMenu) return
+    
+    const touch = e.touches[0]
+    setTouchStartPos({ x: touch.clientX, y: touch.clientY })
+    setDraggedPosition(positionId)
+    
+    // Enable native-like dragging behavior
+    const target = e.currentTarget
+    target.style.position = 'fixed'
+    target.style.zIndex = '9999'
+    target.style.pointerEvents = 'none'
+    target.style.transition = 'none'
+  }
 
-const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
-  if (!showCustomizeMenu || !draggedPosition || !selectedGamePlan) return
-  e.preventDefault() // Prevent scrolling while dragging
-}
+  const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (!showCustomizeMenu || !draggedPosition || !touchStartPos) return
+    
+    const touch = e.touches[0]
+    const target = e.currentTarget
+    
+    // Move the element with the finger
+    target.style.left = `${touch.clientX}px`
+    target.style.top = `${touch.clientY}px`
+    target.style.transform = 'translate(-50%, -50%)'
+  }
 
-const handleTouchEnd = async (e: React.TouchEvent<HTMLDivElement>) => {
-  if (!showCustomizeMenu || !draggedPosition || !selectedGamePlan) {
+  const handleTouchEnd = async (e: React.TouchEvent<HTMLDivElement>) => {
+    if (!showCustomizeMenu || !draggedPosition || !selectedGamePlan || !touchStartPos) {
+      setTouchStartPos(null)
+      setDraggedPosition(null)
+      return
+    }
+
+    const touch = e.changedTouches[0]
+    const fieldElement = fieldRef.current
+    const target = e.currentTarget
+    
+    // Reset styling
+    target.style.position = ''
+    target.style.zIndex = ''
+    target.style.pointerEvents = ''
+    target.style.transition = ''
+    
+    if (!fieldElement) {
+      setTouchStartPos(null)
+      setDraggedPosition(null)
+      return
+    }
+
+    const rect = fieldElement.getBoundingClientRect()
+    let top = ((touch.clientY - rect.top) / rect.height) * 100
+    let left = ((touch.clientX - rect.left) / rect.width) * 100
+
+    // Clamp values between 5 and 95 to keep circles inside the field
+    top = Math.min(95, Math.max(5, top))
+    left = Math.min(95, Math.max(5, left))
+
+    const currentPosition = selectedGamePlan.positions[draggedPosition]
+
+    let targetPosition = {
+      ...(typeof currentPosition === "object" && currentPosition !== null
+        ? currentPosition
+        : { playerId: currentPosition || "" }),
+      top: `${top}%`,
+      left: `${left}%`,
+    }
+
+    const nonOverlappingPos = findNonOverlappingPosition(
+      { top: targetPosition.top, left: targetPosition.left },
+      selectedGamePlan.positions,
+      draggedPosition
+    )
+
+    const updatedPosition = {
+      ...targetPosition,
+      top: nonOverlappingPos.top,
+      left: nonOverlappingPos.left,
+    }
+
+    const updatedPositions = {
+      ...selectedGamePlan.positions,
+      [draggedPosition]: updatedPosition,
+    }
+
+    const updatedGamePlan = {
+      ...selectedGamePlan,
+      positions: updatedPositions,
+    }
+
+    setSelectedGamePlan(updatedGamePlan)
+
+    setGamePlans((prevGamePlans) =>
+      prevGamePlans.map((gp) => (gp._id === selectedGamePlan._id ? updatedGamePlan : gp))
+    )
+
     setTouchStartPos(null)
     setDraggedPosition(null)
-    return
   }
-  
-  e.preventDefault()
-  e.stopPropagation()
 
-  const touch = e.changedTouches[0]
-  const fieldElement = fieldRef.current
-  if (!fieldElement) {
-    setTouchStartPos(null)
+  const handleTouchCancel = (e: React.TouchEvent<HTMLDivElement>) => {
+    const target = e.currentTarget
+    
+    // Reset styling on cancel
+    target.style.position = ''
+    target.style.zIndex = ''
+    target.style.pointerEvents = ''
+    target.style.transition = ''
+    
     setDraggedPosition(null)
-    return
+    setTouchStartPos(null)
   }
-
-  const rect = fieldElement.getBoundingClientRect()
-  let top = ((touch.clientY - rect.top) / rect.height) * 100
-  let left = ((touch.clientX - rect.left) / rect.width) * 100
-
-  // Clamp values between 0 and 100 to avoid overflow
-  top = Math.min(100, Math.max(0, top))
-  left = Math.min(100, Math.max(0, left))
-
-  const currentPosition = selectedGamePlan.positions[draggedPosition]
-
-  let targetPosition = {
-    ...(typeof currentPosition === "object" && currentPosition !== null
-      ? currentPosition
-      : { playerId: currentPosition || "" }),
-    top: `${top}%`,
-    left: `${left}%`,
-  }
-
-  const nonOverlappingPos = findNonOverlappingPosition(
-    { top: targetPosition.top, left: targetPosition.left },
-    selectedGamePlan.positions,
-    draggedPosition
-  )
-
-  const updatedPosition = {
-    ...targetPosition,
-    top: nonOverlappingPos.top,
-    left: nonOverlappingPos.left,
-  }
-
-  const updatedPositions = {
-    ...selectedGamePlan.positions,
-    [draggedPosition]: updatedPosition,
-  }
-
-  const updatedGamePlan = {
-    ...selectedGamePlan,
-    positions: updatedPositions,
-  }
-
-  setSelectedGamePlan(updatedGamePlan)
-
-  setGamePlans((prevGamePlans) =>
-    prevGamePlans.map((gp) => (gp._id === selectedGamePlan._id ? updatedGamePlan : gp))
-  )
-
-  setTouchStartPos(null)
-  setDraggedPosition(null)
-}
-
-const handleTouchCancel = () => {
-  setDraggedPosition(null)
-  setTouchStartPos(null)
-}
   const handlePositionDrop = async (e: React.DragEvent<HTMLDivElement>, positionId: string) => {
     e.preventDefault()
     const playerId = e.dataTransfer.getData("playerId")
@@ -3049,15 +3075,26 @@ const lineOptions = {
 
                   {/* Add customization menu */}
                   {showCustomizeMenu && (
-                    <div className="mt-4 w-full border rounded-lg p-4">
-                      <div className="flex justify-between items-center mb-4">
-                        <h3 className="text-lg font-semibold">Formation Customization</h3>
+                    <div className="mt-4 w-full border rounded-lg p-2 sm:p-4">
+                      <div className="flex flex-col space-y-3 mb-4">
+                        <div className="flex justify-between items-center">
+                          <h3 className="text-base sm:text-lg font-semibold">Formation Customization</h3>
+                        </div>
                         <PositionCounter />
                         <div className="flex flex-col sm:flex-row gap-2 w-full">
-                          <Button variant="outline" onClick={() => setShowCustomizeMenu(false)} className="w-full sm:w-auto">
+                          <Button 
+                            variant="outline" 
+                            onClick={() => setShowCustomizeMenu(false)}
+                            className="w-full sm:w-auto order-2 sm:order-1"
+                          >
                             Cancel
                           </Button>
-                          <Button onClick={handleSaveCustomization} className="w-full sm:w-auto">Save Changes</Button>
+                          <Button 
+                            onClick={handleSaveCustomization}
+                            className="w-full sm:w-auto order-1 sm:order-2"
+                          >
+                            Save Changes
+                          </Button>
                         </div>
                       </div>
 
