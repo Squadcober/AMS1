@@ -339,6 +339,8 @@ export default function TeamBuilder() {
   const [touchStartPos, setTouchStartPos] = useState<{ x: number; y: number } | null>(null)
   const [isTouchDragging, setIsTouchDragging] = useState(false)
   const [touchDraggedPosition, setTouchDraggedPosition] = useState<string | null>(null)
+  const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null)
+  const [isLongPressing, setIsLongPressing] = useState(false)
 
   // Initialize customPositions and deletedPositions from selectedGamePlan on load
   useEffect(() => {
@@ -1080,47 +1082,108 @@ export default function TeamBuilder() {
     
     const touch = e.touches[0]
     setTouchStartPos({ x: touch.clientX, y: touch.clientY })
-    setDraggedPosition(positionId)
     
-    // Enable native-like dragging behavior
-    const target = e.currentTarget
-    target.style.position = 'fixed'
-    target.style.zIndex = '9999'
-    target.style.pointerEvents = 'none'
-    target.style.transition = 'none'
+    // Start long press timer (500ms delay)
+    const timer = setTimeout(() => {
+      setIsLongPressing(true)
+      setDraggedPosition(positionId)
+      
+      // Add vibration feedback if available
+      if (navigator.vibrate) {
+        navigator.vibrate(50)
+      }
+      
+      // Enable dragging visual feedback
+      const target = e.currentTarget
+      target.style.opacity = '0.7'
+      target.style.transform = 'translate(-50%, -50%) scale(1.1)'
+      target.style.transition = 'transform 0.2s, opacity 0.2s'
+      target.style.zIndex = '9999'
+    }, 500) // 500ms = half second long press
+    
+    setLongPressTimer(timer)
   }
 
   const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
-    if (!showCustomizeMenu || !draggedPosition || !touchStartPos) return
+    if (!showCustomizeMenu) return
     
     const touch = e.touches[0]
-    const target = e.currentTarget
+    const touchStartPosition = touchStartPos
     
-    // Move the element with the finger
-    target.style.left = `${touch.clientX}px`
-    target.style.top = `${touch.clientY}px`
-    target.style.transform = 'translate(-50%, -50%)'
+    if (!touchStartPosition) return
+    
+    // Calculate movement distance
+    const moveDistance = Math.sqrt(
+      Math.pow(touch.clientX - touchStartPosition.x, 2) + 
+      Math.pow(touch.clientY - touchStartPosition.y, 2)
+    )
+    
+    // If moved more than 10px before long press completes, cancel
+    if (moveDistance > 10 && !isLongPressing && longPressTimer) {
+      clearTimeout(longPressTimer)
+      setLongPressTimer(null)
+      return
+    }
+    
+    // Only move if long press was successful
+    if (!isLongPressing || !draggedPosition) return
+    
+    e.preventDefault() // Prevent scrolling while dragging
+    
+    const target = e.currentTarget
+    const fieldElement = fieldRef.current
+    
+    if (!fieldElement) return
+    
+    const rect = fieldElement.getBoundingClientRect()
+    let top = ((touch.clientY - rect.top) / rect.height) * 100
+    let left = ((touch.clientX - rect.left) / rect.width) * 100
+    
+    // Clamp values
+    top = Math.min(95, Math.max(5, top))
+    left = Math.min(95, Math.max(5, left))
+    
+    // Update position in real-time during drag
+    target.style.top = `${top}%`
+    target.style.left = `${left}%`
   }
 
   const handleTouchEnd = async (e: React.TouchEvent<HTMLDivElement>) => {
-    if (!showCustomizeMenu || !draggedPosition || !selectedGamePlan || !touchStartPos) {
+    // Clear the long press timer
+    if (longPressTimer) {
+      clearTimeout(longPressTimer)
+      setLongPressTimer(null)
+    }
+    
+    const target = e.currentTarget
+    
+    // Reset visual feedback
+    target.style.opacity = ''
+    target.style.transform = 'translate(-50%, -50%)'
+    target.style.transition = ''
+    target.style.zIndex = ''
+    
+    // If it wasn't a long press, treat it as a normal click
+    if (!isLongPressing) {
       setTouchStartPos(null)
+      setIsLongPressing(false)
+      // Let the onClick handler take over for normal taps
+      return
+    }
+    
+    if (!showCustomizeMenu || !draggedPosition || !selectedGamePlan) {
+      setTouchStartPos(null)
+      setIsLongPressing(false)
       setDraggedPosition(null)
       return
     }
 
     const touch = e.changedTouches[0]
     const fieldElement = fieldRef.current
-    const target = e.currentTarget
-    
-    // Reset styling
-    target.style.position = ''
-    target.style.zIndex = ''
-    target.style.pointerEvents = ''
-    target.style.transition = ''
     
     if (!fieldElement) {
       setTouchStartPos(null)
+      setIsLongPressing(false)
       setDraggedPosition(null)
       return
     }
@@ -1172,20 +1235,28 @@ export default function TeamBuilder() {
     )
 
     setTouchStartPos(null)
+    setIsLongPressing(false)
     setDraggedPosition(null)
   }
 
   const handleTouchCancel = (e: React.TouchEvent<HTMLDivElement>) => {
+    // Clear the timer
+    if (longPressTimer) {
+      clearTimeout(longPressTimer)
+      setLongPressTimer(null)
+    }
+    
     const target = e.currentTarget
     
     // Reset styling on cancel
-    target.style.position = ''
-    target.style.zIndex = ''
-    target.style.pointerEvents = ''
+    target.style.opacity = ''
+    target.style.transform = 'translate(-50%, -50%)'
     target.style.transition = ''
+    target.style.zIndex = ''
     
     setDraggedPosition(null)
     setTouchStartPos(null)
+    setIsLongPressing(false)
   }
   const handlePositionDrop = async (e: React.DragEvent<HTMLDivElement>, positionId: string) => {
     e.preventDefault()
@@ -3048,7 +3119,12 @@ const lineOptions = {
                             onDragStart={(e) => handlePositionDragStart(e, position.id)}
                             onDragOver={handleDragOver}
                             onDrop={(e) => handlePositionDrop(e, position.id)}
-                            onClick={() => handlePositionClick(position)}
+                            onClick={() => {
+                              // Only trigger click if it wasn't a long press
+                              if (!isLongPressing) {
+                                handlePositionClick(position)
+                              }
+                            }}
                             onTouchStart={(e) => handleTouchStart(e, position.id)}
                             onTouchMove={(e) => handleTouchMove(e)}
                             onTouchEnd={(e) => handleTouchEnd(e)}
