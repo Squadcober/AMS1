@@ -105,6 +105,7 @@ export default function AboutPage() {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [teamPhotos, setTeamPhotos] = useState<string[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const colorInputRef = useRef<HTMLInputElement>(null)
   const [selectedFile, setSelectedFile] = useState<CollateralFile | null>(null)
   const [aboutData, setAboutData] = useState<AboutData>({
     academyId: user?.academyId || '',
@@ -127,14 +128,14 @@ export default function AboutPage() {
   useEffect(() => {
     const fetchAboutData = async () => {
       if (!user?.academyId) return;
-      
+
       try {
         setIsLoading(true);
         const response = await fetch(`/api/db/ams-about?academyId=${user.academyId}`);
         if (!response.ok) throw new Error('Failed to fetch about data');
-        
+
         const data = await response.json();
-        
+
         if (data && Object.keys(data).length > 0) {
           setAboutData(data);
           setFormData({
@@ -165,6 +166,118 @@ export default function AboutPage() {
 
     fetchAboutData();
   }, [user?.academyId]);
+
+  // Force color input value update for mobile browsers
+  useEffect(() => {
+    if (isEditing && colorInputRef.current && formData.color) {
+      // Use requestAnimationFrame to ensure DOM is updated
+      requestAnimationFrame(() => {
+        if (colorInputRef.current && document.contains(colorInputRef.current)) {
+          // Longer delay to ensure the input is fully rendered and visible
+          setTimeout(() => {
+            if (colorInputRef.current) {
+              // Focus the input first
+              colorInputRef.current.focus();
+
+              // Temporarily set to a different value and back to trigger HSV update
+              colorInputRef.current.value = '#ffffff';
+              colorInputRef.current.value = formData.color;
+
+              // Trigger multiple events to update HSV controls
+              const inputEvent = new Event('input', { bubbles: true });
+              const changeEvent = new Event('change', { bubbles: true });
+              const blurEvent = new Event('blur', { bubbles: true });
+              const clickEvent = new Event('click', { bubbles: true });
+              const focusEvent = new Event('focus', { bubbles: true });
+
+              colorInputRef.current.dispatchEvent(inputEvent);
+              colorInputRef.current.dispatchEvent(changeEvent);
+              colorInputRef.current.dispatchEvent(blurEvent);
+
+              // Try to simulate a click to open the color picker
+              setTimeout(() => {
+                if (colorInputRef.current) {
+                  colorInputRef.current.dispatchEvent(clickEvent);
+                  colorInputRef.current.dispatchEvent(focusEvent);
+                }
+              }, 10);
+
+              // Additional delay and re-trigger for stubborn mobile browsers
+              setTimeout(() => {
+                if (colorInputRef.current) {
+                  colorInputRef.current.dispatchEvent(new Event('input', { bubbles: true }));
+                  colorInputRef.current.dispatchEvent(new Event('change', { bubbles: true }));
+                  colorInputRef.current.dispatchEvent(new Event('blur', { bubbles: true }));
+                }
+              }, 100);
+
+              // Final aggressive re-trigger for very stubborn mobile browsers
+              setTimeout(() => {
+                if (colorInputRef.current) {
+                  // Try setting to a completely different color and back
+                  const originalColor = colorInputRef.current.value;
+                  colorInputRef.current.value = '#ff0000';
+                  colorInputRef.current.value = '#00ff00';
+                  colorInputRef.current.value = '#0000ff';
+                  colorInputRef.current.value = originalColor;
+
+                  // Dispatch events multiple times
+                  for (let i = 0; i < 5; i++) {
+                    setTimeout(() => {
+                      if (colorInputRef.current) {
+                        colorInputRef.current.dispatchEvent(new Event('input', { bubbles: true }));
+                        colorInputRef.current.dispatchEvent(new Event('change', { bubbles: true }));
+                      }
+                    }, i * 50);
+                  }
+                }
+              }, 200);
+
+              // Additional attempt: Force the color picker to open programmatically
+              setTimeout(() => {
+                if (colorInputRef.current) {
+                  // Try to programmatically open the color picker
+                  colorInputRef.current.click();
+                  // After a brief moment, dispatch more events
+                  setTimeout(() => {
+                    if (colorInputRef.current) {
+                      colorInputRef.current.dispatchEvent(new Event('input', { bubbles: true }));
+                      colorInputRef.current.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+                  }, 100);
+                }
+              }, 300);
+
+              // New approach: Try to trigger the color picker by simulating user interaction
+              setTimeout(() => {
+                if (colorInputRef.current) {
+                  // Create a more aggressive sequence of interactions
+                  const events = ['mousedown', 'mouseup', 'click', 'focus', 'touchstart', 'touchend'];
+                  events.forEach((eventType, index) => {
+                    setTimeout(() => {
+                      if (colorInputRef.current) {
+                        const event = new Event(eventType, { bubbles: true });
+                        colorInputRef.current.dispatchEvent(event);
+                      }
+                    }, index * 20);
+                  });
+
+                  // After simulated interactions, try to set value again
+                  setTimeout(() => {
+                    if (colorInputRef.current) {
+                      colorInputRef.current.value = formData.color;
+                      colorInputRef.current.dispatchEvent(new Event('input', { bubbles: true }));
+                      colorInputRef.current.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+                  }, events.length * 20 + 50);
+                }
+              }, 400);
+            }
+          }, 500);
+        }
+      });
+    }
+  }, [formData.color, isEditing]);
 
   const handleLogoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -649,16 +762,32 @@ export default function AboutPage() {
             <div className="text-right">
               <h3 className="mb-2">Team Color</h3>
               {isEditing ? (
-                <input
-                  key={formData.color}
-                  type="color"
-                  value={formData.color}
-                  onChange={handleColorChange}
-                  className="w-32 h-8 bg-black border border-gray-600"
-                />
+                <>
+                  {/* Mobile: Use hex input */}
+                  <div className="md:hidden">
+                    <Input
+                      type="text"
+                      value={formData.color}
+                      onChange={(e) => handleColorChange({ target: { value: e.target.value } } as any)}
+                      placeholder="#000000"
+                      className="w-32 bg-black border-gray-600 text-white"
+                    />
+                  </div>
+                  {/* Desktop: Use color input */}
+                  <div className="hidden md:block">
+                    <input
+                      key={formData.color}
+                      ref={colorInputRef}
+                      type="color"
+                      value={formData.color}
+                      onChange={handleColorChange}
+                      className="w-32 h-8 bg-black border border-gray-600"
+                    />
+                  </div>
+                </>
               ) : (
-                <div 
-                  className="w-32 h-8 border border-gray-600" 
+                <div
+                  className="w-32 h-8 border border-gray-600"
                   style={{backgroundColor: formData.color}}
                 />
               )}
