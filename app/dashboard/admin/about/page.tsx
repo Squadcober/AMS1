@@ -650,6 +650,7 @@ export default function AboutPage() {
               <h3 className="mb-2">Team Color</h3>
               {isEditing ? (
                 <input
+                  key={formData.color}
                   type="color"
                   value={formData.color}
                   onChange={handleColorChange}
@@ -678,7 +679,7 @@ export default function AboutPage() {
                 about: e.target.value
               }))}
               placeholder="Enter academy description..."
-              className="min-h-[400px] w-full bg-gray-800 text-white resize-none"
+              className="min-h-[150px] w-full bg-gray-800 text-white resize-none"
               disabled={!isEditing}
             />
           </CardContent>
