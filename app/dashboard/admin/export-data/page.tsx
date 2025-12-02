@@ -9,6 +9,14 @@ import { Button } from "@/components/ui/button"
 import { Loader2 } from "lucide-react"
 import * as XLSX from 'xlsx';
 
+// Add: detect wrapped APK / WebView (heuristic)
+const isWrappedWebView = () => {
+  if (typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent.toLowerCase();
+  // webtonative may include its name; wv/webview + android is common for Android WebView
+  return ua.includes('webtonative') || ua.includes('wv') || (ua.includes('android') && ua.includes('webview'));
+};
+
 export default function ExportDataPage() {
   const { user } = useAuth()
   const { toast } = useToast()
@@ -330,6 +338,21 @@ export default function ExportDataPage() {
     }
 
     setLoading(type);
+
+    // If running inside the wrapped APK WebView, do a top-level navigation to the export endpoint.
+    // The server returns a simple HTML page with a data: URL + textarea for navigations (works without JS).
+    if (isWrappedWebView()) {
+      const exportUrl = `/api/db/export?academyId=${user?.academyId}&collection=${type}`;
+      // Inform the user and navigate. In many wrappers this will trigger the wrapper's download handler.
+      toast({
+        title: "Opening export",
+        description: "If download doesn't start automatically, long-press the Download link on the next screen to save the file.",
+      });
+      // navigate; page will unload so we don't need to reset loading here
+      window.location.href = exportUrl;
+      return;
+    }
+
     try {
       const response = await fetch(`/api/db/export?academyId=${user?.academyId}&collection=${type}`);
       if (!response.ok) throw new Error('Failed to fetch data');
