@@ -1,6 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getClientPromise } from '@/lib/mongodb';
 
+// helper to detect Android WebView / wrapped APK requests
+function isApkWebViewRequest(request: NextRequest) {
+	// X-Requested-With is commonly sent by Android WebView with the package name
+	const xr = request.headers.get('x-requested-with');
+	if (xr) return true;
+
+	// Fallback: try to detect WebView via user-agent heuristics (not perfect)
+	const ua = (request.headers.get('user-agent') || '').toLowerCase();
+	// "wv" and "android" together are a reasonable heuristic for WebView
+	if (ua.includes('wv') || (ua.includes('android') && ua.includes('webview'))) return true;
+
+	return false;
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -53,26 +67,19 @@ export async function GET(request: NextRequest) {
       case 'performance':
         // Fetch player performance data with details
         const players = await db.collection('ams-player-data')
-          .find({
+          .find({ 
             academyId,
             performanceHistory: { $exists: true }
           })
           .toArray();
 
-        data = players.flatMap(player =>
+        data = players.flatMap(player => 
           (player.performanceHistory || []).map((ph: any) => ({
             playerId: player.id,
             playerName: player.name,
             ...ph
           }))
         );
-        break;
-
-      case 'sessions':
-        // Fetch all sessions for the academy
-        data = await db.collection('ams-sessions')
-          .find({ academyId })
-          .toArray();
         break;
 
       case 'all':
@@ -101,6 +108,20 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: 'Invalid collection specified' }, { status: 400 });
     }
 
+    // If request comes from an APK/webview, return a downloadable JSON file attachment.
+    if (isApkWebViewRequest(request)) {
+      const filename = `export-${collection ?? 'data'}.json`;
+      const body = JSON.stringify(data);
+      return new Response(body, {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Content-Disposition': `attachment; filename="${filename}"`,
+        },
+      });
+    }
+
+    // Default: existing web behavior (unchanged)
     return NextResponse.json(data);
   } catch (error) {
     console.error('Error exporting data:', error);
