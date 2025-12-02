@@ -411,56 +411,36 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: 'Invalid collection specified' }, { status: 400 });
     }
 
-    // Only return HTML fallback when request is from APK/WebView AND is a top-level navigation.
-    if (isApkWebViewRequest(request) && isNavigationRequest(request)) {
-      const filename = `export-${collection ?? 'data'}.json`;
-      const jsonString = JSON.stringify(data, null, 2); // pretty print for textarea
-      const base64 = Buffer.from(jsonString, 'utf-8').toString('base64');
+    // For APK/WebView requests, return CSV file for download
+    if (isApkWebViewRequest(request)) {
+      let csvContent = '';
 
-      const html = `<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>Export: ${filename}</title>
-  <style>
-    body{font-family:system-ui,Segoe UI,Roboto,Arial;padding:16px}
-    h1{font-size:18px;margin-bottom:8px}
-    textarea{width:100%;height:60vh;margin-top:12px;font-family:monospace;white-space:pre;overflow:auto}
-    p.note{color:#444;font-size:13px}
-  </style>
-</head>
-<body>
-  <h1>Export Ready: ${filename}</h1>
-  <p class="note">Copy the JSON from the textarea below and save it manually via your device.</p>
-  <hr/>
-  <p><strong>Raw JSON (copy/save manually)</strong></p>
-  <textarea readonly>${jsonString.replace(/<\/textarea>/g, '<\\/textarea>')}</textarea>
-</body>
-</html>`;
+      if (collection === 'all' && typeof data === 'object' && !Array.isArray(data)) {
+        // For 'all', generate separate CSV sections
+        const { players, coaches, batches, finances } = data as any;
+        csvContent = [
+          'PLAYERS\n' + formatCSV(players || [], 'players'),
+          '\n\nCOACHES\n' + formatCSV(coaches || [], 'coaches'),
+          '\n\nBATCHES\n' + formatCSV(batches || [], 'batches'),
+          '\n\nFINANCES\n' + formatFinancialData(finances || []).income.map(i => Object.values(i).join(',')).join('\n') +
+            '\n\nEXPENSES\n' + formatFinancialData(finances || []).expenses.map(e => Object.values(e).join(',')).join('\n')
+        ].join('\n\n');
+      } else {
+        csvContent = formatCSV(Array.isArray(data) ? data : [data], collection || 'data');
+      }
 
-      return new Response(html, {
+      const filename = `export-${collection ?? 'data'}.csv`;
+
+      return new Response(csvContent, {
         status: 200,
         headers: {
-          'Content-Type': 'text/html; charset=utf-8',
+          'Content-Type': 'text/csv; charset=utf-8',
+          'Content-Disposition': `attachment; filename="${filename}"`,
         },
       });
     }
 
-    // If request comes from APK/WebView but is NOT a navigation (likely a fetch/XHR), return base64 JSON payload
-    if (isApkWebViewRequest(request)) {
-      const filename = `export-${collection ?? 'data'}.json`;
-      const jsonString = JSON.stringify(data);
-      const base64 = Buffer.from(jsonString, 'utf-8').toString('base64');
 
-      return NextResponse.json({
-        apkExport: true,
-        filename,
-        mime: 'application/json',
-        contentBase64: base64,
-        originalSize: Buffer.byteLength(jsonString, 'utf-8')
-      }, { status: 200 });
-    }
 
     // Default: existing web behavior (unchanged)
     return NextResponse.json(data);
