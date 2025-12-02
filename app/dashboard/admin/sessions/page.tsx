@@ -240,14 +240,15 @@ const exportToFile = async (sessions: Session[], academyId: string, batches: Bat
     }
   } catch (e) {
     console.error("CSV export failed", e);
-    // Final fallback: try to open in new window
+    // Final fallback: copy to clipboard for manual saving
     try {
-      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-      const url = URL.createObjectURL(blob);
-      window.open(url, '_blank');
-      URL.revokeObjectURL(url);
-    } catch (fallbackError) {
-      console.error("All export methods failed", fallbackError);
+      await navigator.clipboard.writeText(csvContent);
+      alert(`CSV data copied to clipboard! You can paste it into a text editor and save as a .csv file.\n\nFirst few lines:\n${csvContent.split('\n').slice(0, 3).join('\n')}`);
+    } catch (clipboardError) {
+      console.error("Clipboard fallback failed", clipboardError);
+      // Last resort: show the data in an alert (truncated for mobile)
+      const truncated = csvContent.length > 1000 ? csvContent.substring(0, 1000) + '...' : csvContent;
+      alert(`Export failed. CSV content (first 1000 chars):\n\n${truncated}\n\nCopy this content manually and save as a .csv file.`);
     }
   }
 
