@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react"
 import { useMediaQuery } from "react-responsive"
+import { HexColorPicker } from "react-colorful"
 import Image from "next/image"
 import { Plus, X, Save, Edit, Facebook, Instagram, Youtube, Twitter, Upload, FileImage, FileText, Download, Eye } from "lucide-react"
 import { Input } from "@/components/ui/input"
@@ -843,20 +844,39 @@ export default function AboutPage() {
           </Dialog>
         )}
 
-        {/* Color Picker Modal for Mobile */}
+        {/* Color Picker Modal */}
         {isColorPickerOpen && (
           <Dialog open={true} onOpenChange={() => setIsColorPickerOpen(false)}>
-            <DialogContent>
+            <DialogContent className="max-w-sm">
               <DialogHeader>
                 <DialogTitle>Select Team Color</DialogTitle>
               </DialogHeader>
-              <div className="py-4">
-                <input
-                  type="color"
-                  value={formData.color}
-                  onChange={handleColorChange}
-                  className="w-full h-12 border border-gray-600 rounded"
-                />
+              <div className="py-4 space-y-4">
+                <div className="flex justify-center">
+                  <HexColorPicker
+                    color={formData.color}
+                    onChange={(color) => handleFormChange(prev => ({
+                      ...prev,
+                      color: color
+                    }))}
+                    className="w-full max-w-xs"
+                  />
+                </div>
+                <div className="flex items-center space-x-2">
+                  <div
+                    className="w-8 h-8 border border-gray-600 rounded"
+                    style={{ backgroundColor: formData.color }}
+                  />
+                  <Input
+                    value={formData.color}
+                    onChange={(e) => handleFormChange(prev => ({
+                      ...prev,
+                      color: e.target.value
+                    }))}
+                    className="flex-1 bg-gray-800 border-gray-600 text-white font-mono text-sm"
+                    placeholder="#000000"
+                  />
+                </div>
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setIsColorPickerOpen(false)}>
