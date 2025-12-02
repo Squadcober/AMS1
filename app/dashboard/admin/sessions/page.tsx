@@ -3666,21 +3666,7 @@ const handleSaveChanges = async () => {
   return (
     <div className="flex h-screen overflow-hidden">
       <Sidebar /> {/* Add the Sidebar component here */}
-      <style jsx>{`
-        @media (max-width: 767px) {
-          .main-content {
-            transform: rotate(90deg);
-            transform-origin: center;
-            width: 100vh;
-            height: 100vw;
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            margin-left: -50vh;
-            margin-top: -50vw;
-          }
-        }
-      `}</style>
+
       <div className="main-content flex-1 flex flex flex-col space-y-6 overflow-auto">
         <h1 className="text-3xl font-bold text-white p-4">Sessions</h1>
         {/* Update the Unsaved Sessions card */}
