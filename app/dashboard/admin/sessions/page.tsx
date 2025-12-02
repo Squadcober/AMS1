@@ -21,6 +21,7 @@ import { Switch } from "@/components/ui/switch"
 import Sidebar from "@/components/Sidebar" // Import the Sidebar component
 import { format } from "date-fns" // Import format from date-fns
 import { Calendar } from "@/components/ui/calendar"
+import { Directory } from '@capacitor/filesystem';
 
 import { toast, useToast } from "@/components/ui/use-toast"; // Import useToast hook
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs" // Add this import
@@ -100,20 +101,74 @@ export interface Batch {
   academyId: string
 }
 
-// Simplified exportToFile using server-side API endpoint
+// Enhanced exportToFile with better error handling and Capacitor support
 const exportToFile = async (sessions: Session[], academyId: string, batches: Batch[]) => {
   try {
+    console.log('Starting export for academy:', academyId);
+
     // Call the server-side CSV export API
     const response = await fetch(`/api/db/export/sessions-csv?academyId=${encodeURIComponent(academyId)}`);
 
     if (!response.ok) {
-      throw new Error(`Export failed: ${response.status} ${response.statusText}`);
+      const errorText = await response.text();
+      console.error('API response error:', response.status, errorText);
+      throw new Error(`Export failed: ${response.status} ${response.statusText} - ${errorText}`);
     }
 
     // Get the CSV content as blob
     const blob = await response.blob();
+    console.log('Blob created, size:', blob.size);
 
-    // Create download link
+    if (blob.size === 0) {
+      throw new Error('Received empty file from server');
+    }
+
+    // Check if we're in a Capacitor environment
+    const isCapacitor = typeof window !== 'undefined' && window.Capacitor;
+
+    if (isCapacitor) {
+      // Use Capacitor's Filesystem API for mobile
+      try {
+        const { Filesystem, Share } = await import('@capacitor/filesystem');
+        const { Capacitor } = await import('@capacitor/core');
+
+        // Convert blob to base64
+        const base64Data = await blobToBase64(blob);
+
+        // Get filename from response headers or generate one
+        const contentDisposition = response.headers.get('Content-Disposition');
+        let filename = `sessions_export_${academyId}_${new Date().toISOString().split('T')[0]}.csv`;
+
+        if (contentDisposition) {
+          const filenameMatch = contentDisposition.match(/filename="([^"]+)"/);
+          if (filenameMatch) {
+            filename = filenameMatch[1];
+          }
+        }
+
+        // Write file to device
+        const result = await Filesystem.writeFile({
+          path: filename,
+          data: base64Data,
+          directory: Capacitor.isNativePlatform() ? Directory.Documents : Directory.Data,
+        });
+
+        // Share the file
+        await Share.share({
+          title: 'Sessions Export',
+          text: 'Exported sessions data',
+          url: result.uri,
+        });
+
+        console.log('File exported using Capacitor:', result.uri);
+        return sessions.length;
+      } catch (capacitorError) {
+        console.warn('Capacitor export failed, falling back to web download:', capacitorError);
+        // Fall through to web download
+      }
+    }
+
+    // Web download fallback
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
@@ -135,11 +190,27 @@ const exportToFile = async (sessions: Session[], academyId: string, batches: Bat
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
 
+    console.log('File exported successfully via web download');
     return sessions.length; // Return count of sessions processed
   } catch (error) {
     console.error('Export failed:', error);
     throw error; // Re-throw to be handled by caller
   }
+};
+
+// Helper function to convert blob to base64
+const blobToBase64 = (blob: Blob): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      // Remove the data URL prefix (e.g., "data:text/csv;base64,")
+      const base64 = result.split(',')[1];
+      resolve(base64);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
 };
 
 
