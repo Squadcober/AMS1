@@ -339,55 +339,57 @@ export default function ExportDataPage() {
 
     setLoading(type);
 
-    // If running inside the wrapped APK WebView, do a top-level navigation to the export endpoint.
-    // The server returns a simple HTML page with a data: URL + textarea for navigations (works without JS).
-    if (isWrappedWebView()) {
-      const exportUrl = `/api/db/export?academyId=${user?.academyId}&collection=${type}`;
-      // Inform the user and navigate. In many wrappers this will trigger the wrapper's download handler.
-      toast({
-        title: "Opening export",
-        description: "If download doesn't start automatically, long-press the Download link on the next screen to save the file.",
-      });
-      // navigate; page will unload so we don't need to reset loading here
-      window.location.href = exportUrl;
-      return;
-    }
-
     try {
       const response = await fetch(`/api/db/export?academyId=${user?.academyId}&collection=${type}`);
       if (!response.ok) throw new Error('Failed to fetch data');
-      let data = await response.json();
 
-      if (type === 'finances') {
-        const formattedData = formatFinancialData(data);
-        downloadExcel(formattedData, 'financial_records');
-      } else if (type === 'performance') {
-        // For performance history, we need to get all players with their performance history
-        const csvContent = formatCSV(data, type);
-        if (!csvContent) {
-          toast({
-            title: "No Data",
-            description: "No performance history data found to export.",
-            variant: "destructive",
-          });
-          return;
-        }
-        downloadCSV(csvContent, 'performance_history.csv');
-      } else if (type === 'batches') {
-        const batches = Array.isArray(data) ? data : [data];
-        for (const batch of batches) {
-          if ((!batch.coaches || !batch.coaches.length) && batch.coachIds?.length) {
-            batch.coaches = await fetchCoachDetails(batch.coachIds);
-          }
-          if ((!batch.playersData || !batch.playersData.length) && batch.players?.length) {
-            batch.playersData = await fetchPlayerDetails(batch.players);
-          }
-        }
-        const csvContent = formatCSV(batches, type);
-        downloadCSV(csvContent, 'batches.csv');
+      // For APK/WebView, the API returns CSV directly for download
+      if (isWrappedWebView()) {
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `export-${type}.csv`;
+        link.click();
+        URL.revokeObjectURL(url);
+        // Ensure loading resets after download
+        setTimeout(() => setLoading(null), 1000);
+        return;
       } else {
-        const csvContent = formatCSV(data, type);
-        downloadCSV(csvContent, `${type}.csv`);
+        // Web app logic
+        let data = await response.json();
+
+        if (type === 'finances') {
+          const formattedData = formatFinancialData(data);
+          downloadExcel(formattedData, 'financial_records');
+        } else if (type === 'performance') {
+          // For performance history, we need to get all players with their performance history
+          const csvContent = formatCSV(data, type);
+          if (!csvContent) {
+            toast({
+              title: "No Data",
+              description: "No performance history data found to export.",
+              variant: "destructive",
+            });
+            return;
+          }
+          downloadCSV(csvContent, 'performance_history.csv');
+        } else if (type === 'batches') {
+          const batches = Array.isArray(data) ? data : [data];
+          for (const batch of batches) {
+            if ((!batch.coaches || !batch.coaches.length) && batch.coachIds?.length) {
+              batch.coaches = await fetchCoachDetails(batch.coachIds);
+            }
+            if ((!batch.playersData || !batch.playersData.length) && batch.players?.length) {
+              batch.playersData = await fetchPlayerDetails(batch.players);
+            }
+          }
+          const csvContent = formatCSV(batches, type);
+          downloadCSV(csvContent, 'batches.csv');
+        } else {
+          const csvContent = formatCSV(data, type);
+          downloadCSV(csvContent, `${type}.csv`);
+        }
       }
 
       toast({
