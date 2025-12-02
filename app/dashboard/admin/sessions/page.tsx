@@ -101,8 +101,8 @@ export interface Batch {
 }
 
 // Move exportToFile inside SessionsContent component
-// Replace existing exportToFile with this definitive implementation
-const exportToFile = (sessions: Session[], academyId: string, batches: Batch[]) => {
+// Replace existing exportToFile with mobile-compatible implementation
+const exportToFile = async (sessions: Session[], academyId: string, batches: Batch[]) => {
   // filter to only sessions for this academy
   const academySessions = Array.isArray(sessions)
     ? sessions.filter(s => s.academyId === academyId)
@@ -203,20 +203,52 @@ const exportToFile = (sessions: Session[], academyId: string, batches: Batch[]) 
   // Combine header + rows
   const csvContent = [headers.join(","), ...rows].join("\n");
 
-  // Trigger download
+  // Mobile-compatible download
   try {
     const dateStr = new Date().toISOString().split("T")[0];
+    const fileName = `sessions_export_${academyId}_${dateStr}.csv`;
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.setAttribute("download", `sessions_export_${academyId}_${dateStr}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+
+    // Check if Web Share API is available (modern mobile browsers)
+    if (navigator.share && navigator.canShare && navigator.canShare({ files: [new File([blob], fileName)] })) {
+      const file = new File([blob], fileName, { type: "text/csv" });
+      await navigator.share({
+        title: 'Sessions Export',
+        text: 'CSV export of academy sessions',
+        files: [file]
+      });
+    } else {
+      // Fallback for older mobile browsers or when Web Share isn't available
+      const url = URL.createObjectURL(blob);
+
+      // Try to use download attribute first (works on some mobile browsers)
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", fileName);
+
+      // Check if download is supported
+      if ('download' in link) {
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } else {
+        // Fallback: open in new window/tab
+        window.open(url, '_blank');
+      }
+
+      URL.revokeObjectURL(url);
+    }
   } catch (e) {
-    console.error("CSV download failed", e);
+    console.error("CSV export failed", e);
+    // Final fallback: try to open in new window
+    try {
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      URL.revokeObjectURL(url);
+    } catch (fallbackError) {
+      console.error("All export methods failed", fallbackError);
+    }
   }
 
   return academySessions.length;
@@ -254,7 +286,7 @@ const exportAndClearSessions = async (
     const sessions = await response.json();
 
     // Generate CSV and trigger download
-    exportToFile(sessions, user.academyId, batches);
+    await exportToFile(sessions, user.academyId, batches);
 
     // If it's an archive operation, clear the sessions from the database
     if (type === 'archive') {
@@ -4205,132 +4237,7 @@ const METRICS_CONFIG = [
   { key: "sessionRating", label: "Session Rating" }
 ] as const;
 
-const handleExportSessions = async (academyId: string | undefined) => {
-  // Ensure user is defined in this scope
-  const { user } = useAuth();
-  try {
-    const response = await fetch('/api/db/ams-sessions/actions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        action: 'export',
-        academyId: academyId || user?.academyId
-      }),
-    });
-    if (!response.ok) throw new Error('Failed to export sessions');
-    const data = await response.json();
-    // Create and download CSV
-    const csv = convertToCSV(data);
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `sessions-${new Date().toISOString()}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    window.URL.revokeObjectURL(url);
-    document.body.removeChild(a);
-    toast({
-      title: "Success",
-      description: "Sessions exported successfully",
-    });
-  } catch (error) {
-    console.error('Error exporting sessions:', error);
-    toast({
-      title: "Error",
-      description: "Failed to export sessions",
-      variant: "destructive",
-    });
-  }
-};
 
-const handleClearSessions = async (
-  academyId: string | undefined,
-  setSessions: React.Dispatch<React.SetStateAction<Session[]>>,
-  setSelectedSessions: React.Dispatch<React.SetStateAction<number[]>>
-) => {
-  const { user } = useAuth();
-  try {
-    if (!window.confirm('Are you sure you want to clear all sessions? This action cannot be undone.')) {
-      return;
-    }
-    const response = await fetch('/api/db/ams-sessions/actions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        action: 'clear',
-        academyId
-      }),
-    });
-    if (!response.ok) throw new Error('Failed to clear sessions');
-    setSessions([]);
-    setSelectedSessions([]);
-    toast({
-      title: "Success",
-      description: "All sessions cleared successfully",
-    });
-  } catch (error) {
-    console.error('Error clearing sessions:', error);
-    toast({
-      title: "Error",
-      description: "Failed to clear sessions",
-      variant: "destructive",
-    });
-  }
-};
-
-const handleDeleteSelected = async (
-  academyId: string | undefined,
-  selectedSessions: number[],
-  setSessions: React.Dispatch<React.SetStateAction<Session[]>>,
-  setSelectedSessions: React.Dispatch<React.SetStateAction<number[]>>
-) => {
-  try {
-    if (!window.confirm(`Are you sure you want to delete ${selectedSessions.length} session(s)?`)) {
-      return;
-    }
-    const response = await fetch('/api/db/ams-sessions/actions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        action: 'delete',
-        sessionIds: selectedSessions,
-        academyId
-      }),
-    });
-    if (!response.ok) throw new Error('Failed to delete sessions');
-    setSessions(prev => prev.filter(session => !selectedSessions.map(String).includes(String(session._id))));
-    setSelectedSessions([]);
-    toast({
-      title: "Success",
-      description: "Selected sessions deleted successfully",
-    });
-  } catch (error) {
-    console.error('Error deleting sessions:', error);
-    toast({
-      title: "Error",
-      description: "Failed to delete sessions",
-      variant: "destructive",
-    });
-  }
-};
-
-const convertToCSV = (data: any[]) => {
-  if (!data.length) return '';
-  const headers = Object.keys(data[0]).join(',');
-  const rows = data.map(item => 
-    Object.values(item).map(value => 
-      typeof value === 'string' ? `"${value}"` : value
-    ).join(',')
-  );
-  return [headers, ...rows].join('\n');
-};
 
 // ...rest of existing code remains unchanged...
 
