@@ -21,7 +21,6 @@ import { Switch } from "@/components/ui/switch"
 import Sidebar from "@/components/Sidebar" // Import the Sidebar component
 import { format } from "date-fns" // Import format from date-fns
 import { Calendar } from "@/components/ui/calendar"
-import { Directory } from '@capacitor/filesystem';
 
 import { toast, useToast } from "@/components/ui/use-toast"; // Import useToast hook
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs" // Add this import
@@ -101,116 +100,126 @@ export interface Batch {
   academyId: string
 }
 
-// Enhanced exportToFile with better error handling and Capacitor support
-const exportToFile = async (sessions: Session[], academyId: string, batches: Batch[]) => {
-  try {
-    console.log('Starting export for academy:', academyId);
+// Move exportToFile inside SessionsContent component
+// Replace existing exportToFile with this definitive implementation
+const exportToFile = (sessions: Session[], academyId: string, batches: Batch[]) => {
+  // filter to only sessions for this academy
+  const academySessions = Array.isArray(sessions)
+    ? sessions.filter(s => s.academyId === academyId)
+    : [];
 
-    // Call the server-side CSV export API
-    const response = await fetch(`/api/db/export/sessions-csv?academyId=${encodeURIComponent(academyId)}`);
+  // CSV headers (order matters)
+  const headers = [
+    "Session ID",
+    "Session Name",
+    "Is Recurring",
+    "Parent Session ID",
+    "Occurrence Date",
+    "Date",
+    "Start Time",
+    "End Time",
+    "Duration",
+    "Status",
+    "Days (selectedDays)",
+    "Assigned Batch ID",
+    "Assigned Batch Name",
+    "Assigned Players (IDs)",
+    "Assigned Players (Names)",
+    "Assigned Coaches (IDs)",
+    "Assigned Coaches (Names)",
+    "Academy ID",
+    "Notes"
+  ];
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('API response error:', response.status, errorText);
-      throw new Error(`Export failed: ${response.status} ${response.statusText} - ${errorText}`);
+  // helper to escape values for CSV
+  const escapeCsvValue = (value: any) => {
+    if (value === null || value === undefined) return "";
+    const str = typeof value === "string" ? value : JSON.stringify(value);
+    if (str.includes('"') || str.includes(",") || str.includes("\n")) {
+      return `"${str.replace(/"/g, '""')}"`;
     }
+    return str;
+  };
 
-    // Get the CSV content as blob
-    const blob = await response.blob();
-    console.log('Blob created, size:', blob.size);
+  const rows = academySessions.map(session => {
+    const batchObj = batches.find(b => b.id === session.assignedBatch);
+    const batchName = batchObj?.name || "";
+    const assignedPlayersIds = Array.isArray(session.assignedPlayers)
+      ? session.assignedPlayers.join(", ")
+      : session.assignedPlayers || "";
+    const assignedPlayersNames = Array.isArray(session.assignedPlayersData)
+      ? session.assignedPlayersData.map(p => p.name).join(", ")
+      : "";
 
-    if (blob.size === 0) {
-      throw new Error('Received empty file from server');
-    }
+    const coachIds = Array.isArray(session.coachId) ? session.coachId.join(", ") : (session.coachId || "");
+    const coachNames = Array.isArray(session.coachNames) ? session.coachNames.join(", ") : (session.coachNames || "");
 
-    // Check if we're in a Capacitor environment
-    const isCapacitor = typeof window !== 'undefined' && window.Capacitor;
-
-    if (isCapacitor) {
-      // Use Capacitor's Filesystem API for mobile
-      try {
-        const { Filesystem, Share } = await import('@capacitor/filesystem');
-        const { Capacitor } = await import('@capacitor/core');
-
-        // Convert blob to base64
-        const base64Data = await blobToBase64(blob);
-
-        // Get filename from response headers or generate one
-        const contentDisposition = response.headers.get('Content-Disposition');
-        let filename = `sessions_export_${academyId}_${new Date().toISOString().split('T')[0]}.csv`;
-
-        if (contentDisposition) {
-          const filenameMatch = contentDisposition.match(/filename="([^"]+)"/);
-          if (filenameMatch) {
-            filename = filenameMatch[1];
+    const duration = session.startTime && session.endTime
+      ? (() => {
+          try {
+            const [sh, sm] = session.startTime.split(":").map(Number);
+            const [eh, em] = session.endTime.split(":").map(Number);
+            const start = new Date();
+            start.setHours(sh, sm, 0, 0);
+            const end = new Date();
+            end.setHours(eh, em, 0, 0);
+            const diffMs = end.getTime() - start.getTime();
+            if (isNaN(diffMs) || diffMs <= 0) return "";
+            const mins = Math.floor(diffMs / 60000);
+            const h = Math.floor(mins / 60);
+            const m = mins % 60;
+            return h > 0 ? `${h}h ${m}m` : `${m}m`;
+          } catch {
+            return "";
           }
-        }
+        })()
+      : "";
 
-        // Write file to device
-        const result = await Filesystem.writeFile({
-          path: filename,
-          data: base64Data,
-          directory: Capacitor.isNativePlatform() ? Directory.Documents : Directory.Data,
-        });
+    const values = [
+      session.id ?? "",
+      session.name ?? "",
+      session.isRecurring ? "Yes" : "No",
+      session.parentSessionId ?? "",
+      session.occurrenceDate ?? "",
+      session.date ?? "",
+      session.startTime ?? "",
+      session.endTime ?? "",
+      duration,
+      session.status ?? "",
+      Array.isArray(session.selectedDays) ? session.selectedDays.join("; ") : (session.selectedDays || ""),
+      session.assignedBatch ?? "",
+      batchName,
+      assignedPlayersIds,
+      assignedPlayersNames,
+      coachIds,
+      coachNames,
+      session.academyId ?? "",
+      "" // Notes column reserved
+    ];
 
-        // Share the file
-        await Share.share({
-          title: 'Sessions Export',
-          text: 'Exported sessions data',
-          url: result.uri,
-        });
+    return values.map(escapeCsvValue).join(",");
+  });
 
-        console.log('File exported using Capacitor:', result.uri);
-        return sessions.length;
-      } catch (capacitorError) {
-        console.warn('Capacitor export failed, falling back to web download:', capacitorError);
-        // Fall through to web download
-      }
-    }
+  // Combine header + rows
+  const csvContent = [headers.join(","), ...rows].join("\n");
 
-    // Web download fallback
+  // Trigger download
+  try {
+    const dateStr = new Date().toISOString().split("T")[0];
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
+    const link = document.createElement("a");
     link.href = url;
-
-    // Get filename from response headers or generate one
-    const contentDisposition = response.headers.get('Content-Disposition');
-    let filename = `sessions_export_${academyId}_${new Date().toISOString().split('T')[0]}.csv`;
-
-    if (contentDisposition) {
-      const filenameMatch = contentDisposition.match(/filename="([^"]+)"/);
-      if (filenameMatch) {
-        filename = filenameMatch[1];
-      }
-    }
-
-    link.setAttribute('download', filename);
+    link.setAttribute("download", `sessions_export_${academyId}_${dateStr}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
-
-    console.log('File exported successfully via web download');
-    return sessions.length; // Return count of sessions processed
-  } catch (error) {
-    console.error('Export failed:', error);
-    throw error; // Re-throw to be handled by caller
+  } catch (e) {
+    console.error("CSV download failed", e);
   }
-};
 
-// Helper function to convert blob to base64
-const blobToBase64 = (blob: Blob): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result as string;
-      // Remove the data URL prefix (e.g., "data:text/csv;base64,")
-      const base64 = result.split(',')[1];
-      resolve(base64);
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
-  });
+  return academySessions.length;
 };
 
 
@@ -245,7 +254,7 @@ const exportAndClearSessions = async (
     const sessions = await response.json();
 
     // Generate CSV and trigger download
-    await exportToFile(sessions, user.academyId, batches);
+    exportToFile(sessions, user.academyId, batches);
 
     // If it's an archive operation, clear the sessions from the database
     if (type === 'archive') {
@@ -4196,7 +4205,132 @@ const METRICS_CONFIG = [
   { key: "sessionRating", label: "Session Rating" }
 ] as const;
 
+const handleExportSessions = async (academyId: string | undefined) => {
+  // Ensure user is defined in this scope
+  const { user } = useAuth();
+  try {
+    const response = await fetch('/api/db/ams-sessions/actions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        action: 'export',
+        academyId: academyId || user?.academyId
+      }),
+    });
+    if (!response.ok) throw new Error('Failed to export sessions');
+    const data = await response.json();
+    // Create and download CSV
+    const csv = convertToCSV(data);
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `sessions-${new Date().toISOString()}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+    toast({
+      title: "Success",
+      description: "Sessions exported successfully",
+    });
+  } catch (error) {
+    console.error('Error exporting sessions:', error);
+    toast({
+      title: "Error",
+      description: "Failed to export sessions",
+      variant: "destructive",
+    });
+  }
+};
 
+const handleClearSessions = async (
+  academyId: string | undefined,
+  setSessions: React.Dispatch<React.SetStateAction<Session[]>>,
+  setSelectedSessions: React.Dispatch<React.SetStateAction<number[]>>
+) => {
+  const { user } = useAuth();
+  try {
+    if (!window.confirm('Are you sure you want to clear all sessions? This action cannot be undone.')) {
+      return;
+    }
+    const response = await fetch('/api/db/ams-sessions/actions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        action: 'clear',
+        academyId
+      }),
+    });
+    if (!response.ok) throw new Error('Failed to clear sessions');
+    setSessions([]);
+    setSelectedSessions([]);
+    toast({
+      title: "Success",
+      description: "All sessions cleared successfully",
+    });
+  } catch (error) {
+    console.error('Error clearing sessions:', error);
+    toast({
+      title: "Error",
+      description: "Failed to clear sessions",
+      variant: "destructive",
+    });
+  }
+};
+
+const handleDeleteSelected = async (
+  academyId: string | undefined,
+  selectedSessions: number[],
+  setSessions: React.Dispatch<React.SetStateAction<Session[]>>,
+  setSelectedSessions: React.Dispatch<React.SetStateAction<number[]>>
+) => {
+  try {
+    if (!window.confirm(`Are you sure you want to delete ${selectedSessions.length} session(s)?`)) {
+      return;
+    }
+    const response = await fetch('/api/db/ams-sessions/actions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        action: 'delete',
+        sessionIds: selectedSessions,
+        academyId
+      }),
+    });
+    if (!response.ok) throw new Error('Failed to delete sessions');
+    setSessions(prev => prev.filter(session => !selectedSessions.map(String).includes(String(session._id))));
+    setSelectedSessions([]);
+    toast({
+      title: "Success",
+      description: "Selected sessions deleted successfully",
+    });
+  } catch (error) {
+    console.error('Error deleting sessions:', error);
+    toast({
+      title: "Error",
+      description: "Failed to delete sessions",
+      variant: "destructive",
+    });
+  }
+};
+
+const convertToCSV = (data: any[]) => {
+  if (!data.length) return '';
+  const headers = Object.keys(data[0]).join(',');
+  const rows = data.map(item => 
+    Object.values(item).map(value => 
+      typeof value === 'string' ? `"${value}"` : value
+    ).join(',')
+  );
+  return [headers, ...rows].join('\n');
+};
 
 // ...rest of existing code remains unchanged...
 
