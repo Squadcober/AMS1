@@ -225,7 +225,8 @@ const debugGamePlan = (gameplan: any, selectedPlayers: string[]) => {
 const dialogStyles = {
   content: {
     maxWidth: '99vw',
-    width: '2200px', // Increased width for match detail dialog
+    width: '95vw', // Responsive width for landscape orientation
+    maxHeight: '90vh',
   }
 };
 
@@ -1606,31 +1607,14 @@ useEffect(() => {
         />
       </div>
     </div>
-    <div className="grid grid-cols-2 gap-4">
-      <div>
-        <Label>Start Time</Label>
-        <TimePicker
-          id="start-time-picker"
-          value={newMatch.startTime}
-          onChange={handleStartTimeChange}
-          className="w-full bg-blue-900 text-white"
-        />
-      </div>
-      <div>
-        <Label>Duration (minutes)</Label>
-        <Input
-          type="number"
-          value={newMatch.duration}
-          onChange={(e) => {
-            const duration = Number.parseInt(e.target.value);
-            setNewMatch(prev => ({
-              ...prev,
-              duration,
-              endTime: calculateEndTime(prev.startTime, duration)
-            }));
-          }}
-        />
-      </div>
+    <div>
+      <Label>Start Time</Label>
+      <TimePicker
+        id="start-time-picker"
+        value={newMatch.startTime}
+        onChange={handleStartTimeChange}
+        className="w-full bg-blue-900 text-white"
+      />
     </div>
   </div>
 );
@@ -1687,7 +1671,7 @@ useEffect(() => {
         {activeLog === "Upcoming" && renderMatchTable("Upcoming")}
 
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent style={{ maxWidth: '99vw', width: '2200px' }} className="max-w-[85vh] overflow-x-auto max-h-[85vh] overflow-y-auto">
+          <DialogContent style={dialogStyles.content} className="overflow-x-auto overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Match Details</DialogTitle>
             </DialogHeader>
