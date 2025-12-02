@@ -15,6 +15,20 @@ function isApkWebViewRequest(request: NextRequest) {
 	return false;
 }
 
+// helper to detect top-level navigation (so we can safely return HTML only on navigations)
+function isNavigationRequest(request: NextRequest) {
+	const accept = (request.headers.get('accept') || '').toLowerCase();
+	if (accept.includes('text/html')) return true;
+
+	// modern browsers/WebViews set sec-fetch-mode/dest for navigations
+	const sfMode = request.headers.get('sec-fetch-mode') || '';
+	const sfDest = request.headers.get('sec-fetch-dest') || '';
+	if (sfMode === 'navigate' || sfDest === 'document') return true;
+
+	// fallback: if referer is empty and accept prefers html, treat as navigation
+	return false;
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -108,17 +122,57 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: 'Invalid collection specified' }, { status: 400 });
     }
 
-    // If request comes from an APK/webview, return a downloadable JSON file attachment.
-    if (isApkWebViewRequest(request)) {
+    // Only return HTML fallback when request is from APK/WebView AND is a top-level navigation.
+    if (isApkWebViewRequest(request) && isNavigationRequest(request)) {
       const filename = `export-${collection ?? 'data'}.json`;
-      const body = JSON.stringify(data);
-      return new Response(body, {
+      const jsonString = JSON.stringify(data, null, 2); // pretty print for textarea
+      const base64 = Buffer.from(jsonString, 'utf-8').toString('base64');
+
+      const html = `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Export: ${filename}</title>
+  <style>
+    body{font-family:system-ui,Segoe UI,Roboto,Arial;padding:16px}
+    h1{font-size:18px;margin-bottom:8px}
+    a.download{display:inline-block;padding:8px 12px;background:#0b5fff;color:#fff;border-radius:6px;text-decoration:none}
+    textarea{width:100%;height:60vh;margin-top:12px;font-family:monospace;white-space:pre;overflow:auto}
+    p.note{color:#444;font-size:13px}
+  </style>
+</head>
+<body>
+  <h1>Export Ready: ${filename}</h1>
+  <p class="note">If the APK WebView does not trigger a download, long-press the link or copy the JSON from the textarea below and save it via your device.</p>
+  <p><a class="download" href="data:application/json;base64,${base64}" download="${filename}">Download ${filename}</a></p>
+  <hr/>
+  <p><strong>Raw JSON (copy/save if download unsupported)</strong></p>
+  <textarea readonly>${jsonString.replace(/<\/textarea>/g, '<\\/textarea>')}</textarea>
+</body>
+</html>`;
+
+      return new Response(html, {
         status: 200,
         headers: {
-          'Content-Type': 'application/json; charset=utf-8',
-          'Content-Disposition': `attachment; filename="${filename}"`,
+          'Content-Type': 'text/html; charset=utf-8',
         },
       });
+    }
+
+    // If request comes from APK/WebView but is NOT a navigation (likely a fetch/XHR), return base64 JSON payload
+    if (isApkWebViewRequest(request)) {
+      const filename = `export-${collection ?? 'data'}.json`;
+      const jsonString = JSON.stringify(data);
+      const base64 = Buffer.from(jsonString, 'utf-8').toString('base64');
+
+      return NextResponse.json({
+        apkExport: true,
+        filename,
+        mime: 'application/json',
+        contentBase64: base64,
+        originalSize: Buffer.byteLength(jsonString, 'utf-8')
+      }, { status: 200 });
     }
 
     // Default: existing web behavior (unchanged)
