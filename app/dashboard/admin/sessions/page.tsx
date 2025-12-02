@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback, useRef } from "react"
+import React, { useState, useEffect, useCallback, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -1749,7 +1749,7 @@ const renderSessionTable = (status: Session["status"] | "All") => {
             </TableHeader>
             <TableBody>
               {visibleSessions.map((session) => (
-                <TableRow 
+                <TableRow
                   // Use a compound key that includes all unique identifiers
                   key={`${session.id}-${session.date}-${session.isOccurrence ? 'occ' : 'reg'}`}
                 >
@@ -1765,7 +1765,7 @@ const renderSessionTable = (status: Session["status"] | "All") => {
                   )}
                   <TableCell>{session.name}</TableCell>
                   <TableCell>
-                    {session.isRecurring 
+                    {session.isRecurring
                       ? `${session.date} to ${session.recurringEndDate}`
                       : session.date
                     }
@@ -1814,7 +1814,7 @@ const renderSessionTable = (status: Session["status"] | "All") => {
                         handleViewDetails(session.id);
                       }
                     }}>
-                      {session.isRecurring 
+                      {session.isRecurring
                         ? status === "Finished"
                           ? "View Finished Sessions"
                           : status === "Upcoming"
@@ -1828,19 +1828,19 @@ const renderSessionTable = (status: Session["status"] | "All") => {
               ))}
             </TableBody>
           </Table>
+
+          {hasMore && (
+            <div className="flex justify-center pt-4">
+              <Button
+                variant="outline"
+                onClick={() => setVisibleSessionsCount(prev => prev + 10)}
+                className="text-white hover:text-gray-300"
+              >
+                View More ({searchedSessions.length - visibleSessionsCount} remaining)
+              </Button>
+            </div>
+          )}
         </div>
-        
-        {hasMore && (
-          <div className="flex justify-center pt-4">
-            <Button
-              variant="outline"
-              onClick={() => setVisibleSessionsCount(prev => prev + 10)}
-              className="text-white hover:text-gray-300"
-            >
-              View More ({searchedSessions.length - visibleSessionsCount} remaining)
-            </Button>
-          </div>
-        )}
       </CardContent>
     </Card>
   );
@@ -3725,12 +3725,14 @@ const handleSaveChanges = async () => {
             </Card>
           </div>
         )}
-        <div className="flex justify-between p-4">
-          <div className="flex space-x-4">
+        <div className="flex flex-col lg:flex-row lg:justify-between p-4 space-y-4 lg:space-y-0">
+          <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 lg:space-x-4">
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
-                <Button 
+                <Button
                   variant="secondary"
+                  size="sm"
+                  className="w-full sm:w-auto"
                   onClick={() => {
                     setNewSession({
                       name: "",
@@ -3815,8 +3817,8 @@ const handleSaveChanges = async () => {
                             onCheckedChange={setTrimDates}
                           />
                           <span className="text-sm text-gray-400">
-                            {trimDates 
-                              ? "Dates will be adjusted to first and last occurrences" 
+                            {trimDates
+                              ? "Dates will be adjusted to first and last occurrences"
                               : "Keep full date range"}
                           </span>
                         </div>
@@ -3941,13 +3943,13 @@ const handleSaveChanges = async () => {
                           </SelectContent>
                         </Select>
                         {newSession.assignedBatch && (
-                          <Button 
-                            variant="ghost" 
+                          <Button
+                            variant="ghost"
                             size="sm"
                             onClick={handleBatchDeselect}
                             className="text-gray-400 hover:text-white"
                           >
-                            Clear 
+                            Clear
                           </Button>
                         )}
                       </div>
@@ -3984,13 +3986,13 @@ const handleSaveChanges = async () => {
                                       currentCoachIds: newSession.coachId,
                                       currentCoachNames: newSession.coachNames
                                     });
-                                    
+
                                     setNewSession(prev => ({
                                       ...prev,
-                                      coachId: checked 
+                                      coachId: checked
                                         ? [...prev.coachId, coach.id]
                                         : (Array.isArray(prev.coachId) ? prev.coachId : [prev.coachId]).filter(id => id !== coach.id),
-                                      coachNames: checked 
+                                      coachNames: checked
                                         ? [...(prev.coachNames || []), coach.displayName]
                                         : (prev.coachNames || []).filter(name => name !== coach.displayName)
                                     }));
@@ -4012,7 +4014,7 @@ const handleSaveChanges = async () => {
                   </div>
                 </div>
                 <DialogFooter>
-                    <Button 
+                    <Button
                         onClick={async () => {
                                 await handleAddSession();
                                 if (!isRecurring) {
@@ -4039,19 +4041,21 @@ const handleSaveChanges = async () => {
                           </DialogFooter>
               </DialogContent>
             </Dialog>
-            <Button variant="destructive" onClick={handleRemoveSession}>
+            <Button variant="destructive" size="sm" className="w-full sm:w-auto" onClick={handleRemoveSession}>
               Remove Selected Sessions
             </Button>
-            <Button 
+          </div>
+          <div className="flex flex-col sm:flex-row sm:justify-between lg:justify-end items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-4">
+            <Button
               variant="default"
-              onClick={handleSaveChanges} 
+              size="sm"
+              className="w-full sm:w-auto"
+              onClick={handleSaveChanges}
               disabled={!hasUnsavedChanges || isSaving}
             >
               {isSaving ? "Saving..." : "Save Changes"}
             </Button>
-          </div>
-          <div>
-            <div className="text-white">
+            <div className="text-white text-sm lg:text-base">
               {format(new Date(), "EEEE, MMMM d, yyyy")}
             </div>
           </div>
