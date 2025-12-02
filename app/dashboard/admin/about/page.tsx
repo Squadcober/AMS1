@@ -105,7 +105,6 @@ export default function AboutPage() {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [teamPhotos, setTeamPhotos] = useState<string[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const colorInputRef = useRef<HTMLInputElement>(null)
   const [selectedFile, setSelectedFile] = useState<CollateralFile | null>(null)
   const [aboutData, setAboutData] = useState<AboutData>({
     academyId: user?.academyId || '',
@@ -123,6 +122,8 @@ export default function AboutPage() {
     }
   });
   const [isLoading, setIsLoading] = useState(true);
+  const [isMobile, setIsMobile] = useState(false);
+  const [hsv, setHsv] = useState({ h: 0, s: 100, v: 100 });
 
   // Load data from MongoDB
   useEffect(() => {
@@ -167,117 +168,46 @@ export default function AboutPage() {
     fetchAboutData();
   }, [user?.academyId]);
 
-  // Force color input value update for mobile browsers
+  // Mobile detection
   useEffect(() => {
-    if (isEditing && colorInputRef.current && formData.color) {
-      // Use requestAnimationFrame to ensure DOM is updated
-      requestAnimationFrame(() => {
-        if (colorInputRef.current && document.contains(colorInputRef.current)) {
-          // Longer delay to ensure the input is fully rendered and visible
-          setTimeout(() => {
-            if (colorInputRef.current) {
-              // Focus the input first
-              colorInputRef.current.focus();
+    const checkIsMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
 
-              // Temporarily set to a different value and back to trigger HSV update
-              colorInputRef.current.value = '#ffffff';
-              colorInputRef.current.value = formData.color;
+    checkIsMobile();
+    window.addEventListener('resize', checkIsMobile);
 
-              // Trigger multiple events to update HSV controls
-              const inputEvent = new Event('input', { bubbles: true });
-              const changeEvent = new Event('change', { bubbles: true });
-              const blurEvent = new Event('blur', { bubbles: true });
-              const clickEvent = new Event('click', { bubbles: true });
-              const focusEvent = new Event('focus', { bubbles: true });
+    return () => window.removeEventListener('resize', checkIsMobile);
+  }, []);
 
-              colorInputRef.current.dispatchEvent(inputEvent);
-              colorInputRef.current.dispatchEvent(changeEvent);
-              colorInputRef.current.dispatchEvent(blurEvent);
+  // Update HSV when formData.color changes
+  useEffect(() => {
+    const hexToHsv = (hex: string) => {
+      const r = parseInt(hex.slice(1, 3), 16) / 255;
+      const g = parseInt(hex.slice(3, 5), 16) / 255;
+      const b = parseInt(hex.slice(5, 7), 16) / 255;
 
-              // Try to simulate a click to open the color picker
-              setTimeout(() => {
-                if (colorInputRef.current) {
-                  colorInputRef.current.dispatchEvent(clickEvent);
-                  colorInputRef.current.dispatchEvent(focusEvent);
-                }
-              }, 10);
+      const max = Math.max(r, g, b);
+      const min = Math.min(r, g, b);
+      const diff = max - min;
 
-              // Additional delay and re-trigger for stubborn mobile browsers
-              setTimeout(() => {
-                if (colorInputRef.current) {
-                  colorInputRef.current.dispatchEvent(new Event('input', { bubbles: true }));
-                  colorInputRef.current.dispatchEvent(new Event('change', { bubbles: true }));
-                  colorInputRef.current.dispatchEvent(new Event('blur', { bubbles: true }));
-                }
-              }, 100);
+      let h = 0;
+      if (diff !== 0) {
+        if (max === r) h = ((g - b) / diff) % 6;
+        else if (max === g) h = (b - r) / diff + 2;
+        else h = (r - g) / diff + 4;
+        h *= 60;
+        if (h < 0) h += 360;
+      }
 
-              // Final aggressive re-trigger for very stubborn mobile browsers
-              setTimeout(() => {
-                if (colorInputRef.current) {
-                  // Try setting to a completely different color and back
-                  const originalColor = colorInputRef.current.value;
-                  colorInputRef.current.value = '#ff0000';
-                  colorInputRef.current.value = '#00ff00';
-                  colorInputRef.current.value = '#0000ff';
-                  colorInputRef.current.value = originalColor;
+      const s = max === 0 ? 0 : diff / max;
+      const v = max;
 
-                  // Dispatch events multiple times
-                  for (let i = 0; i < 5; i++) {
-                    setTimeout(() => {
-                      if (colorInputRef.current) {
-                        colorInputRef.current.dispatchEvent(new Event('input', { bubbles: true }));
-                        colorInputRef.current.dispatchEvent(new Event('change', { bubbles: true }));
-                      }
-                    }, i * 50);
-                  }
-                }
-              }, 200);
+      return { h: Math.round(h), s: Math.round(s * 100), v: Math.round(v * 100) };
+    };
 
-              // Additional attempt: Force the color picker to open programmatically
-              setTimeout(() => {
-                if (colorInputRef.current) {
-                  // Try to programmatically open the color picker
-                  colorInputRef.current.click();
-                  // After a brief moment, dispatch more events
-                  setTimeout(() => {
-                    if (colorInputRef.current) {
-                      colorInputRef.current.dispatchEvent(new Event('input', { bubbles: true }));
-                      colorInputRef.current.dispatchEvent(new Event('change', { bubbles: true }));
-                    }
-                  }, 100);
-                }
-              }, 300);
-
-              // New approach: Try to trigger the color picker by simulating user interaction
-              setTimeout(() => {
-                if (colorInputRef.current) {
-                  // Create a more aggressive sequence of interactions
-                  const events = ['mousedown', 'mouseup', 'click', 'focus', 'touchstart', 'touchend'];
-                  events.forEach((eventType, index) => {
-                    setTimeout(() => {
-                      if (colorInputRef.current) {
-                        const event = new Event(eventType, { bubbles: true });
-                        colorInputRef.current.dispatchEvent(event);
-                      }
-                    }, index * 20);
-                  });
-
-                  // After simulated interactions, try to set value again
-                  setTimeout(() => {
-                    if (colorInputRef.current) {
-                      colorInputRef.current.value = formData.color;
-                      colorInputRef.current.dispatchEvent(new Event('input', { bubbles: true }));
-                      colorInputRef.current.dispatchEvent(new Event('change', { bubbles: true }));
-                    }
-                  }, events.length * 20 + 50);
-                }
-              }, 400);
-            }
-          }, 500);
-        }
-      });
-    }
-  }, [formData.color, isEditing]);
+    setHsv(hexToHsv(formData.color));
+  }, [formData.color]);
 
   const handleLogoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -303,6 +233,38 @@ export default function AboutPage() {
       ...prev,
       color: event.target.value
     }))
+  }
+
+  const handleHsvChange = (component: 'h' | 's' | 'v', value: number) => {
+    const newHsv = { ...hsv, [component]: value };
+    setHsv(newHsv);
+
+    // Convert HSV to RGB then to hex
+    const h = newHsv.h / 360;
+    const s = newHsv.s / 100;
+    const v = newHsv.v / 100;
+
+    const c = v * s;
+    const x = c * (1 - Math.abs((h * 6) % 2 - 1));
+    const m = v - c;
+
+    let r = 0, g = 0, b = 0;
+    if (0 <= h && h < 1/6) { r = c; g = x; b = 0; }
+    else if (1/6 <= h && h < 2/6) { r = x; g = c; b = 0; }
+    else if (2/6 <= h && h < 3/6) { r = 0; g = c; b = x; }
+    else if (3/6 <= h && h < 4/6) { r = 0; g = x; b = c; }
+    else if (4/6 <= h && h < 5/6) { r = x; g = 0; b = c; }
+    else if (5/6 <= h && h < 1) { r = c; g = 0; b = x; }
+
+    r = Math.round((r + m) * 255);
+    g = Math.round((g + m) * 255);
+    b = Math.round((b + m) * 255);
+
+    const hex = `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+    handleFormChange(prev => ({
+      ...prev,
+      color: hex
+    }));
   }
 
   const handleSocialMediaChange = (index: number, field: "name" | "url", value: string) => {
@@ -762,29 +724,57 @@ export default function AboutPage() {
             <div className="text-right">
               <h3 className="mb-2">Team Color</h3>
               {isEditing ? (
-                <>
-                  {/* Mobile: Use hex input */}
-                  <div className="md:hidden">
-                    <Input
-                      type="text"
-                      value={formData.color}
-                      onChange={(e) => handleColorChange({ target: { value: e.target.value } } as any)}
-                      placeholder="#000000"
-                      className="w-32 bg-black border-gray-600 text-white"
+                isMobile ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center space-x-2">
+                      <span className="text-xs text-gray-400 w-8">H:</span>
+                      <input
+                        type="range"
+                        min="0"
+                        max="360"
+                        value={hsv.h}
+                        onChange={(e) => handleHsvChange('h', parseInt(e.target.value))}
+                        className="flex-1 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                      />
+                      <span className="text-xs text-gray-400 w-8">{hsv.h}°</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <span className="text-xs text-gray-400 w-8">S:</span>
+                      <input
+                        type="range"
+                        min="0"
+                        max="100"
+                        value={hsv.s}
+                        onChange={(e) => handleHsvChange('s', parseInt(e.target.value))}
+                        className="flex-1 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                      />
+                      <span className="text-xs text-gray-400 w-8">{hsv.s}%</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <span className="text-xs text-gray-400 w-8">V:</span>
+                      <input
+                        type="range"
+                        min="0"
+                        max="100"
+                        value={hsv.v}
+                        onChange={(e) => handleHsvChange('v', parseInt(e.target.value))}
+                        className="flex-1 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                      />
+                      <span className="text-xs text-gray-400 w-8">{hsv.v}%</span>
+                    </div>
+                    <div
+                      className="w-full h-8 border border-gray-600 rounded"
+                      style={{backgroundColor: formData.color}}
                     />
                   </div>
-                  {/* Desktop: Use color input */}
-                  <div className="hidden md:block">
-                    <input
-                      key={formData.color}
-                      ref={colorInputRef}
-                      type="color"
-                      value={formData.color}
-                      onChange={handleColorChange}
-                      className="w-32 h-8 bg-black border border-gray-600"
-                    />
-                  </div>
-                </>
+                ) : (
+                  <input
+                    type="color"
+                    value={formData.color}
+                    onChange={handleColorChange}
+                    className="w-32 h-8 bg-black border border-gray-600"
+                  />
+                )
               ) : (
                 <div
                   className="w-32 h-8 border border-gray-600"
@@ -808,7 +798,7 @@ export default function AboutPage() {
                 about: e.target.value
               }))}
               placeholder="Enter academy description..."
-              className="min-h-[150px] w-full bg-gray-800 text-white resize-none"
+              className="min-h-[1500px] w-full bg-gray-800 text-white resize-none"
               disabled={!isEditing}
             />
           </CardContent>
