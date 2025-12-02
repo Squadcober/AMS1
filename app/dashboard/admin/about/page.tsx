@@ -635,7 +635,7 @@ export default function AboutPage() {
                     </>
                   ) : (
                     <span className="text-sm text-gray-400">
-                      {isEditing ? 'Click to add logo within 2 MB limit' : 'No logo uploaded'}
+                      {isEditing ? '  Click to add logo   within 2 MB limit' : 'No logo uploaded'}
                     </span>
                   )}
                 </div>
