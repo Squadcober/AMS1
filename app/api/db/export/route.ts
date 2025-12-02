@@ -137,17 +137,15 @@ export async function GET(request: NextRequest) {
   <style>
     body{font-family:system-ui,Segoe UI,Roboto,Arial;padding:16px}
     h1{font-size:18px;margin-bottom:8px}
-    a.download{display:inline-block;padding:8px 12px;background:#0b5fff;color:#fff;border-radius:6px;text-decoration:none}
     textarea{width:100%;height:60vh;margin-top:12px;font-family:monospace;white-space:pre;overflow:auto}
     p.note{color:#444;font-size:13px}
   </style>
 </head>
 <body>
   <h1>Export Ready: ${filename}</h1>
-  <p class="note">If the APK WebView does not trigger a download, long-press the link or copy the JSON from the textarea below and save it via your device.</p>
-  <p><a class="download" href="data:application/json;base64,${base64}" download="${filename}">Download ${filename}</a></p>
+  <p class="note">Copy the JSON from the textarea below and save it manually via your device.</p>
   <hr/>
-  <p><strong>Raw JSON (copy/save if download unsupported)</strong></p>
+  <p><strong>Raw JSON (copy/save manually)</strong></p>
   <textarea readonly>${jsonString.replace(/<\/textarea>/g, '<\\/textarea>')}</textarea>
 </body>
 </html>`;
