@@ -100,159 +100,46 @@ export interface Batch {
   academyId: string
 }
 
-// Move exportToFile inside SessionsContent component
-// Replace existing exportToFile with mobile-compatible implementation
+// Simplified exportToFile using server-side API endpoint
 const exportToFile = async (sessions: Session[], academyId: string, batches: Batch[]) => {
-  // filter to only sessions for this academy
-  const academySessions = Array.isArray(sessions)
-    ? sessions.filter(s => s.academyId === academyId)
-    : [];
-
-  // CSV headers (order matters)
-  const headers = [
-    "Session ID",
-    "Session Name",
-    "Is Recurring",
-    "Parent Session ID",
-    "Occurrence Date",
-    "Date",
-    "Start Time",
-    "End Time",
-    "Duration",
-    "Status",
-    "Days (selectedDays)",
-    "Assigned Batch ID",
-    "Assigned Batch Name",
-    "Assigned Players (IDs)",
-    "Assigned Players (Names)",
-    "Assigned Coaches (IDs)",
-    "Assigned Coaches (Names)",
-    "Academy ID",
-    "Notes"
-  ];
-
-  // helper to escape values for CSV
-  const escapeCsvValue = (value: any) => {
-    if (value === null || value === undefined) return "";
-    const str = typeof value === "string" ? value : JSON.stringify(value);
-    if (str.includes('"') || str.includes(",") || str.includes("\n")) {
-      return `"${str.replace(/"/g, '""')}"`;
-    }
-    return str;
-  };
-
-  const rows = academySessions.map(session => {
-    const batchObj = batches.find(b => b.id === session.assignedBatch);
-    const batchName = batchObj?.name || "";
-    const assignedPlayersIds = Array.isArray(session.assignedPlayers)
-      ? session.assignedPlayers.join(", ")
-      : session.assignedPlayers || "";
-    const assignedPlayersNames = Array.isArray(session.assignedPlayersData)
-      ? session.assignedPlayersData.map(p => p.name).join(", ")
-      : "";
-
-    const coachIds = Array.isArray(session.coachId) ? session.coachId.join(", ") : (session.coachId || "");
-    const coachNames = Array.isArray(session.coachNames) ? session.coachNames.join(", ") : (session.coachNames || "");
-
-    const duration = session.startTime && session.endTime
-      ? (() => {
-          try {
-            const [sh, sm] = session.startTime.split(":").map(Number);
-            const [eh, em] = session.endTime.split(":").map(Number);
-            const start = new Date();
-            start.setHours(sh, sm, 0, 0);
-            const end = new Date();
-            end.setHours(eh, em, 0, 0);
-            const diffMs = end.getTime() - start.getTime();
-            if (isNaN(diffMs) || diffMs <= 0) return "";
-            const mins = Math.floor(diffMs / 60000);
-            const h = Math.floor(mins / 60);
-            const m = mins % 60;
-            return h > 0 ? `${h}h ${m}m` : `${m}m`;
-          } catch {
-            return "";
-          }
-        })()
-      : "";
-
-    const values = [
-      session.id ?? "",
-      session.name ?? "",
-      session.isRecurring ? "Yes" : "No",
-      session.parentSessionId ?? "",
-      session.occurrenceDate ?? "",
-      session.date ?? "",
-      session.startTime ?? "",
-      session.endTime ?? "",
-      duration,
-      session.status ?? "",
-      Array.isArray(session.selectedDays) ? session.selectedDays.join("; ") : (session.selectedDays || ""),
-      session.assignedBatch ?? "",
-      batchName,
-      assignedPlayersIds,
-      assignedPlayersNames,
-      coachIds,
-      coachNames,
-      session.academyId ?? "",
-      "" // Notes column reserved
-    ];
-
-    return values.map(escapeCsvValue).join(",");
-  });
-
-  // Combine header + rows
-  const csvContent = [headers.join(","), ...rows].join("\n");
-
-  // Mobile-compatible download
   try {
-    const dateStr = new Date().toISOString().split("T")[0];
-    const fileName = `sessions_export_${academyId}_${dateStr}.csv`;
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    // Call the server-side CSV export API
+    const response = await fetch(`/api/db/export/sessions-csv?academyId=${encodeURIComponent(academyId)}`);
 
-    // Check if Web Share API is available (modern mobile browsers)
-    if (navigator.share && navigator.canShare && navigator.canShare({ files: [new File([blob], fileName)] })) {
-      const file = new File([blob], fileName, { type: "text/csv" });
-      await navigator.share({
-        title: 'Sessions Export',
-        text: 'CSV export of academy sessions',
-        files: [file]
-      });
-    } else {
-      // Fallback for older mobile browsers or when Web Share isn't available
-      const url = URL.createObjectURL(blob);
+    if (!response.ok) {
+      throw new Error(`Export failed: ${response.status} ${response.statusText}`);
+    }
 
-      // Try to use download attribute first (works on some mobile browsers)
-      const link = document.createElement("a");
-      link.href = url;
-      link.setAttribute("download", fileName);
+    // Get the CSV content as blob
+    const blob = await response.blob();
 
-      // Check if download is supported
-      if ('download' in link) {
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      } else {
-        // Fallback: open in new window/tab
-        window.open(url, '_blank');
+    // Create download link
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+
+    // Get filename from response headers or generate one
+    const contentDisposition = response.headers.get('Content-Disposition');
+    let filename = `sessions_export_${academyId}_${new Date().toISOString().split('T')[0]}.csv`;
+
+    if (contentDisposition) {
+      const filenameMatch = contentDisposition.match(/filename="([^"]+)"/);
+      if (filenameMatch) {
+        filename = filenameMatch[1];
       }
+    }
 
-      URL.revokeObjectURL(url);
-    }
-  } catch (e) {
-    console.error("CSV export failed", e);
-    // Final fallback: copy to clipboard for manual saving
-    try {
-      await navigator.clipboard.writeText(csvContent);
-      alert(`CSV data copied to clipboard! You can paste it into a text editor and save as a .csv file.\n\nFirst few lines:\n${csvContent.split('\n').slice(0, 3).join('\n')}`);
-    } catch (clipboardError) {
-      console.error("Clipboard fallback failed", clipboardError);
-      // Last resort: show the data in an alert (truncated for mobile)
-      const truncated = csvContent.length > 1000 ? csvContent.substring(0, 1000) + '...' : csvContent;
-      alert(`Export failed. CSV content (first 1000 chars):\n\n${truncated}\n\nCopy this content manually and save as a .csv file.`);
-    }
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    return sessions.length; // Return count of sessions processed
+  } catch (error) {
+    console.error('Export failed:', error);
+    throw error; // Re-throw to be handled by caller
   }
-
-  return academySessions.length;
 };
 
 

@@ -53,19 +53,26 @@ export async function GET(request: NextRequest) {
       case 'performance':
         // Fetch player performance data with details
         const players = await db.collection('ams-player-data')
-          .find({ 
+          .find({
             academyId,
             performanceHistory: { $exists: true }
           })
           .toArray();
 
-        data = players.flatMap(player => 
+        data = players.flatMap(player =>
           (player.performanceHistory || []).map((ph: any) => ({
             playerId: player.id,
             playerName: player.name,
             ...ph
           }))
         );
+        break;
+
+      case 'sessions':
+        // Fetch all sessions for the academy
+        data = await db.collection('ams-sessions')
+          .find({ academyId })
+          .toArray();
         break;
 
       case 'all':
