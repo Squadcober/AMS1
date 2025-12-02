@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
+import { useMediaQuery } from "react-responsive"
 import Image from "next/image"
 import { Plus, X, Save, Edit, Facebook, Instagram, Youtube, Twitter, Upload, FileImage, FileText, Download, Eye } from "lucide-react"
 import { Input } from "@/components/ui/input"
@@ -77,6 +78,8 @@ const STORAGE_KEY = 'aboutPageData'
 export default function AboutPage() {
   console.log("🚀 AboutPage with upload/download features loaded!");
   const { user } = useAuth()
+  const isMobile = useMediaQuery({ maxWidth: 768 })
+  const [isColorPickerOpen, setIsColorPickerOpen] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [formData, setFormData] = useState<AboutPageData>({
     logo: null,
@@ -122,21 +125,19 @@ export default function AboutPage() {
     }
   });
   const [isLoading, setIsLoading] = useState(true);
-  const [isMobile, setIsMobile] = useState(false);
-  const [hsv, setHsv] = useState({ h: 0, s: 100, v: 100 });
 
   // Load data from MongoDB
   useEffect(() => {
     const fetchAboutData = async () => {
       if (!user?.academyId) return;
-
+      
       try {
         setIsLoading(true);
         const response = await fetch(`/api/db/ams-about?academyId=${user.academyId}`);
         if (!response.ok) throw new Error('Failed to fetch about data');
-
+        
         const data = await response.json();
-
+        
         if (data && Object.keys(data).length > 0) {
           setAboutData(data);
           setFormData({
@@ -168,47 +169,6 @@ export default function AboutPage() {
     fetchAboutData();
   }, [user?.academyId]);
 
-  // Mobile detection
-  useEffect(() => {
-    const checkIsMobile = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-
-    checkIsMobile();
-    window.addEventListener('resize', checkIsMobile);
-
-    return () => window.removeEventListener('resize', checkIsMobile);
-  }, []);
-
-  // Update HSV when formData.color changes
-  useEffect(() => {
-    const hexToHsv = (hex: string) => {
-      const r = parseInt(hex.slice(1, 3), 16) / 255;
-      const g = parseInt(hex.slice(3, 5), 16) / 255;
-      const b = parseInt(hex.slice(5, 7), 16) / 255;
-
-      const max = Math.max(r, g, b);
-      const min = Math.min(r, g, b);
-      const diff = max - min;
-
-      let h = 0;
-      if (diff !== 0) {
-        if (max === r) h = ((g - b) / diff) % 6;
-        else if (max === g) h = (b - r) / diff + 2;
-        else h = (r - g) / diff + 4;
-        h *= 60;
-        if (h < 0) h += 360;
-      }
-
-      const s = max === 0 ? 0 : diff / max;
-      const v = max;
-
-      return { h: Math.round(h), s: Math.round(s * 100), v: Math.round(v * 100) };
-    };
-
-    setHsv(hexToHsv(formData.color));
-  }, [formData.color]);
-
   const handleLogoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (file) {
@@ -233,38 +193,6 @@ export default function AboutPage() {
       ...prev,
       color: event.target.value
     }))
-  }
-
-  const handleHsvChange = (component: 'h' | 's' | 'v', value: number) => {
-    const newHsv = { ...hsv, [component]: value };
-    setHsv(newHsv);
-
-    // Convert HSV to RGB then to hex
-    const h = newHsv.h / 360;
-    const s = newHsv.s / 100;
-    const v = newHsv.v / 100;
-
-    const c = v * s;
-    const x = c * (1 - Math.abs((h * 6) % 2 - 1));
-    const m = v - c;
-
-    let r = 0, g = 0, b = 0;
-    if (0 <= h && h < 1/6) { r = c; g = x; b = 0; }
-    else if (1/6 <= h && h < 2/6) { r = x; g = c; b = 0; }
-    else if (2/6 <= h && h < 3/6) { r = 0; g = c; b = x; }
-    else if (3/6 <= h && h < 4/6) { r = 0; g = x; b = c; }
-    else if (4/6 <= h && h < 5/6) { r = x; g = 0; b = c; }
-    else if (5/6 <= h && h < 1) { r = c; g = 0; b = x; }
-
-    r = Math.round((r + m) * 255);
-    g = Math.round((g + m) * 255);
-    b = Math.round((b + m) * 255);
-
-    const hex = `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
-    handleFormChange(prev => ({
-      ...prev,
-      color: hex
-    }));
   }
 
   const handleSocialMediaChange = (index: number, field: "name" | "url", value: string) => {
@@ -725,48 +653,13 @@ export default function AboutPage() {
               <h3 className="mb-2">Team Color</h3>
               {isEditing ? (
                 isMobile ? (
-                  <div className="space-y-2">
-                    <div className="flex items-center space-x-2">
-                      <span className="text-xs text-gray-400 w-8">H:</span>
-                      <input
-                        type="range"
-                        min="0"
-                        max="360"
-                        value={hsv.h}
-                        onChange={(e) => handleHsvChange('h', parseInt(e.target.value))}
-                        className="flex-1 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
-                      />
-                      <span className="text-xs text-gray-400 w-8">{hsv.h}°</span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <span className="text-xs text-gray-400 w-8">S:</span>
-                      <input
-                        type="range"
-                        min="0"
-                        max="100"
-                        value={hsv.s}
-                        onChange={(e) => handleHsvChange('s', parseInt(e.target.value))}
-                        className="flex-1 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
-                      />
-                      <span className="text-xs text-gray-400 w-8">{hsv.s}%</span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <span className="text-xs text-gray-400 w-8">V:</span>
-                      <input
-                        type="range"
-                        min="0"
-                        max="100"
-                        value={hsv.v}
-                        onChange={(e) => handleHsvChange('v', parseInt(e.target.value))}
-                        className="flex-1 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
-                      />
-                      <span className="text-xs text-gray-400 w-8">{hsv.v}%</span>
-                    </div>
-                    <div
-                      className="w-full h-8 border border-gray-600 rounded"
-                      style={{backgroundColor: formData.color}}
-                    />
-                  </div>
+                  <Button
+                    onClick={() => setIsColorPickerOpen(true)}
+                    className="w-32 h-8 bg-black border border-gray-600 text-white"
+                    style={{backgroundColor: formData.color}}
+                  >
+                    Select Color
+                  </Button>
                 ) : (
                   <input
                     type="color"
@@ -798,7 +691,7 @@ export default function AboutPage() {
                 about: e.target.value
               }))}
               placeholder="Enter academy description..."
-              className="min-h-[1500px] w-full bg-gray-800 text-white resize-none"
+              className="min-h-[150px] w-full bg-gray-800 text-white resize-none"
               disabled={!isEditing}
             />
           </CardContent>
@@ -896,11 +789,11 @@ export default function AboutPage() {
                     </div>
                   ) : (
                     <div className="flex justify-center">
-                      <Image 
-                        src={selectedFile.url} 
-                        alt={selectedFile.name} 
-                        width={600} 
-                        height={400} 
+                      <Image
+                        src={selectedFile.url}
+                        alt={selectedFile.name}
+                        width={600}
+                        height={400}
                         className="max-w-full h-auto rounded-lg"
                       />
                     </div>
@@ -945,6 +838,33 @@ export default function AboutPage() {
                     Close
                   </Button>
                 </div>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        )}
+
+        {/* Color Picker Modal for Mobile */}
+        {isColorPickerOpen && (
+          <Dialog open={true} onOpenChange={() => setIsColorPickerOpen(false)}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Select Team Color</DialogTitle>
+              </DialogHeader>
+              <div className="py-4">
+                <input
+                  type="color"
+                  value={formData.color}
+                  onChange={handleColorChange}
+                  className="w-full h-12 border border-gray-600 rounded"
+                />
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsColorPickerOpen(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={() => setIsColorPickerOpen(false)}>
+                  Done
+                </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>

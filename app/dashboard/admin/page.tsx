@@ -678,7 +678,7 @@ export default function AboutPage() {
                 about: e.target.value
               }))}
               placeholder="Enter academy description..."
-              className="min-h-[400px] w-full bg-gray-800 text-white resize-none"
+              className="min-h-[150px] w-full bg-gray-800 text-white resize-none"
               disabled={!isEditing}
             />
           </CardContent>
