@@ -4,6 +4,6 @@
   "webDir": "out",
   "bundledWebRuntime": false,
   "android": {
-    "orientation": "landscape"
+    "orientation": "any"
   }
 }

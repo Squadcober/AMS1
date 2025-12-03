@@ -1623,6 +1623,13 @@ useEffect(() => {
     <div className="flex">
       <Sidebar />
       <div className="flex-1 space-y-6 p-4">
+        {/* Landscape orientation warning for mobile */}
+        <div className="md:hidden block">
+          <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded mb-4">
+            <p className="font-bold">Please rotate your device to landscape mode</p>
+            <p>This page is optimized for landscape orientation on mobile devices.</p>
+          </div>
+        </div>
         <div className="flex justify-between items-center">
           <h1 className="text-3xl font-bold text-white">Match Day</h1>
           <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
