@@ -640,7 +640,7 @@ export default function BatchPerformancePage() {
         )}
 
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent className="max-h-[80vh] max-w-[80vw] overflow-y-auto">
+          <DialogContent className="max-h-[80vh] max-w-[80vw] md:max-w-[80vw] sm:max-w-[95vw] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>
                 Compare Players in {getBatchName()}
@@ -648,23 +648,25 @@ export default function BatchPerformancePage() {
               </DialogTitle>
             </DialogHeader>
             <CardContent>
-              <div className="flex justify-between items-center mb-4">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
                 <Input
                   placeholder="Search players"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-64"
+                  className="w-full sm:w-64"
                 />
-                <div className="flex gap-2">
-                  <Button 
-                    variant="outline" 
+                <div className="flex gap-2 w-full sm:w-auto">
+                  <Button
+                    variant="outline"
                     onClick={() => setSelectedPlayers(batchPlayers.map(p => p.id.toString()))}
+                    className="flex-1 sm:flex-none"
                   >
                     Select All
                   </Button>
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     onClick={() => setSelectedPlayers([])}
+                    className="flex-1 sm:flex-none"
                   >
                     Deselect All
                   </Button>
@@ -695,7 +697,7 @@ export default function BatchPerformancePage() {
               </div>
 
               <div className="border rounded-md p-4 mb-6">
-                <div className="grid grid-cols-3 gap-4 max-h-[200px] overflow-y-auto">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 max-h-[200px] overflow-y-auto">
                   {filteredPlayers.map((player) => (
                     <div key={player.id} className="flex items-center space-x-2 p-2 hover:bg-accent rounded-md">
                       <input
@@ -705,7 +707,7 @@ export default function BatchPerformancePage() {
                         id={`player-${player.id}`}
                         className="mr-2"
                       />
-                      <label 
+                      <label
                         htmlFor={`player-${player.id}`}
                         className="flex-1 cursor-pointer"
                       >
@@ -732,12 +734,14 @@ export default function BatchPerformancePage() {
                   <CardHeader>
                     <CardTitle>Attribute Comparison</CardTitle>
                     <p className="text-sm text-muted-foreground">
-                      <span className="text-green-500 font-bold">Green</span> = Highest value, 
+                      <span className="text-green-500 font-bold">Green</span> = Highest value,
                       <span className="text-red-500 font-bold"> Red</span> = Lowest value
                     </p>
                   </CardHeader>
                   <CardContent>
-                    {renderAttributeComparison()}
+                    <div className="overflow-x-auto">
+                      {renderAttributeComparison()}
+                    </div>
                   </CardContent>
                 </Card>
               </div>
