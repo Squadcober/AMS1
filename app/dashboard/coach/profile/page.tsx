@@ -199,13 +199,28 @@ const saveToCache = (key: string, data: any) => {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
   const { name, value } = e.target
-  
+
   if (isEditing) {
     // During editing, update the actual coachData state
-    setCoachData((prev) => ({ 
-      ...prev, 
-      [name]: name === 'age' || name === 'experience' ? parseInt(value) || 0 : value 
-    }))
+    if (name === 'age') {
+      // Parse to number, default to 0 if invalid
+      const ageValue = parseInt(value) || 0
+      setCoachData((prev) => ({
+        ...prev,
+        age: ageValue
+      }))
+    } else if (name === 'experience') {
+      const expValue = parseInt(value) || 0
+      setCoachData((prev) => ({
+        ...prev,
+        experience: expValue
+      }))
+    } else {
+      setCoachData((prev) => ({
+        ...prev,
+        [name]: value
+      }))
+    }
   } else {
     // For non-editing mode (if needed)
     setCoachData((prev) => ({ ...prev, [name]: value }))
@@ -250,7 +265,7 @@ const saveToCache = (key: string, data: any) => {
   setTempPhotoUrl(coachData.photoUrl) // Set current photo as temp
   setEditFormData({
     name: coachData.name,
-    age: coachData.age,
+    age: coachData.age ?? 0,
     license: coachData.license,
     about: coachData.about,
     experience: coachData.experience
@@ -403,7 +418,7 @@ const saveToCache = (key: string, data: any) => {
                       id="age"
                       name="age"
                       type="number"
-                      value={coachData.age}
+                      value={coachData.age ?? ''}
                       onChange={handleInputChange}
                       className="mb-2"
                     />
@@ -419,7 +434,7 @@ const saveToCache = (key: string, data: any) => {
                 ) : (
                   <>
                     <h2 className="text-2xl font-bold">{coachData.name.toUpperCase()}</h2>
-                    <p className="text-sm mt-1">Age: {coachData.age}</p>
+                    <p className="text-sm mt-1">Age: {coachData.age ?? 0}</p>
                     <p className="text-sm">{coachData.license}</p>
                   </>
                 )}
@@ -481,7 +496,7 @@ const saveToCache = (key: string, data: any) => {
                         id="age"
                         name="age"
                         type="number"
-                        value={coachData.age}
+                        value={coachData.age ?? ''}
                         onChange={handleInputChange}
                         className="mb-2"
                       />
@@ -497,7 +512,7 @@ const saveToCache = (key: string, data: any) => {
                   ) : (
                     <>
                       <h2 className="text-2xl font-bold">{coachData.name.toUpperCase()}</h2>
-                      <p className="text-sm mt-1">Age: {coachData.age}</p>
+                      <p className="text-sm mt-1">Age: {coachData.age ?? 0}</p>
                       <p className="text-sm">{coachData.license}</p>
                     </>
                   )}

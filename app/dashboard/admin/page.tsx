@@ -1,6 +1,8 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
+import { useMediaQuery } from "react-responsive"
+import { HexColorPicker } from "react-colorful"
 import Image from "next/image"
 import { Plus, X, Save, Edit, Facebook, Instagram, Youtube, Twitter, Upload, FileImage, FileText, Download, Eye } from "lucide-react"
 import { Input } from "@/components/ui/input"
@@ -77,6 +79,8 @@ const STORAGE_KEY = 'aboutPageData'
 export default function AboutPage() {
   console.log("🚀 AboutPage with upload/download features loaded!");
   const { user } = useAuth()
+  const isMobile = useMediaQuery({ maxWidth: 768 })
+  const [isColorPickerOpen, setIsColorPickerOpen] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [formData, setFormData] = useState<AboutPageData>({
     logo: null,
@@ -631,7 +635,7 @@ export default function AboutPage() {
                     </>
                   ) : (
                     <span className="text-sm text-gray-400">
-                      {isEditing ? 'Click to add logo' : 'No logo uploaded'}
+                      {isEditing ? '  Click to add logo   within 2 MB limit' : 'No logo uploaded'}
                     </span>
                   )}
                 </div>
@@ -649,15 +653,25 @@ export default function AboutPage() {
             <div className="text-right">
               <h3 className="mb-2">Team Color</h3>
               {isEditing ? (
-                <input
-                  type="color"
-                  value={formData.color}
-                  onChange={handleColorChange}
-                  className="w-32 h-8 bg-black border border-gray-600"
-                />
+                isMobile ? (
+                  <Button
+                    onClick={() => setIsColorPickerOpen(true)}
+                    className="w-32 h-8 bg-black border border-gray-600 text-white"
+                    style={{backgroundColor: formData.color}}
+                  >
+                    Select Color
+                  </Button>
+                ) : (
+                  <input
+                    type="color"
+                    value={formData.color}
+                    onChange={handleColorChange}
+                    className="w-32 h-8 bg-black border border-gray-600"
+                  />
+                )
               ) : (
-                <div 
-                  className="w-32 h-8 border border-gray-600" 
+                <div
+                  className="w-32 h-8 border border-gray-600"
                   style={{backgroundColor: formData.color}}
                 />
               )}
@@ -776,11 +790,11 @@ export default function AboutPage() {
                     </div>
                   ) : (
                     <div className="flex justify-center">
-                      <Image 
-                        src={selectedFile.url} 
-                        alt={selectedFile.name} 
-                        width={600} 
-                        height={400} 
+                      <Image
+                        src={selectedFile.url}
+                        alt={selectedFile.name}
+                        width={600}
+                        height={400}
                         className="max-w-full h-auto rounded-lg"
                       />
                     </div>
@@ -825,6 +839,52 @@ export default function AboutPage() {
                     Close
                   </Button>
                 </div>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        )}
+
+        {/* Color Picker Modal */}
+        {isColorPickerOpen && (
+          <Dialog open={true} onOpenChange={() => setIsColorPickerOpen(false)}>
+            <DialogContent className="max-w-sm">
+              <DialogHeader>
+                <DialogTitle>Select Team Color</DialogTitle>
+              </DialogHeader>
+              <div className="py-4 space-y-4">
+                <div className="flex justify-center">
+                  <HexColorPicker
+                    color={formData.color}
+                    onChange={(color) => handleFormChange(prev => ({
+                      ...prev,
+                      color: color
+                    }))}
+                    className="w-full max-w-xs"
+                  />
+                </div>
+                <div className="flex items-center space-x-2">
+                  <div
+                    className="w-8 h-8 border border-gray-600 rounded"
+                    style={{ backgroundColor: formData.color }}
+                  />
+                  <Input
+                    value={formData.color}
+                    onChange={(e) => handleFormChange(prev => ({
+                      ...prev,
+                      color: e.target.value
+                    }))}
+                    className="flex-1 bg-gray-800 border-gray-600 text-white font-mono text-sm"
+                    placeholder="#000000"
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsColorPickerOpen(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={() => setIsColorPickerOpen(false)}>
+                  Done
+                </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>

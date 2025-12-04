@@ -339,8 +339,8 @@ export default function TeamBuilder() {
   const [touchStartPos, setTouchStartPos] = useState<{ x: number; y: number } | null>(null)
   const [isTouchDragging, setIsTouchDragging] = useState(false)
   const [touchDraggedPosition, setTouchDraggedPosition] = useState<string | null>(null)
-  const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null)
   const [isLongPressing, setIsLongPressing] = useState(false)
+  const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null)
 
   // Initialize customPositions and deletedPositions from selectedGamePlan on load
   useEffect(() => {
