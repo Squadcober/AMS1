@@ -348,10 +348,10 @@ export default function ExportDataPage() {
         title: "Opening export",
         description: "If download doesn't start automatically, long-press the Download link on the next screen to save the file.",
       });
-      // Reset loading state before navigating
-      setLoading(null);
-      // navigate; page will unload
-      window.location.href = exportUrl;
+      // Delay navigation slightly to allow UI to show "Exporting..." state
+      setTimeout(() => {
+        window.location.href = exportUrl;
+      }, 100);
       return;
     }
 
