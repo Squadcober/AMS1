@@ -10,8 +10,8 @@ function isApkWebViewRequest(request: NextRequest) {
 
 	// Fallback: try to detect WebView via user-agent heuristics (not perfect)
 	const ua = (request.headers.get('user-agent') || '').toLowerCase();
-	// "wv" and "android" together are a reasonable heuristic for WebView
-	if (ua.includes('wv') || (ua.includes('android') && ua.includes('webview'))) return true;
+	// webtonative may include its name; wv/webview + android is common for Android WebView
+	if (ua.includes('webtonative') || ua.includes('wv') || (ua.includes('android') && ua.includes('webview'))) return true;
 
 	return false;
 }
@@ -411,7 +411,7 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: 'Invalid collection specified' }, { status: 400 });
     }
 
-    // For APK/WebView requests, return appropriate response based on request type
+    // For APK/WebView requests, return CSV file for download
     if (isApkWebViewRequest(request)) {
       let csvContent = '';
 
@@ -431,39 +431,13 @@ export async function GET(request: NextRequest) {
 
       const filename = `export-${collection ?? 'data'}.csv`;
 
-      if (isNavigationRequest(request)) {
-        // For navigation requests, return HTML page with download link
-        const dataUrl = `data:text/csv;charset=utf-8,${encodeURIComponent(csvContent)}`;
-        const html = `
-<!DOCTYPE html>
-<html>
-<head>
-  <title>Download</title>
-</head>
-<body>
-  <p>If download doesn't start automatically, click the link below to download your file:</p>
-  <a href="${dataUrl}" download="${filename}">Download ${filename}</a>
-  <br><br>
-  <textarea readonly style="width:100%;height:200px;">${csvContent}</textarea>
-</body>
-</html>
-        `;
-        return new Response(html, {
-          status: 200,
-          headers: {
-            'Content-Type': 'text/html; charset=utf-8',
-          },
-        });
-      } else {
-        // For fetch requests, return CSV directly
-        return new Response(csvContent, {
-          status: 200,
-          headers: {
-            'Content-Type': 'text/csv; charset=utf-8',
-            'Content-Disposition': `attachment; filename="${filename}"`,
-          },
-        });
-      }
+      return new Response(csvContent, {
+        status: 200,
+        headers: {
+          'Content-Type': 'text/csv; charset=utf-8',
+          'Content-Disposition': `attachment; filename="${filename}"`,
+        },
+      });
     }
 
 

@@ -339,22 +339,81 @@ export default function ExportDataPage() {
 
     setLoading(type);
 
-    // If running inside the wrapped APK WebView, do a top-level navigation to the export endpoint.
-    // The server returns a simple HTML page with a data: URL + textarea for navigations (works without JS).
+    // For APK/WebView, try to download directly like web browsers first
+    // If that fails, provide option to open in external browser
     if (isWrappedWebView()) {
-      const exportUrl = `/api/db/export?academyId=${user?.academyId}&collection=${type}`;
-      // Inform the user and navigate. In many wrappers this will trigger the wrapper's download handler.
-      toast({
-        title: "Opening export",
-        description: "If download doesn't start automatically, long-press the Download link on the next screen to save the file.",
-      });
-      // Delay navigation slightly to allow UI to show "Exporting..." state
-      setTimeout(() => {
-        window.location.href = exportUrl;
-      }, 100);
+      try {
+        // First try to fetch and download like normal web browser
+        const response = await fetch(`/api/db/export?academyId=${user?.academyId}&collection=${type}`);
+        if (!response.ok) throw new Error('Failed to fetch data');
+
+        // Check if response is CSV (APK detection worked) or JSON (fallback)
+        const contentType = response.headers.get('content-type');
+        if (contentType?.includes('text/csv')) {
+          // APK detection worked, download the CSV directly
+          const csvContent = await response.text();
+          downloadCSV(csvContent, `${type}.csv`);
+          toast({
+            title: "Success",
+            description: "Data exported successfully",
+          });
+        } else {
+          // APK detection failed or returned JSON, process like web browser
+          let data = await response.json();
+
+          if (type === 'finances') {
+            const formattedData = formatFinancialData(data);
+            downloadExcel(formattedData, 'financial_records');
+          } else if (type === 'performance') {
+            const csvContent = formatCSV(data, type);
+            if (!csvContent) {
+              toast({
+                title: "No Data",
+                description: "No performance history data found to export.",
+                variant: "destructive",
+              });
+              return;
+            }
+            downloadCSV(csvContent, 'performance_history.csv');
+          } else if (type === 'batches') {
+            const batches = Array.isArray(data) ? data : [data];
+            for (const batch of batches) {
+              if ((!batch.coaches || !batch.coaches.length) && batch.coachIds?.length) {
+                batch.coaches = await fetchCoachDetails(batch.coachIds);
+              }
+              if ((!batch.playersData || !batch.playersData.length) && batch.players?.length) {
+                batch.playersData = await fetchPlayerDetails(batch.players);
+              }
+            }
+            const csvContent = formatCSV(batches, type);
+            downloadCSV(csvContent, 'batches.csv');
+          } else {
+            const csvContent = formatCSV(data, type);
+            downloadCSV(csvContent, `${type}.csv`);
+          }
+
+          toast({
+            title: "Success",
+            description: "Data exported successfully",
+          });
+        }
+      } catch (error) {
+        console.error('Error with direct download:', error);
+        // If direct download fails, try opening in external browser
+        const exportUrl = `${window.location.origin}/api/db/export?academyId=${user?.academyId}&collection=${type}`;
+        toast({
+          title: "Opening in Browser",
+          description: "Opening export in your default browser for download. If it doesn't work, try Chrome or another mobile browser.",
+        });
+        // Try to open in external browser
+        window.open(exportUrl, '_blank');
+      } finally {
+        setLoading(null);
+      }
       return;
     }
 
+    // Normal web browser behavior
     try {
       const response = await fetch(`/api/db/export?academyId=${user?.academyId}&collection=${type}`);
       if (!response.ok) throw new Error('Failed to fetch data');
