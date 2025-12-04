@@ -348,7 +348,9 @@ export default function ExportDataPage() {
         title: "Opening export",
         description: "If download doesn't start automatically, long-press the Download link on the next screen to save the file.",
       });
-      // navigate; page will unload so we don't need to reset loading here
+      // Reset loading state before navigating
+      setLoading(null);
+      // navigate; page will unload
       window.location.href = exportUrl;
       return;
     }
