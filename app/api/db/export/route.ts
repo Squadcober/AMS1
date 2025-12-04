@@ -411,7 +411,7 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: 'Invalid collection specified' }, { status: 400 });
     }
 
-    // For APK/WebView requests, return CSV file for download
+    // For APK/WebView requests, return appropriate response based on request type
     if (isApkWebViewRequest(request)) {
       let csvContent = '';
 
@@ -431,13 +431,39 @@ export async function GET(request: NextRequest) {
 
       const filename = `export-${collection ?? 'data'}.csv`;
 
-      return new Response(csvContent, {
-        status: 200,
-        headers: {
-          'Content-Type': 'text/csv; charset=utf-8',
-          'Content-Disposition': `attachment; filename="${filename}"`,
-        },
-      });
+      if (isNavigationRequest(request)) {
+        // For navigation requests, return HTML page with download link
+        const dataUrl = `data:text/csv;charset=utf-8,${encodeURIComponent(csvContent)}`;
+        const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Download</title>
+</head>
+<body>
+  <p>If download doesn't start automatically, click the link below to download your file:</p>
+  <a href="${dataUrl}" download="${filename}">Download ${filename}</a>
+  <br><br>
+  <textarea readonly style="width:100%;height:200px;">${csvContent}</textarea>
+</body>
+</html>
+        `;
+        return new Response(html, {
+          status: 200,
+          headers: {
+            'Content-Type': 'text/html; charset=utf-8',
+          },
+        });
+      } else {
+        // For fetch requests, return CSV directly
+        return new Response(csvContent, {
+          status: 200,
+          headers: {
+            'Content-Type': 'text/csv; charset=utf-8',
+            'Content-Disposition': `attachment; filename="${filename}"`,
+          },
+        });
+      }
     }
 
 
