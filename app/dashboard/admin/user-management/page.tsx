@@ -300,14 +300,16 @@ export default function UserManagementPage() {
       <Sidebar />
       <div className="flex-1 overflow-auto p-8">
         <div className="space-y-6">
-          <div className="flex justify-between items-center">
-            <h1 className="text-3xl font-bold">User Management</h1>
-            <div className="text-sm text-muted-foreground">
-              Academy ID: {user?.academyId}
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-2 sm:space-y-0">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-1 sm:space-y-0 sm:space-x-4">
+              <h1 className="text-2xl sm:text-3xl font-bold">User Management</h1>
+              <div className="text-sm text-muted-foreground">
+                Academy ID: {user?.academyId}
+              </div>
             </div>
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
-                <Button>Add New User</Button>
+                <Button className="w-full sm:w-auto">Add New User</Button>
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
@@ -362,18 +364,18 @@ export default function UserManagementPage() {
             </CardHeader>
             <CardContent>
               <div className="flex flex-col space-y-4 mb-4">
-                <div className="flex space-x-4">
+                <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4">
                   <Input
                     placeholder="Search users..."
                     value={searchTerm}
                     onChange={e => setSearchTerm(e.target.value)}
-                    className="max-w-sm"
+                    className="w-full sm:max-w-sm"
                   />
                   <Select
                     value={selectedRole}
                     onValueChange={setSelectedRole}
                   >
-                    <SelectTrigger className="w-[180px]">
+                    <SelectTrigger className="w-full sm:w-[180px]">
                       <SelectValue placeholder="Filter by role" />
                     </SelectTrigger>
                     <SelectContent>
@@ -385,14 +387,14 @@ export default function UserManagementPage() {
                     </SelectContent>
                   </Select>
                 </div>
-                
+
                 {/* Status Filter Buttons */}
-                <div className="flex space-x-2">
+                <div className="flex flex-wrap gap-2">
                   <Button
                     variant={selectedStatus === "all" ? "default" : "outline"}
                     size="sm"
                     onClick={() => setSelectedStatus("all")}
-                    className="transition-all duration-200"
+                    className="transition-all duration-200 flex-1 sm:flex-none"
                   >
                     All Users ({users.length})
                   </Button>
@@ -400,7 +402,7 @@ export default function UserManagementPage() {
                     variant={selectedStatus === "active" ? "default" : "outline"}
                     size="sm"
                     onClick={() => setSelectedStatus("active")}
-                    className="transition-all duration-200"
+                    className="transition-all duration-200 flex-1 sm:flex-none"
                   >
                     Active ({users.filter(u => u?.status === "active").length})
                   </Button>
@@ -408,74 +410,78 @@ export default function UserManagementPage() {
                     variant={selectedStatus === "inactive" ? "default" : "outline"}
                     size="sm"
                     onClick={() => setSelectedStatus("inactive")}
-                    className="transition-all duration-200"
+                    className="transition-all duration-200 flex-1 sm:flex-none"
                   >
                     Inactive ({users.filter(u => u?.status === "inactive").length})
                   </Button>
                 </div>
               </div>
 
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Role</TableHead>
-                    <TableHead>Academy ID</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {loading ? (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center">
-                        Loading users...
-                      </TableCell>
+                      <TableHead className="min-w-[120px]">Name</TableHead>
+                      <TableHead className="min-w-[200px]">Email</TableHead>
+                      <TableHead className="min-w-[100px]">Role</TableHead>
+                      <TableHead className="min-w-[120px]">Academy ID</TableHead>
+                      <TableHead className="min-w-[80px]">Status</TableHead>
+                      <TableHead className="min-w-[150px]">Actions</TableHead>
                     </TableRow>
-                  ) : filteredUsers.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={6} className="text-center">
-                        No users found
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    filteredUsers.map(user => (
-                      <TableRow key={user.id}>
-                        <TableCell>{user.name}</TableCell>
-                        <TableCell>{user.email}</TableCell>
-                        <TableCell className="capitalize">{user.role}</TableCell>
-                        <TableCell>{user.academyId}</TableCell>
-                        <TableCell>
-                          <Badge variant={user.status === "active" ? "default" : "secondary"}>
-                            {user.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex space-x-2">
-                            {user.role !== 'admin' && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleStatusToggle(user.id)}
-                              >
-                                {user.status === 'active' ? 'Deactivate' : 'Activate'}
-                              </Button>
-                            )}
-                            <Button
-                              variant="destructive"
-                              size="sm"
-                              onClick={() => handleDeleteUser(user.id, user.name)}
-                            >
-                              Delete
-                            </Button>
-                          </div>
+                  </TableHeader>
+                  <TableBody>
+                    {loading ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center">
+                          Loading users...
                         </TableCell>
                       </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
+                    ) : filteredUsers.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center">
+                          No users found
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      filteredUsers.map(user => (
+                        <TableRow key={user.id}>
+                          <TableCell className="break-words whitespace-normal">{user.name}</TableCell>
+                          <TableCell className="break-words whitespace-normal">{user.email}</TableCell>
+                          <TableCell className="capitalize break-words whitespace-normal">{user.role}</TableCell>
+                          <TableCell className="break-words whitespace-normal">{user.academyId}</TableCell>
+                          <TableCell>
+                            <Badge variant={user.status === "active" ? "default" : "secondary"}>
+                              {user.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-col sm:flex-row gap-2 sm:gap-0 sm:space-x-2">
+                              {user.role !== 'admin' && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleStatusToggle(user.id)}
+                                  className="w-full sm:w-auto"
+                                >
+                                  {user.status === 'active' ? 'Deactivate' : 'Activate'}
+                                </Button>
+                              )}
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => handleDeleteUser(user.id, user.name)}
+                                className="w-full sm:w-auto"
+                              >
+                                Delete
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
             </CardContent>
           </Card>
 
