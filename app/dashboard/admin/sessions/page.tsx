@@ -2430,8 +2430,8 @@ const handleConfirmExport = async () => {
       return;
     }
 
-    // Export CSV — returns number of exported rows
-    const exportedCount = exportToFile(sessions, user.academyId, batches);
+    // Export CSV — returns number of exported rows (now properly awaited)
+    const exportedCount = await exportToFile(sessions, user.academyId, batches);
 
     // Clear sessions server-side
     const clearResp = await fetch("/api/db/ams-sessions/actions", {
