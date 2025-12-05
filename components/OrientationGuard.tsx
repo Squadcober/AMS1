@@ -6,8 +6,23 @@ import { Smartphone } from "lucide-react";
 export function OrientationGuard({ children }: { children: React.ReactNode }) {
   const [isPortrait, setIsPortrait] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [orientationLocked, setOrientationLocked] = useState(false);
 
   useEffect(() => {
+    const lockToLandscape = async () => {
+      if ('screen' in window && 'orientation' in window.screen) {
+        try {
+          // Try to lock to landscape orientation
+          await (window.screen.orientation as any).lock('landscape');
+          setOrientationLocked(true);
+        } catch (error) {
+          // Lock failed, fall back to prompting user
+          console.log('Could not lock orientation:', error);
+          setOrientationLocked(false);
+        }
+      }
+    };
+
     const checkOrientation = () => {
       const mobile = window.innerWidth < 1024;
       setIsMobile(mobile);
@@ -15,12 +30,22 @@ export function OrientationGuard({ children }: { children: React.ReactNode }) {
       if (mobile) {
         const portrait = window.innerHeight > window.innerWidth;
         setIsPortrait(portrait);
+
+        // If not already locked and we're in portrait, try to lock to landscape
+        if (!orientationLocked && portrait) {
+          lockToLandscape();
+        }
       } else {
         setIsPortrait(false);
       }
     };
 
+    // Initial check and attempt to lock orientation
     checkOrientation();
+    if (window.innerWidth < 1024) {
+      lockToLandscape();
+    }
+
     window.addEventListener("resize", checkOrientation);
     window.addEventListener("orientationchange", checkOrientation);
 
@@ -28,7 +53,7 @@ export function OrientationGuard({ children }: { children: React.ReactNode }) {
       window.removeEventListener("resize", checkOrientation);
       window.removeEventListener("orientationchange", checkOrientation);
     };
-  }, []);
+  }, [orientationLocked]);
 
   if (isMobile && isPortrait) {
     return (
