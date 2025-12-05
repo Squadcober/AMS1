@@ -5,19 +5,7 @@ import { usePathname } from "next/navigation"
 import { motion } from "framer-motion"
 import { useAuth } from "@/contexts/AuthContext"
 import { CustomTooltip } from "@/components/custom-tooltip"
-import { 
-  LayoutDashboard,
-  School,
-  Users,
-  CalendarDays,
-  ClipboardList,
-  Info,
-  Settings,
-  Group,
-  ChevronLeft,
-  ChevronRight,
-  Menu
-} from "lucide-react"
+import { Menu } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { useState } from "react"
@@ -89,43 +77,7 @@ const navItems = {
   ],
 }
 
-const ownerRoutes = [
-  {
-    label: "Academies",
-    icon: School,
-    href: "/dashboard/owner/academies",
-    color: "text-violet-500",
-  },
-  {
-    label: "User Management",
-    icon: Users,
-    href: "/dashboard/owner/user-management",
-    color: "text-pink-700",
-  },
-  {
-    label: "Sessions",
-    icon: CalendarDays,
-    href: "/dashboard/owner/sessions",
-    color: "text-orange-700",
-  },
-  {
-    label: "Batches",
-    icon: Group,
-    href: "/dashboard/owner/batches",
-    color: "text-emerald-500",
-  },
-  {
-    label: "Attendance",
-    icon: ClipboardList,
-    href: "/dashboard/owner/attendance",
-    color: "text-green-700",
-  },
-  {
-    label: "Settings",
-    icon: Settings,
-    href: "/dashboard/owner/settings",
-  },
-];
+
 
 export const Sidebar = ({ className }: { className?: string }) => {
   const pathname = usePathname()
@@ -152,32 +104,27 @@ export const Sidebar = ({ className }: { className?: string }) => {
         <Menu className="h-6 w-6" />
       </Button>
 
+      {/* Desktop collapse toggle button */}
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={() => setIsCollapsed(!isCollapsed)}
+        className="fixed top-4 left-4 z-20 hidden md:flex"
+      >
+        <Menu className="h-6 w-6" />
+      </Button>
+
       <motion.aside
         initial={{ width: 256 }}
-        animate={{ 
-          width: isCollapsed ? 80 : 256,
+        animate={{
+          width: isCollapsed ? 0 : 256,
           transition: { duration: 0.2 }
         }}
-        className={`${
-          isCollapsed ? 'w-20' : 'w-64'
-        } p-4 fixed left-0 top-0 bottom-0 bg-background z-30 ${className || ''} ${
+        className={`fixed left-0 top-0 bottom-0 bg-background z-30 ${className || ''} ${
           isMobileOpen ? 'block' : 'hidden md:block'
         }`}
       >
         <Card className="h-full relative">
-          {/* Collapse toggle button */}
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setIsCollapsed(!isCollapsed)}
-            className="absolute -right-3 top-6 z-50 h-6 w-6 rounded-full bg-primary text-primary-foreground"
-          >
-            {isCollapsed ? (
-              <ChevronRight className="h-4 w-4" />
-            ) : (
-              <ChevronLeft className="h-4 w-4" />
-            )}
-          </Button>
 
           <CardHeader className="p-4">
             <CardTitle className={`transition-all duration-200 ${
@@ -251,7 +198,7 @@ export const Sidebar = ({ className }: { className?: string }) => {
       </motion.aside>
 
       {/* Add wrapper div for main content with margin */}
-      <div className={`${isCollapsed ? 'md:ml-20' : 'md:ml-64'} transition-all duration-200`}>
+      <div className={`${isCollapsed ? 'md:ml-0' : 'md:ml-64'} transition-all duration-200`}>
         {/* Main content goes here */}
       </div>
 
