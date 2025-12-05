@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Loader2 } from "lucide-react"
 import * as XLSX from 'xlsx';
+import { saveAs } from 'file-saver';
 
 // Add: detect wrapped APK / WebView (heuristic)
 const isWrappedWebView = () => {
@@ -207,10 +208,7 @@ export default function ExportDataPage() {
 
   const downloadCSV = (csvContent: string, filename: string) => {
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = filename;
-    link.click();
+    saveAs(blob, filename);
   };
 
   const fetchCoachDetails = async (ids: string[]) => {
@@ -363,7 +361,12 @@ export default function ExportDataPage() {
 
           if (type === 'finances') {
             const formattedData = formatFinancialData(data);
-            downloadExcel(formattedData, 'financial_records');
+            // Convert to CSV for WebView compatibility
+            const csvContent = [
+              'Income\n' + formattedData.income.map(i => Object.values(i).join(',')).join('\n'),
+              '\nExpenses\n' + formattedData.expenses.map(e => Object.values(e).join(',')).join('\n')
+            ].join('\n');
+            downloadCSV(csvContent, 'financial_records.csv');
           } else if (type === 'performance') {
             const csvContent = formatCSV(data, type);
             if (!csvContent) {
