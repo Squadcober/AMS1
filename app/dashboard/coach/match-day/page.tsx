@@ -20,6 +20,7 @@ import { toast } from "@/components/ui/use-toast"
 import Sidebar from "@/components/Sidebar"
 import { TimePicker } from "@/components/ui/timepicker"
 import { useAuth } from "@/contexts/AuthContext"
+import { OrientationGuard } from "@/components/OrientationGuard"
 
 interface Match {
   id: string
@@ -1636,127 +1637,129 @@ useEffect(() => {
 );
 
   return (
-    <div className="flex">
-      <Sidebar />
-      <div className="flex-1 space-y-6 p-4">
-        <div className="flex justify-between items-center">
-          <h1 className="text-3xl font-bold text-white">Match Day</h1>
-          <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-             <DialogTrigger asChild>
-               <Button>Create New Match</Button>
-             </DialogTrigger>
-             <DialogContent className="max-w-3xl max-h-[90vh]">
-               <DialogHeader>
-                 <DialogTitle>Create New Match</DialogTitle>
-               </DialogHeader>
-               <ScrollArea className="h-[calc(90vh-120px)] pr-4">
-                 <div className="grid gap-6 py-4">
-                   {renderNewMatchForm()}
+    <OrientationGuard>
+      <div className="flex">
+        <Sidebar />
+        <div className="flex-1 space-y-6 p-4">
+          <div className="flex justify-between items-center">
+            <h1 className="text-3xl font-bold text-white">Match Day</h1>
+            <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+               <DialogTrigger asChild>
+                 <Button>Create New Match</Button>
+               </DialogTrigger>
+               <DialogContent className="max-w-3xl max-h-[90vh]">
+                 <DialogHeader>
+                   <DialogTitle>Create New Match</DialogTitle>
+                 </DialogHeader>
+                 <ScrollArea className="h-[calc(90vh-120px)] pr-4">
+                   <div className="grid gap-6 py-4">
+                     {renderNewMatchForm()}
+                   </div>
+                 </ScrollArea>
+                 <div className="flex justify-end pt-0 pb-0 px-0 py-0 ">
+                  <Button onClick={handleCreateMatch}>Create Match</Button>
                  </div>
-               </ScrollArea>
-               <div className="flex justify-end pt-0 pb-0 px-0 py-0 ">
-                <Button onClick={handleCreateMatch}>Create Match</Button>
-               </div>
-             </DialogContent>
-           </Dialog>
-        </div>
+               </DialogContent>
+             </Dialog>
+          </div>
 
-        <div className="flex justify-between items-center">
-          <ToggleGroup
-            type="single"
-            value={activeLog}
-            onValueChange={(value) => setActiveLog(value as "All" | "Finished" | "On-going" | "Upcoming")}
-            className="justify-center"
-          >
-            <ToggleGroupItem value="All">All</ToggleGroupItem>
-            <ToggleGroupItem value="Finished">Finished</ToggleGroupItem>
-            <ToggleGroupItem value="On-going">On-going</ToggleGroupItem>
-            <ToggleGroupItem value="Upcoming">Upcoming</ToggleGroupItem>
-          </ToggleGroup>
-          <Input
-            placeholder="Search player"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="max-w-xs"
-          />
-        </div>
+          <div className="flex justify-between items-center">
+            <ToggleGroup
+              type="single"
+              value={activeLog}
+              onValueChange={(value) => setActiveLog(value as "All" | "Finished" | "On-going" | "Upcoming")}
+              className="justify-center"
+            >
+              <ToggleGroupItem value="All">All</ToggleGroupItem>
+              <ToggleGroupItem value="Finished">Finished</ToggleGroupItem>
+              <ToggleGroupItem value="On-going">On-going</ToggleGroupItem>
+              <ToggleGroupItem value="Upcoming">Upcoming</ToggleGroupItem>
+            </ToggleGroup>
+            <Input
+              placeholder="Search player"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="max-w-xs"
+            />
+          </div>
 
-        {activeLog === "All" && renderMatchTable("All")}
-        {activeLog === "Finished" && renderMatchTable("Finished")}
-        {activeLog === "On-going" && renderMatchTable("On-going")}
-        {activeLog === "Upcoming" && renderMatchTable("Upcoming")}
+          {activeLog === "All" && renderMatchTable("All")}
+          {activeLog === "Finished" && renderMatchTable("Finished")}
+          {activeLog === "On-going" && renderMatchTable("On-going")}
+          {activeLog === "Upcoming" && renderMatchTable("Upcoming")}
 
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent style={{ maxWidth: '99vw', width: '2200px' }} className="max-w-[85vh] overflow-x-auto max-h-[85vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Match Details</DialogTitle>
-            </DialogHeader>
-            {viewDetailsMatchId && (
-              <div className="space-y-6">
-                {renderMatchDetails()}
-              </div>
-            )}
-            <DialogFooter>
-              <Button variant="default" onClick={() => setIsDialogOpen(false)}>Close</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogContent style={{ maxWidth: '99vw', width: '2200px' }} className="max-w-[85vh] overflow-x-auto max-h-[85vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Match Details</DialogTitle>
+              </DialogHeader>
+              {viewDetailsMatchId && (
+                <div className="space-y-6">
+                  {renderMatchDetails()}
+                </div>
+              )}
+              <DialogFooter>
+                <Button variant="default" onClick={() => setIsDialogOpen(false)}>Close</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
 
-        <Dialog open={isGamePlanDialogOpen} onOpenChange={setIsGamePlanDialogOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Game Plan: {selectedGamePlan?.name || "No game plan selected"}</DialogTitle>
-            </DialogHeader>
-            <div className="p-4 space-y-4">
-              {selectedGamePlan ? (
-                <>
-                  <div>
-                    <h4 className="font-semibold">Formation: {selectedGamePlan.formation}</h4>
-                    <p>Size: {selectedGamePlan.size} players</p>
-                    {selectedGamePlan.strategy && (
-                      <p>Strategy: {selectedGamePlan.strategy}</p>
-                    )}
-                  </div>
-                  <div>
-                    <h4 className="font-semibold">Positions:</h4>
-                    <ul className="list-disc list-inside space-y-1">
-                      {Object.entries(selectedGamePlan.positions).map(([pos, data]) => {
-                        if (!data || !data.playerId) return null;
-                        const player = players.find(p => p.id === data.playerId);
-                        return (
-                          <li key={pos}>
-                            {pos.toUpperCase()}: {player?.name || 'Unknown Player'}
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  </div>
-                  {selectedGamePlan.substitutes && selectedGamePlan.substitutes.length > 0 && (
+          <Dialog open={isGamePlanDialogOpen} onOpenChange={setIsGamePlanDialogOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Game Plan: {selectedGamePlan?.name || "No game plan selected"}</DialogTitle>
+              </DialogHeader>
+              <div className="p-4 space-y-4">
+                {selectedGamePlan ? (
+                  <>
                     <div>
-                      <h4 className="font-semibold">Substitutes:</h4>
+                      <h4 className="font-semibold">Formation: {selectedGamePlan.formation}</h4>
+                      <p>Size: {selectedGamePlan.size} players</p>
+                      {selectedGamePlan.strategy && (
+                        <p>Strategy: {selectedGamePlan.strategy}</p>
+                      )}
+                    </div>
+                    <div>
+                      <h4 className="font-semibold">Positions:</h4>
                       <ul className="list-disc list-inside space-y-1">
-                        {selectedGamePlan.substitutes.map((sub, index) => {
-                          const player = players.find(p => p.id === sub.playerId);
+                        {Object.entries(selectedGamePlan.positions).map(([pos, data]) => {
+                          if (!data || !data.playerId) return null;
+                          const player = players.find(p => p.id === data.playerId);
                           return (
-                            <li key={index}>
-                              {player?.name || 'Unknown Player'}
+                            <li key={pos}>
+                              {pos.toUpperCase()}: {player?.name || 'Unknown Player'}
                             </li>
                           );
                         })}
                       </ul>
                     </div>
-                  )}
-                </>
-              ) : (
-                <p>No game plan selected.</p>
-              )}
-            </div>
-            <div className="flex justify-end pt-4">
-              <Button variant="default" onClick={() => setIsGamePlanDialogOpen(false)}>Close</Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+                    {selectedGamePlan.substitutes && selectedGamePlan.substitutes.length > 0 && (
+                      <div>
+                        <h4 className="font-semibold">Substitutes:</h4>
+                        <ul className="list-disc list-inside space-y-1">
+                          {selectedGamePlan.substitutes.map((sub, index) => {
+                            const player = players.find(p => p.id === sub.playerId);
+                            return (
+                              <li key={index}>
+                                {player?.name || 'Unknown Player'}
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <p>No game plan selected.</p>
+                )}
+              </div>
+              <div className="flex justify-end pt-4">
+                <Button variant="default" onClick={() => setIsGamePlanDialogOpen(false)}>Close</Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
-    </div>
+    </OrientationGuard>
   )
 }
