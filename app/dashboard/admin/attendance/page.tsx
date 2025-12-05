@@ -195,7 +195,7 @@ export default function AttendancePage() {
         present: stats.present,
         absent: stats.absent,
         unmarked: stats.unmarked,
-        attendance: stats.totalSessions > 0 ? 
+        attendance: stats.totalSessions > 0 ?
           `${Math.round((stats.present / stats.totalSessions) * 100)}%` : "0%"
       }
     })
@@ -203,24 +203,30 @@ export default function AttendancePage() {
     const csvContent = [
       ["Player ID", "Player Name", "Total Sessions", "Present", "Absent", "Unmarked", "Attendance %"].join(","),
       ...exportData.map(row => [
-        row.id, 
-        row.name, 
-        row.total, 
-        row.present, 
-        row.absent, 
-        row.unmarked, 
+        row.id,
+        row.name,
+        row.total,
+        row.present,
+        row.absent,
+        row.unmarked,
         row.attendance
       ].join(","))
     ].join("\n")
 
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" })
-    const link = document.createElement("a")
     const url = URL.createObjectURL(blob)
-    link.setAttribute("href", url)
-    link.setAttribute("download", `attendance_report_${date.toISOString().split("T")[0]}.csv`)
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+
+    if (isMobile) {
+      window.open(url, '_blank')
+    } else {
+      const link = document.createElement("a")
+      link.setAttribute("href", url)
+      link.setAttribute("download", `attendance_report_${date.toISOString().split("T")[0]}.csv`)
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+    }
     URL.revokeObjectURL(url)
   }
 
@@ -282,7 +288,9 @@ export default function AttendancePage() {
               <CardTitle>Calendar</CardTitle>
             </CardHeader>
             <CardContent>
-              <Calendar mode="single" selected={date} onSelect={newDate => newDate && setDate(newDate)} />
+              <div className="overflow-x-auto">
+                <Calendar mode="single" selected={date} onSelect={newDate => newDate && setDate(newDate)} />
+              </div>
             </CardContent>
           </Card>
         </div>
