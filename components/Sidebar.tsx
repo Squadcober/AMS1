@@ -165,12 +165,12 @@ export const Sidebar = ({ className }: { className?: string }) => {
       <motion.aside
         initial={{ width: 256 }}
         animate={{
-          width: isCollapsed ? 64 : 256,
+          width: isCollapsed ? 80 : 256,
           transition: { duration: 0.2 }
         }}
         className={`${
-          isCollapsed ? 'w-16' : 'w-64'
-        } p-4 fixed left-0 top-0 bottom-0 bg-background z-30 ${className || ''} ${
+          isCollapsed ? 'w-20' : 'w-64'
+        } ${isCollapsed ? 'p-2' : 'p-4'} fixed left-0 top-0 bottom-0 bg-background z-30 ${className || ''} ${
           isMobileOpen ? 'block' : 'hidden md:block'
         }`}
       >
@@ -226,7 +226,7 @@ export const Sidebar = ({ className }: { className?: string }) => {
                             }
                           `}
                         >
-                          {IconComponent && <IconComponent className="h-4 w-4" />}
+                          {IconComponent && <IconComponent className={isCollapsed ? "h-5 w-5" : "h-4 w-4"} />}
                           {!isCollapsed && <span className="ml-2">Logout</span>}
                         </a>
                       ) : (
@@ -244,7 +244,7 @@ export const Sidebar = ({ className }: { className?: string }) => {
                             }
                           `}
                         >
-                          {IconComponent && <IconComponent className="h-4 w-4" />}
+                          {IconComponent && <IconComponent className={isCollapsed ? "h-5 w-5" : "h-4 w-4"} />}
                           {!isCollapsed && <span className="ml-2">{item.name}</span>}
                         </Link>
                       )}
@@ -266,7 +266,7 @@ export const Sidebar = ({ className }: { className?: string }) => {
       </motion.aside>
 
       {/* Add wrapper div for main content with margin */}
-      <div className={`${isCollapsed ? 'md:ml-16' : 'md:ml-64'} transition-all duration-200`}>
+      <div className={`${isCollapsed ? 'md:ml-20' : 'md:ml-64'} transition-all duration-200`}>
         {/* Main content goes here */}
       </div>
 
