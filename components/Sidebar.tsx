@@ -104,110 +104,82 @@ export const Sidebar = ({ className }: { className?: string }) => {
         <Menu className="h-6 w-6" />
       </Button>
 
-      {/* Desktop collapse toggle button - only visible when sidebar is collapsed */}
-      {isCollapsed && (
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setIsCollapsed(false)}
-          className="fixed top-4 left-4 z-20 hidden md:flex"
-        >
-          <Menu className="h-6 w-6" />
-        </Button>
-      )}
-
-      <motion.aside
-        initial={{ width: 256 }}
-        animate={{
-          width: isCollapsed ? 64 : 256,
-          transition: { duration: 0.2 }
-        }}
-        className={`fixed left-0 top-0 bottom-0 bg-background z-30 ${className || ''} ${
-          isMobileOpen ? 'block' : 'hidden md:block'
-        }`}
+      {/* Desktop floating hamburger button - always visible */}
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={() => setIsCollapsed(!isCollapsed)}
+        className="fixed top-4 left-4 z-20 hidden md:flex"
       >
-        <Card className="h-full relative">
+        <Menu className="h-6 w-6" />
+      </Button>
 
-          <CardHeader className="p-4">
-            <div className="flex items-center justify-between">
-              <CardTitle className={`transition-all duration-200 ${
-                isCollapsed ? 'text-center text-sm' : 'text-xl'
-              }`}>
-                {isCollapsed ? 'AMS' : 'AMS Dashboard'}
+      {/* Sidebar - only render when not collapsed */}
+      {!isCollapsed && (
+        <motion.aside
+          initial={{ width: 256 }}
+          animate={{ width: 256 }}
+          className={`fixed left-0 top-0 bottom-0 bg-background z-30 ${className || ''} ${
+            isMobileOpen ? 'block' : 'hidden md:block'
+          }`}
+        >
+          <Card className="h-full relative">
+
+            <CardHeader className="p-4">
+              <CardTitle className="text-xl">
+                AMS Dashboard
               </CardTitle>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setIsCollapsed(!isCollapsed)}
-                className="h-6 w-6"
-              >
-                <Menu className="h-4 w-4" />
-              </Button>
-            </div>
-          </CardHeader>
-          
-          <ScrollArea className="flex-1 h-[calc(100vh-8rem)] px-2">
-            <CardContent className="p-2">
-              {/* Remove Quick Access section and keep only navigation items */}
-              <div className="space-y-1">
-                {!isCollapsed && (
-                  <h2 className="text-lg font-semibold mb-2"></h2>
-                )}
-                {navItems[user.role as unknown as keyof typeof navItems]?.map((item) => (
-                  <CustomTooltip 
-                    key={item.name} 
-                    content={isCollapsed ? item.name : `Go to ${item.name}`}
-                  >
-                    {item.name.toLowerCase() === 'logout' ? (
-                      <a
-                        href="#"
-                        onClick={handleLogout}
-                        className={`block rounded-md transition-all duration-200
-                          ${pathname === item.href 
-                            ? "bg-primary text-primary-foreground" 
-                            : "hover:bg-accent"
-                          }
-                          ${isCollapsed 
-                            ? 'p-2 text-center w-10 mx-auto' 
-                            : 'w-full p-2'
-                          }
-                        `}
-                      >
-                        {isCollapsed ? 'L' : 'Logout'}
-                      </a>
-                    ) : (
-                      <Link
-                        href={item.href}
-                        onClick={() => setIsMobileOpen(false)}
-                        className={`block rounded-md transition-all duration-200
-                          ${pathname === item.href 
-                            ? "bg-primary text-primary-foreground" 
-                            : "hover:bg-accent"
-                          }
-                          ${isCollapsed 
-                            ? 'p-2 text-center w-10 mx-auto' 
-                            : 'w-full p-2'
-                          }
-                        `}
-                      >
-                        {isCollapsed ? item.name.charAt(0) : item.name}
-                      </Link>
-                    )}
-                  </CustomTooltip>
-                ))}
-              </div>
-            </CardContent>
-          </ScrollArea>
+            </CardHeader>
 
-          <div className={`p-4 border-t transition-all duration-200 ${
-            isCollapsed ? 'text-center' : ''
-          }`}>
-            <div className="text-sm text-muted-foreground truncate">
-              {isCollapsed ? user.name?.charAt(0) : `Logged in as: ${user.name}`}
+            <ScrollArea className="flex-1 h-[calc(100vh-8rem)] px-2">
+              <CardContent className="p-2">
+                <div className="space-y-1">
+                  {navItems[user.role as unknown as keyof typeof navItems]?.map((item) => (
+                    <CustomTooltip
+                      key={item.name}
+                      content={`Go to ${item.name}`}
+                    >
+                      {item.name.toLowerCase() === 'logout' ? (
+                        <a
+                          href="#"
+                          onClick={handleLogout}
+                          className={`block rounded-md transition-all duration-200 w-full p-2
+                            ${pathname === item.href
+                              ? "bg-primary text-primary-foreground"
+                              : "hover:bg-accent"
+                            }
+                          `}
+                        >
+                          Logout
+                        </a>
+                      ) : (
+                        <Link
+                          href={item.href}
+                          onClick={() => setIsMobileOpen(false)}
+                          className={`block rounded-md transition-all duration-200 w-full p-2
+                            ${pathname === item.href
+                              ? "bg-primary text-primary-foreground"
+                              : "hover:bg-accent"
+                            }
+                          `}
+                        >
+                          {item.name}
+                        </Link>
+                      )}
+                    </CustomTooltip>
+                  ))}
+                </div>
+              </CardContent>
+            </ScrollArea>
+
+            <div className="p-4 border-t">
+              <div className="text-sm text-muted-foreground truncate">
+                Logged in as: {user.name}
+              </div>
             </div>
-          </div>
-        </Card>
-      </motion.aside>
+          </Card>
+        </motion.aside>
+      )}
 
       {/* Add wrapper div for main content with margin */}
       <div className={`${isCollapsed ? 'md:ml-0' : 'md:ml-64'} transition-all duration-200`}>
