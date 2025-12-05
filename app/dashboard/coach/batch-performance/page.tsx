@@ -16,6 +16,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import Sidebar from "@/components/Sidebar"
 import { useAuth } from "@/contexts/AuthContext"
 import { toast } from "@/components/ui/use-toast"
+import { OrientationGuard } from "@/components/OrientationGuard"
 
 ChartJS.register(RadialLinearScale, PointElement, LineElement, Filler, Tooltip, Legend, CategoryScale, LinearScale)
 
@@ -153,6 +154,8 @@ export default function BatchPerformancePage() {
 
     fetchBatchData();
   }, [selectedBatch]);
+
+
 
   const handlePlayerSelection = async (playerId: string) => {
     setSelectedPlayers(prev => {
@@ -560,226 +563,228 @@ export default function BatchPerformancePage() {
   };
 
   return (
-    <div className="flex h-screen bg-background dark:bg-gray-900">
-      <Sidebar />
-      <div className="flex-1 p-8 overflow-y-auto">
-        <h1 className="text-3xl font-bold text-white mb-6">Batch Performance</h1>
+    <OrientationGuard>
+      <div className="flex h-screen bg-background dark:bg-gray-900">
+        <Sidebar />
+        <div className="flex-1 p-8 overflow-y-auto">
+          <h1 className="text-3xl font-bold text-white mb-6">Batch Performance</h1>
 
-        {isLoading ? (
-          <div className="flex items-center justify-center h-40">
-            <p className="text-muted-foreground">Loading batches...</p>
-          </div>
-        ) : localBatches.length === 0 ? (
-          <div className="text-center py-8">
-            <h3 className="text-lg font-semibold mb-2">No Batches Found</h3>
-            <p className="text-muted-foreground">No batches are currently available</p>
-          </div>
-        ) : (
-          <div className="grid md:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Batches</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Batch Name</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {localBatches.map((batch) => (
-                      <TableRow 
-                        key={batch._id}
-                        className={selectedBatch?._id === batch._id ? 'bg-accent' : ''}
-                      >
-                        <TableCell>{batch.name}</TableCell>
-                        <TableCell>
-                          <Button 
-                            variant="default" 
-                            onClick={() => setSelectedBatch(batch)}
-                          >
-                            View Details
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-
-            {selectedBatch && (
+          {isLoading ? (
+            <div className="flex items-center justify-center h-40">
+              <p className="text-muted-foreground">Loading batches...</p>
+            </div>
+          ) : localBatches.length === 0 ? (
+            <div className="text-center py-8">
+              <h3 className="text-lg font-semibold mb-2">No Batches Found</h3>
+              <p className="text-muted-foreground">No batches are currently available</p>
+            </div>
+          ) : (
+            <div className="grid md:grid-cols-2 gap-6">
               <Card>
                 <CardHeader>
-                  <CardTitle>
-                    Batch Average Attributes - {getBatchName()}
-                  </CardTitle>
+                  <CardTitle>Batches</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {batchAverageAttributes ? (
-                    <div className="grid grid-cols-2 gap-4">
-                      {Object.entries(batchAverageAttributes).map(([key, value]) => (
-                        <div key={key} className="flex justify-between">
-                          <span className="capitalize">{key}</span>
-                          <span>{value}</span>
-                        </div>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Batch Name</TableHead>
+                        <TableHead>Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {localBatches.map((batch) => (
+                        <TableRow
+                          key={batch._id}
+                          className={selectedBatch?._id === batch._id ? 'bg-accent' : ''}
+                        >
+                          <TableCell>{batch.name}</TableCell>
+                          <TableCell>
+                            <Button
+                              variant="default"
+                              onClick={() => setSelectedBatch(batch)}
+                            >
+                              View Details
+                            </Button>
+                          </TableCell>
+                        </TableRow>
                       ))}
-                    </div>
-                  ) : (
-                    <p>No player data available for this batch</p>
-                  )}
-                  <Button onClick={() => setIsDialogOpen(true)} className="mt-4">
-                    Compare Players
-                  </Button>
+                    </TableBody>
+                  </Table>
                 </CardContent>
               </Card>
-            )}
-          </div>
-        )}
 
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent className="max-h-[80vh] max-w-[80vw] md:max-w-[80vw] sm:max-w-[95vw] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>
-                Compare Players in {getBatchName()}
-                ({filteredPlayers?.length || 0} players)
-              </DialogTitle>
-            </DialogHeader>
-            <CardContent>
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
-                <Input
-                  placeholder="Search players"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full sm:w-64"
-                />
-                <div className="flex gap-2 w-full sm:w-auto">
-                  <Button
-                    variant="outline"
-                    onClick={() => setSelectedPlayers(batchPlayers.map(p => p.id.toString()))}
-                    className="flex-1 sm:flex-none"
-                  >
-                    Select All
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => setSelectedPlayers([])}
-                    className="flex-1 sm:flex-none"
-                  >
-                    Deselect All
-                  </Button>
-                </div>
-              </div>
+              {selectedBatch && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>
+                      Batch Average Attributes - {getBatchName()}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {batchAverageAttributes ? (
+                      <div className="grid grid-cols-2 gap-4">
+                        {Object.entries(batchAverageAttributes).map(([key, value]) => (
+                          <div key={key} className="flex justify-between">
+                            <span className="capitalize">{key}</span>
+                            <span>{value}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p>No player data available for this batch</p>
+                    )}
+                    <Button onClick={() => setIsDialogOpen(true)} className="mt-4">
+                      Compare Players
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          )}
 
-              {/* Attribute Filter Toggle */}
-              <div className="flex justify-center mb-6">
-                <div className="flex items-center space-x-4 bg-muted p-2 rounded-lg">
-                  <span className="text-sm font-medium">View:</span>
-                  <div className="flex space-x-2">
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogContent className="max-h-[80vh] max-w-[80vw] md:max-w-[80vw] sm:max-w-[95vw] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>
+                  Compare Players in {getBatchName()}
+                  ({filteredPlayers?.length || 0} players)
+                </DialogTitle>
+              </DialogHeader>
+              <CardContent>
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
+                  <Input
+                    placeholder="Search players"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full sm:w-64"
+                  />
+                  <div className="flex gap-2 w-full sm:w-auto">
                     <Button
-                      variant={attributeFilter === "latest" ? "default" : "outline"}
-                      onClick={() => setAttributeFilter("latest")}
-                      size="sm"
+                      variant="outline"
+                      onClick={() => setSelectedPlayers(batchPlayers.map(p => p.id.toString()))}
+                      className="flex-1 sm:flex-none"
                     >
-                      Latest Values
+                      Select All
                     </Button>
                     <Button
-                      variant={attributeFilter === "overall" ? "default" : "outline"}
-                      onClick={() => setAttributeFilter("overall")}
-                      size="sm"
+                      variant="outline"
+                      onClick={() => setSelectedPlayers([])}
+                      className="flex-1 sm:flex-none"
                     >
-                      Overall Average
+                      Deselect All
                     </Button>
                   </div>
                 </div>
-              </div>
 
-              <div className="border rounded-md p-4 mb-6">
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 max-h-[200px] overflow-y-auto">
-                  {filteredPlayers.map((player) => (
-                    <div key={player.id} className="flex items-center space-x-2 p-2 hover:bg-accent rounded-md">
-                      <input
-                        type="checkbox"
-                        checked={selectedPlayers.includes(player.id.toString())}
-                        onChange={() => handlePlayerSelection(player.id.toString())}
-                        id={`player-${player.id}`}
-                        className="mr-2"
-                      />
-                      <label
-                        htmlFor={`player-${player.id}`}
-                        className="flex-1 cursor-pointer"
+                {/* Attribute Filter Toggle */}
+                <div className="flex justify-center mb-6">
+                  <div className="flex items-center space-x-4 bg-muted p-2 rounded-lg">
+                    <span className="text-sm font-medium">View:</span>
+                    <div className="flex space-x-2">
+                      <Button
+                        variant={attributeFilter === "latest" ? "default" : "outline"}
+                        onClick={() => setAttributeFilter("latest")}
+                        size="sm"
                       >
-                        {player.name} (ID: {player.id})
-                      </label>
+                        Latest Values
+                      </Button>
+                      <Button
+                        variant={attributeFilter === "overall" ? "default" : "outline"}
+                        onClick={() => setAttributeFilter("overall")}
+                        size="sm"
+                      >
+                        Overall Average
+                      </Button>
                     </div>
-                  ))}
-                </div>
-                {filteredPlayers.length === 0 && (
-                  <div className="text-center text-muted-foreground py-4">
-                    No players found in this batch
                   </div>
-                )}
-              </div>
-
-              <div className="mt-6">
-                <div className="w-full h-[500px]">
-                  <Radar data={radarData} options={radarOptions} />
                 </div>
-              </div>
-              
-              <div className="mt-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Attribute Comparison</CardTitle>
-                    <p className="text-sm text-muted-foreground">
-                      <span className="text-green-500 font-bold">Green</span> = Highest value,
-                      <span className="text-red-500 font-bold"> Red</span> = Lowest value
-                    </p>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="overflow-x-auto">
-                      {renderAttributeComparison()}
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
 
-              <div className="mt-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Performance Over Time - {selectedAttribute.charAt(0).toUpperCase() + selectedAttribute.slice(1)}</CardTitle>
-                    <p className="text-sm text-muted-foreground">
-                      Track how player attributes change over the last month
-                    </p>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex flex-wrap gap-2 mb-4">
-                      {["Attack", "pace", "Physicality", "Defense", "passing", "Technique"].map((attr) => (
-                        <Button
-                          key={attr}
-                          variant={selectedAttribute === attr ? "default" : "outline"}
-                          onClick={() => setSelectedAttribute(attr)}
-                          size="sm"
+                <div className="border rounded-md p-4 mb-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 max-h-[200px] overflow-y-auto">
+                    {filteredPlayers.map((player) => (
+                      <div key={player.id} className="flex items-center space-x-2 p-2 hover:bg-accent rounded-md">
+                        <input
+                          type="checkbox"
+                          checked={selectedPlayers.includes(player.id.toString())}
+                          onChange={() => handlePlayerSelection(player.id.toString())}
+                          id={`player-${player.id}`}
+                          className="mr-2"
+                        />
+                        <label
+                          htmlFor={`player-${player.id}`}
+                          className="flex-1 cursor-pointer"
                         >
-                          {attr.charAt(0).toUpperCase() + attr.slice(1)}
-                        </Button>
-                      ))}
+                          {player.name} (ID: {player.id})
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                  {filteredPlayers.length === 0 && (
+                    <div className="text-center text-muted-foreground py-4">
+                      No players found in this batch
                     </div>
-                    <div className="h-[400px]">
-                      <Line 
-                        data={generateComparisonData(selectedPlayers)} 
-                        options={lineOptions} 
-                      />
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            </CardContent>
-          </DialogContent>
-        </Dialog>
+                  )}
+                </div>
+
+                <div className="mt-6">
+                  <div className="w-full h-[500px]">
+                    <Radar data={radarData} options={radarOptions} />
+                  </div>
+                </div>
+
+                <div className="mt-6">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Attribute Comparison</CardTitle>
+                      <p className="text-sm text-muted-foreground">
+                        <span className="text-green-500 font-bold">Green</span> = Highest value,
+                        <span className="text-red-500 font-bold"> Red</span> = Lowest value
+                      </p>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="overflow-x-auto">
+                        {renderAttributeComparison()}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                <div className="mt-6">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Performance Over Time - {selectedAttribute.charAt(0).toUpperCase() + selectedAttribute.slice(1)}</CardTitle>
+                      <p className="text-sm text-muted-foreground">
+                        Track how player attributes change over the last month
+                      </p>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex flex-wrap gap-2 mb-4">
+                        {["Attack", "pace", "Physicality", "Defense", "passing", "Technique"].map((attr) => (
+                          <Button
+                            key={attr}
+                            variant={selectedAttribute === attr ? "default" : "outline"}
+                            onClick={() => setSelectedAttribute(attr)}
+                            size="sm"
+                          >
+                            {attr.charAt(0).toUpperCase() + attr.slice(1)}
+                          </Button>
+                        ))}
+                      </div>
+                      <div className="h-[400px]">
+                        <Line
+                          data={generateComparisonData(selectedPlayers)}
+                          options={lineOptions}
+                        />
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </CardContent>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
-    </div>
+    </OrientationGuard>
   )
 }
