@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input"
 import Sidebar from "@/components/Sidebar"
 import { useAuth } from "@/contexts/AuthContext"
 import { useToast } from "@/components/ui/use-toast"
+import { saveAs } from 'file-saver';
 
 interface User {
   id: string
@@ -214,20 +215,14 @@ export default function AttendancePage() {
     ].join("\n")
 
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" })
-    const url = URL.createObjectURL(blob)
-    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+    const filename = `attendance_report_${date.toISOString().split("T")[0]}.csv`
 
-    if (isMobile) {
-      window.open(url, '_blank')
-    } else {
-      const link = document.createElement("a")
-      link.setAttribute("href", url)
-      link.setAttribute("download", `attendance_report_${date.toISOString().split("T")[0]}.csv`)
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-    }
-    URL.revokeObjectURL(url)
+    saveAs(blob, filename)
+
+    toast({
+      title: "Success",
+      description: "Attendance report exported successfully",
+    })
   }
 
   const getFilteredUsers = () => {
