@@ -104,20 +104,22 @@ export const Sidebar = ({ className }: { className?: string }) => {
         <Menu className="h-6 w-6" />
       </Button>
 
-      {/* Desktop collapse toggle button */}
-      <Button
-        variant="ghost"
-        size="icon"
-        onClick={() => setIsCollapsed(!isCollapsed)}
-        className="fixed top-4 left-4 z-20 hidden md:flex"
-      >
-        <Menu className="h-6 w-6" />
-      </Button>
+      {/* Desktop collapse toggle button - only visible when sidebar is collapsed */}
+      {isCollapsed && (
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setIsCollapsed(false)}
+          className="fixed top-4 left-4 z-20 hidden md:flex"
+        >
+          <Menu className="h-6 w-6" />
+        </Button>
+      )}
 
       <motion.aside
         initial={{ width: 256 }}
         animate={{
-          width: isCollapsed ? 0 : 256,
+          width: isCollapsed ? 64 : 256,
           transition: { duration: 0.2 }
         }}
         className={`fixed left-0 top-0 bottom-0 bg-background z-30 ${className || ''} ${
@@ -127,11 +129,21 @@ export const Sidebar = ({ className }: { className?: string }) => {
         <Card className="h-full relative">
 
           <CardHeader className="p-4">
-            <CardTitle className={`transition-all duration-200 ${
-              isCollapsed ? 'text-center text-sm' : 'text-xl'
-            }`}>
-              {isCollapsed ? 'AMS' : 'AMS Dashboard'}
-            </CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className={`transition-all duration-200 ${
+                isCollapsed ? 'text-center text-sm' : 'text-xl'
+              }`}>
+                {isCollapsed ? 'AMS' : 'AMS Dashboard'}
+              </CardTitle>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setIsCollapsed(!isCollapsed)}
+                className="h-6 w-6"
+              >
+                <Menu className="h-4 w-4" />
+              </Button>
+            </div>
           </CardHeader>
           
           <ScrollArea className="flex-1 h-[calc(100vh-8rem)] px-2">
