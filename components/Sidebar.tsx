@@ -181,8 +181,8 @@ export const Sidebar = ({ className }: { className?: string }) => {
         </motion.aside>
       )}
 
-      {/* Add wrapper div for main content with margin */}
-      <div className={`${isCollapsed ? 'md:ml-0' : 'md:ml-64'} transition-all duration-200`}>
+      {/* Main content wrapper - full screen when sidebar is collapsed */}
+      <div className={`transition-all duration-200 ${isCollapsed ? 'md:ml-0 md:w-screen' : 'md:ml-64 md:w-[calc(100vw-16rem)]'}`}>
         {/* Main content goes here */}
       </div>
 
