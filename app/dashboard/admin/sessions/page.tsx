@@ -21,6 +21,8 @@ import { Switch } from "@/components/ui/switch"
 import Sidebar from "@/components/Sidebar" // Import the Sidebar component
 import { format } from "date-fns" // Import format from date-fns
 import { Calendar } from "@/components/ui/calendar"
+import { Capacitor } from '@capacitor/core'
+import { Filesystem, Directory, Encoding } from '@capacitor/filesystem'
 
 import { toast, useToast } from "@/components/ui/use-toast"; // Import useToast hook
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs" // Add this import
@@ -40,7 +42,6 @@ import { Slider } from "@/components/ui/slider" // Add this import
 import { getAll, create, update, remove, getByFilter } from '@/lib/db'
 import { StorageUtils } from '@/lib/utils/storage';
 import { CoachProvider } from "@/contexts/CoachContext" // Add this import
-// import sessions from "@/app/api/sessions" // REMOVE or RENAME this import to avoid conflict
 
 export interface Session {
   id: string | number
@@ -102,7 +103,7 @@ export interface Batch {
 
 // Move exportToFile inside SessionsContent component
 // Replace existing exportToFile with this definitive implementation
-const exportToFile = (sessions: Session[], academyId: string, batches: Batch[]) => {
+const exportToFile = async (sessions: Session[], academyId: string, batches: Batch[]) => {
   // filter to only sessions for this academy
   const academySessions = Array.isArray(sessions)
     ? sessions.filter(s => s.academyId === academyId)
@@ -203,20 +204,44 @@ const exportToFile = (sessions: Session[], academyId: string, batches: Batch[]) 
   // Combine header + rows
   const csvContent = [headers.join(","), ...rows].join("\n");
 
-  // Trigger download
+  // Trigger download - handle both web and mobile
   try {
     const dateStr = new Date().toISOString().split("T")[0];
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.setAttribute("download", `sessions_export_${academyId}_${dateStr}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    const fileName = `sessions_export_${academyId}_${dateStr}.csv`;
+
+    if (Capacitor.isNativePlatform()) {
+      // Mobile app - use Capacitor Filesystem API
+      await Filesystem.writeFile({
+        path: fileName,
+        data: csvContent,
+        directory: Directory.Documents,
+        encoding: Encoding.UTF8,
+      });
+
+      // Show success message for mobile
+      toast({
+        title: "Export Successful",
+        description: `File saved to Documents folder as ${fileName}`,
+      });
+    } else {
+      // Web browser - use traditional download
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", fileName);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    }
   } catch (e) {
-    console.error("CSV download failed", e);
+    console.error("CSV export failed", e);
+    toast({
+      title: "Export Failed",
+      description: "Failed to export sessions. Please try again.",
+      variant: "destructive",
+    });
   }
 
   return academySessions.length;
