@@ -640,8 +640,7 @@ export default function FinancesPage() {
                         {record.documentId ? (
                           <a
                             href={`/api/docs/${record.documentId}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
+                            download
                             className="text-blue-500 hover:underline"
                           >
                             View Document
