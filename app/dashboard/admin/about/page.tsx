@@ -262,37 +262,24 @@ export default function AboutPage() {
     })
   }
 
-  // Enhanced file download handler with mobile compatibility
+  // Enhanced file download handler using server-side API for cross-platform compatibility
   const handleFileDownload = async (file: CollateralFile) => {
     try {
-      // For data URLs (base64 encoded files)
-      if (file.url.startsWith('data:')) {
-        // Convert data URL to blob for better download handling
-        const response = await fetch(file.url);
-        const blob = await response.blob();
-        const downloadUrl = window.URL.createObjectURL(blob);
+      // Use the new download API endpoint for consistent cross-platform downloads
+      const downloadUrl = `/api/db/ams-about/download?fileId=${file.id}&academyId=${user?.academyId}`;
 
-        // Try modern download API first (works in most browsers)
-        if ('download' in document.createElement('a')) {
-          const a = document.createElement('a');
-          a.href = downloadUrl;
-          a.download = file.name;
-          a.style.display = 'none';
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-
-          // Clean up blob URL
-          window.URL.revokeObjectURL(downloadUrl);
-        } else {
-          // Fallback for mobile browsers and WebViews - open in new tab
-          window.open(downloadUrl, '_blank');
-          // Clean up blob URL after a delay to allow download to start
-          setTimeout(() => window.URL.revokeObjectURL(downloadUrl), 1000);
-        }
+      // Try modern download API first (works in most browsers)
+      if ('download' in document.createElement('a')) {
+        const a = document.createElement('a');
+        a.href = downloadUrl;
+        a.download = file.name;
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
       } else {
-        // For other URL types (shouldn't happen with current implementation)
-        window.open(file.url, '_blank');
+        // Fallback for mobile browsers and WebViews - open in new tab
+        window.open(downloadUrl, '_blank');
       }
 
       toast({
@@ -802,12 +789,12 @@ export default function AboutPage() {
               </DialogHeader>
               <div className="flex-1 overflow-y-auto py-4">
                 {selectedFile.type.startsWith("image/") ? (
-                  (selectedFile.size && selectedFile.size > 1024 * 1024) ? (
+                  (selectedFile.size && selectedFile.size > 2 * 1024 * 1024) ? (
                     <div className="text-center py-8">
                       <FileImage className="w-16 h-16 mx-auto mb-4 text-gray-400" />
                       <p className="mb-2 text-lg font-medium">File too large to preview</p>
                       <p className="mb-4 text-gray-400">
-                        Files larger than 1MB cannot be previewed.<br />
+                        Files larger than 2MB cannot be previewed.<br />
                         File size: {formatFileSize(selectedFile.size)}
                       </p>
                       <Button onClick={() => handleFileDownload(selectedFile)}>
@@ -823,33 +810,46 @@ export default function AboutPage() {
                         width={800}
                         height={600}
                         className="w-auto h-auto object-contain rounded-lg"
+                        onError={(e) => {
+                          // If image fails to load, show download option
+                          e.currentTarget.style.display = 'none';
+                          const parent = e.currentTarget.parentElement;
+                          if (parent) {
+                            parent.innerHTML = `
+                              <div class="text-center py-8">
+                                <div class="w-16 h-16 mx-auto mb-4 text-gray-400">
+                                  <svg class="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                  </svg>
+                                </div>
+                                <p class="mb-2 text-lg font-medium">Preview not available</p>
+                                <p class="mb-4 text-gray-400">Unable to load image preview</p>
+                                <button onclick="window.open('/api/db/ams-about/download?fileId=${selectedFile.id}&academyId=${user?.academyId}', '_blank')" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+                                  <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                  </svg>
+                                  Download to View
+                                </button>
+                              </div>
+                            `;
+                          }
+                        }}
                       />
                     </div>
                   )
                 ) : (
-                  (selectedFile.size && selectedFile.size > 1024 * 1024) ? (
-                    <div className="text-center py-8">
-                      <FileText className="w-16 h-16 mx-auto mb-4 text-gray-400" />
-                      <p className="mb-2 text-lg font-medium">Document too large to preview</p>
-                      <p className="mb-4 text-gray-400">
-                        Files larger than 1MB cannot be previewed.<br />
-                        File size: {formatFileSize(selectedFile.size)}
-                      </p>
-                      <Button onClick={() => handleFileDownload(selectedFile)}>
-                        <Download className="w-4 h-4 mr-2" />
-                        Download to View
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="text-center py-8">
-                      <FileText className="w-16 h-16 mx-auto mb-4 text-gray-400" />
-                      <p className="mb-4">Preview not available for this file type</p>
-                      <Button onClick={() => handleFileDownload(selectedFile)}>
-                        <Download className="w-4 h-4 mr-2" />
-                        Download to View
-                      </Button>
-                    </div>
-                  )
+                  <div className="text-center py-8">
+                    <FileText className="w-16 h-16 mx-auto mb-4 text-gray-400" />
+                    <p className="mb-2 text-lg font-medium">Preview not available</p>
+                    <p className="mb-4 text-gray-400">
+                      Document preview is not supported.<br />
+                      File size: {formatFileSize(selectedFile.size)}
+                    </p>
+                    <Button onClick={() => handleFileDownload(selectedFile)}>
+                      <Download className="w-4 h-4 mr-2" />
+                      Download to View
+                    </Button>
+                  </div>
                 )}
               </div>
               <DialogFooter className="flex-shrink-0 flex flex-col sm:flex-row justify-between gap-4 border-t pt-4">
