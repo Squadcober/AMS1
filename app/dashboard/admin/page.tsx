@@ -793,7 +793,7 @@ export default function AboutPage() {
         {/* File Content Modal */}
         {selectedFile && (
           <Dialog open={true} onOpenChange={() => setSelectedFile(null)}>
-            <DialogContent className={`w-[95vw] max-w-4xl h-[90vh] ${isMobile ? 'max-h-[70vh]' : 'max-h-[90vh]'} overflow-hidden flex flex-col`}>
+            <DialogContent className={`w-[95vw] max-w-4xl h-[90dvh] ${isMobile ? 'max-h-[70dvh]' : 'max-h-[90dvh]'} overflow-hidden flex flex-col`}>
               <DialogHeader className="flex-shrink-0">
                 <DialogTitle className="flex items-center space-x-2 text-sm sm:text-base">
                   {getFileIcon(selectedFile.type)}

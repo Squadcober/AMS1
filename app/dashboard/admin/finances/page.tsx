@@ -482,7 +482,7 @@ export default function FinancesPage() {
                     <DialogTrigger asChild>
                       <Button variant="outline">Add Transaction</Button>
                     </DialogTrigger>
-                    <DialogContent className={`${isMobile ? 'max-h-[70vh]' : 'max-h-[90vh]'} overflow-y-auto`}>
+                    <DialogContent className="max-h-[100dvh] overflow-y-auto">
                       <DialogHeader>
                         <DialogTitle>Add New Transaction</DialogTitle>
                       </DialogHeader>
