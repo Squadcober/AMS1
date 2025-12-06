@@ -822,8 +822,7 @@ export default function AboutPage() {
                         alt={selectedFile.name}
                         width={800}
                         height={600}
-                        className="max-w-full max-h-full w-auto h-auto object-contain rounded-lg"
-                        style={{ maxHeight: 'calc(90vh - 200px)' }}
+                        className="w-auto h-auto object-contain rounded-lg"
                       />
                     </div>
                   )

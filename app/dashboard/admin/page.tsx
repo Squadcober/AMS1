@@ -224,183 +224,88 @@ export default function AboutPage() {
     setHasUnsavedChanges(true)
   }
 
-  // Add upload helper (similar to finances page)
-  const uploadFile = async (file: File) => {
-    try {
-      if (!user?.academyId) {
-        toast({
-          title: "Error",
-          description: "Academy ID not found. Please try again.",
-          variant: "destructive",
-        })
-        return null
-      }
-
-      const fd = new FormData()
-      fd.append('file', file)
-      fd.append('academyId', String(user.academyId).trim())
-
-      const res = await fetch('/api/upload', {
-        method: 'POST',
-        body: fd,
-      })
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        throw new Error(err.error || 'Failed to upload file')
-      }
-
-      const data = await res.json()
-      if (!data.docId) throw new Error('No document ID received from server')
-      return `/api/docs/${data.docId}`
-    } catch (error) {
-      console.error('Upload error:', error)
-      toast({
-        title: "Upload Failed",
-        description: error instanceof Error ? error.message : "Failed to upload file",
-        variant: "destructive",
-      })
-      return null
-    }
-  }
-
-  // Replace handleFileUpload: preview immediately, upload in background, replace preview URL with server URL when done
-  const handleFileUpload = async (collateralIndex: number, files: FileList) => {
+  // Enhanced file upload handler with better file processing and mobile compatibility
+  const handleFileUpload = (collateralIndex: number, files: FileList) => {
+    const updatedCollaterals = [...formData.collaterals]
     const filesArray = Array.from(files)
 
-    // helper to read file as data URL for immediate preview
-    const readFile = (file: File) =>
-      new Promise<string>((resolve, reject) => {
-        const reader = new FileReader()
-        reader.onload = (e) => resolve(e.target?.result as string)
-        reader.onerror = (e) => reject(e)
-        reader.readAsDataURL(file)
-      })
-
-    // process files sequentially but allow parallel uploads via Promise.all
-    const uploadPromises = filesArray.map(async (file) => {
-      const dataUrl = await readFile(file).catch(() => '')
-      const id = Math.random().toString(36).substr(2, 9)
-      const newFile: CollateralFile = {
-        academyId: user?.academyId || '',
-        id,
-        name: file.name,
-        url: dataUrl || '', // preview url
-        type: file.type || 'application/octet-stream',
-        size: file.size,
-        dateUploaded: new Date().toISOString(),
-      }
-
-      // append preview to state (functional update to avoid stale state)
-      setFormData(prev => {
-        const updated = [...prev.collaterals]
-        // ensure collateral exists
-        if (!updated[collateralIndex]) updated[collateralIndex] = { name: "Unknown", files: [], acceptedTypes: "" }
-        updated[collateralIndex] = {
-          ...updated[collateralIndex],
-          files: [...updated[collateralIndex].files, newFile]
+    filesArray.forEach((file, index) => {
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        const dataUrl = e.target?.result as string
+        const newFile: CollateralFile = {
+          academyId: user?.academyId || '',
+          id: Math.random().toString(36).substr(2, 9),
+          name: file.name,
+          url: dataUrl,
+          type: file.type,
+          size: file.size,
+          dateUploaded: new Date().toISOString(),
         }
-        return { ...prev, collaterals: updated }
-      })
-      setHasUnsavedChanges(true)
 
-      // upload in background and replace preview URL with server URL when done
-      const uploadedUrl = await uploadFile(file)
-      if (uploadedUrl) {
-        setFormData(prev => {
-          const updated = [...prev.collaterals]
-          const filesList = updated[collateralIndex]?.files?.map(f => f.id === id ? { ...f, url: uploadedUrl } : f) || []
-          updated[collateralIndex] = { ...updated[collateralIndex], files: filesList }
-          return { ...prev, collaterals: updated }
-        })
+        updatedCollaterals[collateralIndex].files = [...updatedCollaterals[collateralIndex].files, newFile]
+        setFormData(prev => ({
+          ...prev,
+          collaterals: updatedCollaterals
+        }))
+        setHasUnsavedChanges(true)
+
+        // Show toast only after all files are processed
+        if (index === filesArray.length - 1) {
+          toast({
+            title: "Files Uploaded",
+            description: `${filesArray.length} file(s) uploaded successfully`,
+          });
+        }
       }
-      return true
-    })
-
-    // wait for all uploads to at least attempt (they may have failed individually)
-    await Promise.all(uploadPromises)
-
-    toast({
-      title: "Files Processed",
-      description: `${filesArray.length} file(s) processed. Uploaded files are available for download.`,
+      reader.readAsDataURL(file)
     })
   }
 
-  // Enhanced file download handler with support for server-hosted docs (/api/docs/...)
+  // Enhanced file download handler with mobile compatibility
   const handleFileDownload = async (file: CollateralFile) => {
     try {
-      // server-hosted files (use fetch + blob -> force download like finances)
-      if (file.url && file.url.includes('/api/docs/')) {
-        const response = await fetch(file.url)
-        if (!response.ok) throw new Error('Failed to fetch document from server')
-        const blob = await response.blob()
-        const downloadUrl = window.URL.createObjectURL(blob)
+      // For data URLs (base64 encoded files)
+      if (file.url.startsWith('data:')) {
+        // Convert data URL to blob for better download handling
+        const response = await fetch(file.url);
+        const blob = await response.blob();
+        const downloadUrl = window.URL.createObjectURL(blob);
 
-        // create anchor and click to download
-        const a = document.createElement('a')
-        a.href = downloadUrl
-        a.download = file.name || 'download'
-        a.style.display = 'none'
-        document.body.appendChild(a)
-        a.click()
-        document.body.removeChild(a)
-
-        // cleanup
-        window.URL.revokeObjectURL(downloadUrl)
-
-        toast({
-          title: "Download Started",
-          description: `Downloading ${file.name}`,
-        })
-        return
-      }
-
-      // For data URLs (base64 encoded files) - convert to blob then download
-      if (file.url && file.url.startsWith('data:')) {
-        const response = await fetch(file.url)
-        const blob = await response.blob()
-        const downloadUrl = window.URL.createObjectURL(blob)
-
+        // Try modern download API first (works in most browsers)
         if ('download' in document.createElement('a')) {
-          const a = document.createElement('a')
-          a.href = downloadUrl
-          a.download = file.name || 'download'
-          a.style.display = 'none'
-          document.body.appendChild(a)
-          a.click()
-          document.body.removeChild(a)
-          window.URL.revokeObjectURL(downloadUrl)
+          const a = document.createElement('a');
+          a.href = downloadUrl;
+          a.download = file.name;
+          a.style.display = 'none';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+
+          // Clean up blob URL
+          window.URL.revokeObjectURL(downloadUrl);
         } else {
-          // fallback open in new tab
-          window.open(downloadUrl, '_blank')
-          setTimeout(() => window.URL.revokeObjectURL(downloadUrl), 1000)
+          // Fallback for mobile browsers and WebViews - open in new tab
+          window.open(downloadUrl, '_blank');
+          // Clean up blob URL after a delay to allow download to start
+          setTimeout(() => window.URL.revokeObjectURL(downloadUrl), 1000);
         }
-
-        toast({
-          title: "Download Started",
-          description: `Downloading ${file.name}`,
-        })
-        return
+      } else {
+        // For other URL types (shouldn't happen with current implementation)
+        window.open(file.url, '_blank');
       }
 
-      // For absolute urls or other types - open in new tab
-      if (file.url) {
-        window.open(file.url, '_blank')
-        toast({
-          title: "Opening",
-          description: `Opening ${file.name}`,
-        })
-        return
-      }
-
-      throw new Error('No file URL available')
+      toast({
+        title: "Download Started",
+        description: `Downloading ${file.name}`,
+      });
     } catch (error) {
-      console.error('Download error:', error)
+      console.error('Download error:', error);
       toast({
         title: "Download Failed",
-        description: error instanceof Error ? error.message : "Failed to download file. Please try again.",
+        description: "Failed to download file. Please try again.",
         variant: "destructive",
-      })
+      });
     }
   }
 
@@ -888,17 +793,14 @@ export default function AboutPage() {
         {/* File Content Modal */}
         {selectedFile && (
           <Dialog open={true} onOpenChange={() => setSelectedFile(null)}>
-            {/* allow dialog to size up to viewport and enable internal scrolling */}
-            <DialogContent className="w-[95vw] max-w-5xl max-h-[90vh] overflow-auto flex flex-col">
+            <DialogContent className="w-[95vw] max-w-4xl h-[90vh] max-h-[90vh] overflow-hidden flex flex-col">
               <DialogHeader className="flex-shrink-0">
                 <DialogTitle className="flex items-center space-x-2 text-sm sm:text-base">
                   {getFileIcon(selectedFile.type)}
                   <span className="truncate">{selectedFile.name}</span>
                 </DialogTitle>
               </DialogHeader>
-
-              {/* responsive preview area: this section scrolls when needed */}
-              <div className="flex-1 overflow-auto py-4 px-4 flex items-center justify-center">
+              <div className="flex-1 overflow-y-auto py-4">
                 {selectedFile.type.startsWith("image/") ? (
                   (selectedFile.size && selectedFile.size > 1024 * 1024) ? (
                     <div className="text-center py-8">
@@ -914,18 +816,14 @@ export default function AboutPage() {
                       </Button>
                     </div>
                   ) : (
-                    <div className="w-full flex justify-center items-center">
-                      {/* Next/Image with explicit dimensions and CSS limits so it always fits */}
-                      <div className="relative w-full" style={{ maxWidth: 1100 }}>
-                        <Image
-                          src={selectedFile.url}
-                          alt={selectedFile.name}
-                          width={1100}
-                          height={800}
-                          className="object-contain rounded-lg"
-                          style={{ maxHeight: 'calc(90vh - 180px)', width: '100%', height: 'auto' }}
-                        />
-                      </div>
+                    <div className="flex justify-center items-center min-h-0">
+                      <Image
+                        src={selectedFile.url}
+                        alt={selectedFile.name}
+                        width={800}
+                        height={600}
+                        className="w-auto h-auto object-contain rounded-lg"
+                      />
                     </div>
                   )
                 ) : (
@@ -954,7 +852,6 @@ export default function AboutPage() {
                   )
                 )}
               </div>
-
               <DialogFooter className="flex-shrink-0 flex flex-col sm:flex-row justify-between gap-4 border-t pt-4">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-4 text-sm text-gray-400">
                   <span>Size: {formatFileSize(selectedFile.size)}</span>
