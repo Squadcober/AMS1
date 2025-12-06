@@ -470,10 +470,10 @@ export default function AboutPage() {
                       variant="outline"
                       size="icon"
                       onClick={() => fileInputRefs.current[index]?.click()}
-                      className="absolute top-1 right-1 sm:top-2 sm:right-2 h-4 w-4 sm:h-6 sm:w-6 p-0"
+                      className="absolute top-0 right-1 sm:top-1 sm:right-2 h-4 w-4 sm:h-6 sm:w-6 p-0"
                       title="Upload files"
                     >
-                      <Upload className="w-2 h-2 sm:w-3 sm:h-3" />
+                      <Upload className="w-2 h-2 sm:w-0 sm:h-1" />
                     </Button>
                   )}
                   <div className="space-y-4">
