@@ -483,11 +483,15 @@ export default function FinancesPage() {
                     <DialogTrigger asChild>
                       <Button variant="outline">Add Transaction</Button>
                     </DialogTrigger>
-                     <DialogContent className="max-w-4xl max-h-[100vh] overflow-y-auto">
-                      <DialogHeader >
+                     <DialogContent className="max-w-[95vw] w-full h-[85vh] flex flex-col overflow-hidden">
+                      <DialogHeader className="flex-shrink-0 pb-4">
                         <DialogTitle>Add New Transaction</DialogTitle>
                       </DialogHeader>
-                      <div className="grid gap-4 py-4 overflow-y-scroll flex-1 pr-2">
+                      <div className="grid gap-4 py-2 overflow-y-scroll flex-1 pr-2" style={{
+                        scrollbarWidth: 'thin',
+                        scrollbarColor: '#888 #f1f1f1',
+                        WebkitOverflowScrolling: 'touch'
+                      }}>
                         <div className="grid grid-cols-4 items-center gap-4">
                           <Label htmlFor="description" className="text-right">
                             Description
