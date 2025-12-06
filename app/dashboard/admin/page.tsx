@@ -793,14 +793,17 @@ export default function AboutPage() {
         {/* File Content Modal */}
         {selectedFile && (
           <Dialog open={true} onOpenChange={() => setSelectedFile(null)}>
-            <DialogContent className="w-[95vw] max-w-4xl h-[90vh] max-h-[90vh] overflow-hidden flex flex-col">
+            {/* allow dialog to size up to viewport and enable internal scrolling */}
+            <DialogContent className="w-[95vw] max-w-5xl max-h-[90vh] overflow-auto flex flex-col">
               <DialogHeader className="flex-shrink-0">
                 <DialogTitle className="flex items-center space-x-2 text-sm sm:text-base">
                   {getFileIcon(selectedFile.type)}
                   <span className="truncate">{selectedFile.name}</span>
                 </DialogTitle>
               </DialogHeader>
-              <div className="flex-1 overflow-y-auto py-4">
+
+              {/* responsive preview area: this section scrolls when needed */}
+              <div className="flex-1 overflow-auto py-4 px-4 flex items-center justify-center">
                 {selectedFile.type.startsWith("image/") ? (
                   (selectedFile.size && selectedFile.size > 1024 * 1024) ? (
                     <div className="text-center py-8">
@@ -816,15 +819,18 @@ export default function AboutPage() {
                       </Button>
                     </div>
                   ) : (
-                    <div className="flex justify-center items-center min-h-0">
-                      <Image
-                        src={selectedFile.url}
-                        alt={selectedFile.name}
-                        width={800}
-                        height={600}
-                        className="max-w-full max-h-full w-auto h-auto object-contain rounded-lg"
-                        style={{ maxHeight: 'calc(90vh - 200px)' }}
-                      />
+                    <div className="w-full flex justify-center items-center">
+                      {/* Next/Image with explicit dimensions and CSS limits so it always fits */}
+                      <div className="relative w-full" style={{ maxWidth: 1100 }}>
+                        <Image
+                          src={selectedFile.url}
+                          alt={selectedFile.name}
+                          width={1100}
+                          height={800}
+                          className="object-contain rounded-lg"
+                          style={{ maxHeight: 'calc(90vh - 180px)', width: '100%', height: 'auto' }}
+                        />
+                      </div>
                     </div>
                   )
                 ) : (
@@ -853,6 +859,7 @@ export default function AboutPage() {
                   )
                 )}
               </div>
+
               <DialogFooter className="flex-shrink-0 flex flex-col sm:flex-row justify-between gap-4 border-t pt-4">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-4 text-sm text-gray-400">
                   <span>Size: {formatFileSize(selectedFile.size)}</span>
