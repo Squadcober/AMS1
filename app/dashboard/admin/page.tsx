@@ -250,32 +250,37 @@ export default function AboutPage() {
     });
   }
 
-  // Enhanced file download handler
+  // Enhanced file download handler with mobile compatibility
   const handleFileDownload = async (file: CollateralFile) => {
     try {
+      let downloadUrl = file.url;
+
       // For blob URLs created from file uploads
       if (file.url.startsWith('blob:')) {
         const response = await fetch(file.url);
         const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = file.name;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-      } else {
-        // For regular URLs
-        const a = document.createElement('a');
-        a.href = file.url;
-        a.download = file.name;
-        a.target = '_blank';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
+        downloadUrl = window.URL.createObjectURL(blob);
       }
-      
+
+      // Try modern download API first (works in most browsers)
+      if ('download' in document.createElement('a')) {
+        const a = document.createElement('a');
+        a.href = downloadUrl;
+        a.download = file.name;
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+
+        // Clean up blob URL
+        if (downloadUrl !== file.url) {
+          window.URL.revokeObjectURL(downloadUrl);
+        }
+      } else {
+        // Fallback for mobile browsers and WebViews
+        window.open(downloadUrl, '_blank');
+      }
+
       toast({
         title: "Download Started",
         description: `Downloading ${file.name}`,
@@ -284,7 +289,7 @@ export default function AboutPage() {
       console.error('Download error:', error);
       toast({
         title: "Download Failed",
-        description: "Failed to download file",
+        description: "Failed to download file. Please try again.",
         variant: "destructive",
       });
     }
@@ -521,39 +526,39 @@ export default function AboutPage() {
                               </div>
                             </div>
                             
-                            <div className="flex items-center space-x-1">
+                            <div className="flex flex-col space-y-1 sm:flex-row sm:space-y-0 sm:space-x-1">
                               {/* Preview button */}
                               <Button
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => handleFileClick(file)}
-                                className="h-8 w-8 p-0"
+                                className="h-6 w-6 p-0 sm:h-8 sm:w-8"
                                 title="Preview file"
                               >
-                                <Eye className="w-4 h-4" />
+                                <Eye className="w-3 h-3 sm:w-4 sm:h-4" />
                               </Button>
-                              
+
                               {/* Download button */}
                               <Button
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => handleFileDownload(file)}
-                                className="h-8 w-8 p-0"
+                                className="h-6 w-6 p-0 sm:h-8 sm:w-8"
                                 title="Download file"
                               >
-                                <Download className="w-4 h-4" />
+                                <Download className="w-3 h-3 sm:w-4 sm:h-4" />
                               </Button>
-                              
+
                               {/* Delete button (only in edit mode) */}
                               {isEditing && (
                                 <Button
                                   variant="ghost"
                                   size="sm"
                                   onClick={() => handleFileDelete(index, file.id)}
-                                  className="h-8 w-8 p-0 text-red-400 hover:text-red-300"
+                                  className="h-6 w-6 p-0 sm:h-8 sm:w-8 text-red-400 hover:text-red-300"
                                   title="Delete file"
                                 >
-                                  <X className="w-4 h-4" />
+                                  <X className="w-3 h-3 sm:w-4 sm:h-4" />
                                 </Button>
                               )}
                             </div>
@@ -615,7 +620,7 @@ export default function AboutPage() {
                 >
                   {formData.logo ? (
                     <>
-                      <Image src={formData.logo || "/placeholder.svg"} alt="Team Logo" width={128} height={128} />
+                      <Image src={formData.logo || "/placeholder.svg"} alt="Team Logo" width={128} height={128} objectFit="cover" />
                       {isEditing && (
                         <Button
                           variant="destructive"
@@ -766,7 +771,7 @@ export default function AboutPage() {
         {/* File Content Modal */}
         {selectedFile && (
           <Dialog open={true} onOpenChange={() => setSelectedFile(null)}>
-            <DialogContent className="max-w-4xl">
+            <DialogContent className="max-w-full sm:max-w-4xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle className="flex items-center space-x-2">
                   {getFileIcon(selectedFile.type)}
@@ -795,7 +800,7 @@ export default function AboutPage() {
                         alt={selectedFile.name}
                         width={600}
                         height={400}
-                        className="max-w-full h-auto rounded-lg"
+                        className="w-full h-auto max-w-full rounded-lg"
                       />
                     </div>
                   )
@@ -825,8 +830,8 @@ export default function AboutPage() {
                   )
                 )}
               </div>
-              <DialogFooter className="flex justify-between">
-                <div className="flex items-center space-x-4 text-sm text-gray-400">
+              <DialogFooter className="flex flex-col sm:flex-row justify-between gap-4">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-4 text-sm text-gray-400">
                   <span>Size: {formatFileSize(selectedFile.size)}</span>
                   <span>Uploaded: {new Date(selectedFile.dateUploaded).toLocaleDateString()}</span>
                 </div>

@@ -250,32 +250,37 @@ export default function AboutPage() {
     });
   }
 
-  // Enhanced file download handler
+  // Enhanced file download handler with mobile compatibility
   const handleFileDownload = async (file: CollateralFile) => {
     try {
+      let downloadUrl = file.url;
+
       // For blob URLs created from file uploads
       if (file.url.startsWith('blob:')) {
         const response = await fetch(file.url);
         const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = file.name;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-      } else {
-        // For regular URLs
-        const a = document.createElement('a');
-        a.href = file.url;
-        a.download = file.name;
-        a.target = '_blank';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
+        downloadUrl = window.URL.createObjectURL(blob);
       }
-      
+
+      // Try modern download API first (works in most browsers)
+      if ('download' in document.createElement('a')) {
+        const a = document.createElement('a');
+        a.href = downloadUrl;
+        a.download = file.name;
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+
+        // Clean up blob URL
+        if (downloadUrl !== file.url) {
+          window.URL.revokeObjectURL(downloadUrl);
+        }
+      } else {
+        // Fallback for mobile browsers and WebViews
+        window.open(downloadUrl, '_blank');
+      }
+
       toast({
         title: "Download Started",
         description: `Downloading ${file.name}`,
@@ -284,7 +289,7 @@ export default function AboutPage() {
       console.error('Download error:', error);
       toast({
         title: "Download Failed",
-        description: "Failed to download file",
+        description: "Failed to download file. Please try again.",
         variant: "destructive",
       });
     }
@@ -766,7 +771,7 @@ export default function AboutPage() {
         {/* File Content Modal */}
         {selectedFile && (
           <Dialog open={true} onOpenChange={() => setSelectedFile(null)}>
-            <DialogContent className="max-w-4xl">
+            <DialogContent className="max-w-full sm:max-w-4xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle className="flex items-center space-x-2">
                   {getFileIcon(selectedFile.type)}
@@ -795,7 +800,7 @@ export default function AboutPage() {
                         alt={selectedFile.name}
                         width={600}
                         height={400}
-                        className="max-w-full h-auto rounded-lg"
+                        className="w-full h-auto max-w-full rounded-lg"
                       />
                     </div>
                   )
@@ -825,8 +830,8 @@ export default function AboutPage() {
                   )
                 )}
               </div>
-              <DialogFooter className="flex justify-between">
-                <div className="flex items-center space-x-4 text-sm text-gray-400">
+              <DialogFooter className="flex flex-col sm:flex-row justify-between gap-4">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-4 text-sm text-gray-400">
                   <span>Size: {formatFileSize(selectedFile.size)}</span>
                   <span>Uploaded: {new Date(selectedFile.dateUploaded).toLocaleDateString()}</span>
                 </div>
