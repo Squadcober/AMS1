@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useMediaQuery } from "react-responsive"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
@@ -42,6 +43,8 @@ interface FinancialRecord {
 
 export default function FinancesPage() {
   const today = new Date().toISOString().split('T')[0];
+
+  const isMobile = useMediaQuery({ maxWidth: 768 })
 
   const { user } = useAuth()
   const { toast } = useToast()
@@ -479,7 +482,7 @@ export default function FinancesPage() {
                     <DialogTrigger asChild>
                       <Button variant="outline">Add Transaction</Button>
                     </DialogTrigger>
-                    <DialogContent className="max-h-[90vh] overflow-y-auto">
+                    <DialogContent className={`${isMobile ? 'max-h-[70vh]' : 'max-h-[90vh]'} overflow-y-auto`}>
                       <DialogHeader>
                         <DialogTitle>Add New Transaction</DialogTitle>
                       </DialogHeader>
