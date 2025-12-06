@@ -627,24 +627,27 @@ export default function AboutPage() {
             <div>
               <h2 className="text-2xl font-bold mb-4">Team Logo</h2>
               <div className="relative">
+                {/* fixed square box that won't shrink and won't overflow neighbours */}
                 <div
-                  className={`w-24 h-24 sm:w-32 sm:h-32 border-2 border-dashed border-gray-600 flex items-center justify-center bg-black overflow-hidden
-                    ${isEditing ? 'cursor-pointer' : ''}`}
+                  className={`relative w-24 h-24 sm:w-32 sm:h-32 flex-shrink-0 border-2 border-dashed border-gray-600 bg-black overflow-hidden ${isEditing ? 'cursor-pointer' : ''}`}
                   onClick={isEditing ? () => fileInputRef.current?.click() : undefined}
                 >
                   {formData.logo ? (
                     <>
-                      <Image
-                        src={formData.logo || "/placeholder.svg"}
-                        alt="Team Logo"
-                        fill
-                        className="object-cover"
-                      />
+                      {/* nested relative wrapper - Image with fill will fit this inner area */}
+                      <div className="relative w-full h-full">
+                        <Image
+                          src={formData.logo || "/placeholder.svg"}
+                          alt="Team Logo"
+                          fill
+                          className="object-contain object-center"
+                        />
+                      </div>
                       {isEditing && (
                         <Button
                           variant="destructive"
                           size="icon"
-                          className="absolute -top-2 -right-2 h-6 w-6 rounded-full"
+                          className="absolute top-1 right-1 z-20 h-6 w-6 rounded-full"
                           onClick={(e) => {
                             e.stopPropagation();
                             handleFormChange(prev => ({
@@ -658,9 +661,9 @@ export default function AboutPage() {
                       )}
                     </>
                   ) : (
-                    <span className="text-xs sm:text-sm text-gray-400 text-center px-2">
+                    <div className="flex items-center justify-center w-full h-full text-xs sm:text-sm text-gray-400 px-2">
                       {isEditing ? 'Click to add logo within 2 MB limit' : 'No logo uploaded'}
-                    </span>
+                    </div>
                   )}
                 </div>
                 {isEditing && (
