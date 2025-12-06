@@ -224,61 +224,75 @@ export default function AboutPage() {
     setHasUnsavedChanges(true)
   }
 
-  // Enhanced file upload handler with better file processing
+  // Enhanced file upload handler with better file processing and mobile compatibility
   const handleFileUpload = (collateralIndex: number, files: FileList) => {
     const updatedCollaterals = [...formData.collaterals]
-    const newFiles: CollateralFile[] = Array.from(files).map((file) => ({
-      academyId: user?.academyId || '',
-      id: Math.random().toString(36).substr(2, 9),
-      name: file.name,
-      url: URL.createObjectURL(file),
-      type: file.type,
-      size: file.size,
-      dateUploaded: new Date().toISOString(),
-    }))
-    
-    updatedCollaterals[collateralIndex].files = [...updatedCollaterals[collateralIndex].files, ...newFiles]
-    setFormData(prev => ({
-      ...prev,
-      collaterals: updatedCollaterals
-    }))
-    setHasUnsavedChanges(true)
-    
-    toast({
-      title: "Files Uploaded",
-      description: `${files.length} file(s) uploaded successfully`,
-    });
+    const filesArray = Array.from(files)
+
+    filesArray.forEach((file, index) => {
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        const dataUrl = e.target?.result as string
+        const newFile: CollateralFile = {
+          academyId: user?.academyId || '',
+          id: Math.random().toString(36).substr(2, 9),
+          name: file.name,
+          url: dataUrl,
+          type: file.type,
+          size: file.size,
+          dateUploaded: new Date().toISOString(),
+        }
+
+        updatedCollaterals[collateralIndex].files = [...updatedCollaterals[collateralIndex].files, newFile]
+        setFormData(prev => ({
+          ...prev,
+          collaterals: updatedCollaterals
+        }))
+        setHasUnsavedChanges(true)
+
+        // Show toast only after all files are processed
+        if (index === filesArray.length - 1) {
+          toast({
+            title: "Files Uploaded",
+            description: `${filesArray.length} file(s) uploaded successfully`,
+          });
+        }
+      }
+      reader.readAsDataURL(file)
+    })
   }
 
   // Enhanced file download handler with mobile compatibility
   const handleFileDownload = async (file: CollateralFile) => {
     try {
-      let downloadUrl = file.url;
-
-      // For blob URLs created from file uploads
-      if (file.url.startsWith('blob:')) {
+      // For data URLs (base64 encoded files)
+      if (file.url.startsWith('data:')) {
+        // Convert data URL to blob for better download handling
         const response = await fetch(file.url);
         const blob = await response.blob();
-        downloadUrl = window.URL.createObjectURL(blob);
-      }
+        const downloadUrl = window.URL.createObjectURL(blob);
 
-      // Try modern download API first (works in most browsers)
-      if ('download' in document.createElement('a')) {
-        const a = document.createElement('a');
-        a.href = downloadUrl;
-        a.download = file.name;
-        a.style.display = 'none';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
+        // Try modern download API first (works in most browsers)
+        if ('download' in document.createElement('a')) {
+          const a = document.createElement('a');
+          a.href = downloadUrl;
+          a.download = file.name;
+          a.style.display = 'none';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
 
-        // Clean up blob URL
-        if (downloadUrl !== file.url) {
+          // Clean up blob URL
           window.URL.revokeObjectURL(downloadUrl);
+        } else {
+          // Fallback for mobile browsers and WebViews - open in new tab
+          window.open(downloadUrl, '_blank');
+          // Clean up blob URL after a delay to allow download to start
+          setTimeout(() => window.URL.revokeObjectURL(downloadUrl), 1000);
         }
       } else {
-        // Fallback for mobile browsers and WebViews
-        window.open(downloadUrl, '_blank');
+        // For other URL types (shouldn't happen with current implementation)
+        window.open(file.url, '_blank');
       }
 
       toast({
@@ -776,14 +790,14 @@ export default function AboutPage() {
         {/* File Content Modal */}
         {selectedFile && (
           <Dialog open={true} onOpenChange={() => setSelectedFile(null)}>
-            <DialogContent className="max-w-full sm:max-w-4xl max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle className="flex items-center space-x-2">
+            <DialogContent className="w-[95vw] max-w-4xl h-[90vh] max-h-[90vh] overflow-hidden flex flex-col">
+              <DialogHeader className="flex-shrink-0">
+                <DialogTitle className="flex items-center space-x-2 text-sm sm:text-base">
                   {getFileIcon(selectedFile.type)}
-                  <span>{selectedFile.name}</span>
+                  <span className="truncate">{selectedFile.name}</span>
                 </DialogTitle>
               </DialogHeader>
-              <div className="py-4">
+              <div className="flex-1 overflow-y-auto py-4">
                 {selectedFile.type.startsWith("image/") ? (
                   (selectedFile.size && selectedFile.size > 1024 * 1024) ? (
                     <div className="text-center py-8">
@@ -799,13 +813,14 @@ export default function AboutPage() {
                       </Button>
                     </div>
                   ) : (
-                    <div className="flex justify-center">
+                    <div className="flex justify-center items-center min-h-0">
                       <Image
                         src={selectedFile.url}
                         alt={selectedFile.name}
-                        width={600}
-                        height={400}
-                        className="w-full h-auto max-w-full rounded-lg"
+                        width={800}
+                        height={600}
+                        className="max-w-full max-h-full w-auto h-auto object-contain rounded-lg"
+                        style={{ maxHeight: 'calc(90vh - 200px)' }}
                       />
                     </div>
                   )
@@ -835,7 +850,7 @@ export default function AboutPage() {
                   )
                 )}
               </div>
-              <DialogFooter className="flex flex-col sm:flex-row justify-between gap-4">
+              <DialogFooter className="flex-shrink-0 flex flex-col sm:flex-row justify-between gap-4 border-t pt-4">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-4 text-sm text-gray-400">
                   <span>Size: {formatFileSize(selectedFile.size)}</span>
                   <span>Uploaded: {new Date(selectedFile.dateUploaded).toLocaleDateString()}</span>
