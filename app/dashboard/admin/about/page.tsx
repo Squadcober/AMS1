@@ -451,7 +451,7 @@ export default function AboutPage() {
     return (
       <section className="mb-12">
         <h2 className="text-2xl font-bold mb-6">Social Media Collaterals</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-h-[700px] overflow-y-auto pr-4">
           {formData.collaterals.map((collateral, index) => {
             return (
               <Card key={collateral.name} className="relative overflow-hidden">
@@ -477,17 +477,6 @@ export default function AboutPage() {
                   )}
                 </CardHeader>
                 <CardContent className="relative">
-                  {isEditing && (
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={() => fileInputRefs.current[index]?.click()}
-                      className="absolute top-0 right-1 sm:top-1 sm:right-2 h-4 w-4 sm:h-6 sm:w-6 p-0"
-                      title="Upload files"
-                    >
-                      <Upload className="w-2 h-2 sm:w-0 sm:h-1" />
-                    </Button>
-                  )}
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-gray-400">
@@ -831,7 +820,7 @@ export default function AboutPage() {
                               <div class="text-center py-8">
                                 <div class="w-16 h-16 mx-auto mb-4 text-gray-400">
                                   <svg class="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V5a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
                                   </svg>
                                 </div>
                                 <p class="mb-2 text-lg font-medium">Preview not available</p>
