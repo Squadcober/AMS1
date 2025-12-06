@@ -491,7 +491,8 @@ export default function FinancesPage() {
                         scrollbarWidth: 'thin',
                         scrollbarColor: '#888 #f1f1f1',
                         WebkitOverflowScrolling: 'touch',
-                        maxHeight: isLandscape ? 'calc(85vh - 120px)' : 'calc(90vh - 120px)' // Adjust based on header height
+                        maxHeight: isLandscape ? 'calc(85vh - 120px)' : 'calc(90vh - 120px)', // Adjust based on header height
+                        minHeight: '250px'
                       }}>
                         <div className="grid grid-cols-4 items-center gap-4">
                           <Label htmlFor="description" className="text-right">

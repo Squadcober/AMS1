@@ -455,7 +455,7 @@ export default function AboutPage() {
           {formData.collaterals.map((collateral, index) => {
             return (
               <Card key={collateral.name} className="relative overflow-hidden">
-                <CardHeader>
+                <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle className="flex items-center">
                     <span className="flex items-center space-x-2">
                       {collateral.name === "Images & Graphics" && <FileImage className="w-5 h-5" />}
@@ -463,6 +463,18 @@ export default function AboutPage() {
                       <span>{collateral.name}</span>
                     </span>
                   </CardTitle>
+                  {isEditing && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => fileInputRefs.current[index]?.click()}
+                      className="ml-2"
+                      title="Upload files"
+                    >
+                      <Upload className="w-4 h-4 mr-1" />
+                      Upload
+                    </Button>
+                  )}
                 </CardHeader>
                 <CardContent className="relative">
                   {isEditing && (
