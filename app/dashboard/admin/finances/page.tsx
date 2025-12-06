@@ -483,7 +483,7 @@ export default function FinancesPage() {
                     <DialogTrigger asChild>
                       <Button variant="outline">Add Transaction</Button>
                     </DialogTrigger>
-                    <DialogContent className={`${isMobile ? 'max-h-[50vh]' : 'max-h-[90vh]'} overflow-y-auto`}>
+                    <DialogContent className={`${isMobile ? (isLandscape ? 'max-h-[40vh]' : 'max-h-[60vh]') : 'max-h-[90vh]'} overflow-y-auto`}>
                       <DialogHeader>
                         <DialogTitle>Add New Transaction</DialogTitle>
                       </DialogHeader>
@@ -586,7 +586,7 @@ export default function FinancesPage() {
                         >
                           Cancel
                         </Button>
-                        <Button 
+                        <Button
                           onClick={handleAddTransaction}
                           disabled={isSubmitting || uploadingFile}
                         >
