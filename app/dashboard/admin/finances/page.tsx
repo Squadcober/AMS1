@@ -482,11 +482,12 @@ export default function FinancesPage() {
                     <DialogTrigger asChild>
                       <Button variant="outline">Add Transaction</Button>
                     </DialogTrigger>
-                    <DialogContent className="max-h-[70dvh] overflow-y-auto">
-                      <DialogHeader>
+                    <DialogContent className="max-h-[80dvh] flex flex-col">
+                      <DialogHeader className="flex-shrink-0">
                         <DialogTitle>Add New Transaction</DialogTitle>
                       </DialogHeader>
-                      <div className="grid gap-4 py-4">
+                      <div className="flex-1 overflow-y-auto py-4">
+                        <div className="grid gap-4">
                         <div className="grid grid-cols-4 items-center gap-4">
                           <Label htmlFor="description" className="text-right">
                             Description
@@ -575,6 +576,7 @@ export default function FinancesPage() {
                               </p>
                             )}
                           </div>
+                        </div>
                         </div>
                       </div>
                       <div className="flex justify-end space-x-2">
