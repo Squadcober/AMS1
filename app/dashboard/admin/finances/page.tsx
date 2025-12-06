@@ -45,6 +45,7 @@ export default function FinancesPage() {
   const today = new Date().toISOString().split('T')[0];
 
   const isMobile = useMediaQuery({ maxWidth: 768 })
+  const isLandscape = useMediaQuery({ orientation: 'landscape' })
 
   const { user } = useAuth()
   const { toast } = useToast()
