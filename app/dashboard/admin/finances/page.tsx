@@ -487,7 +487,7 @@ export default function FinancesPage() {
                       <DialogHeader className="flex-shrink-0">
                         <DialogTitle>Add New Transaction</DialogTitle>
                       </DialogHeader>
-                      <div className="grid gap-4 py-4 overflow-y-auto flex-1 pr-2">
+                      <div className="grid gap-4 py-4 overflow-y-scroll flex-1 pr-2">
                         <div className="grid grid-cols-4 items-center gap-4">
                           <Label htmlFor="description" className="text-right">
                             Description
