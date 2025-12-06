@@ -21,9 +21,7 @@ import { Switch } from "@/components/ui/switch"
 import Sidebar from "@/components/Sidebar" // Import the Sidebar component
 import { format } from "date-fns" // Import format from date-fns
 import { Calendar } from "@/components/ui/calendar"
-import { Capacitor } from '@capacitor/core'
-import { Filesystem, Directory, Encoding } from '@capacitor/filesystem'
-import { Share } from '@capacitor/share'
+
 
 import { toast, useToast } from "@/components/ui/use-toast"; // Import useToast hook
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs" // Add this import
@@ -205,22 +203,22 @@ const exportToFile = async (sessions: Session[], academyId: string, batches: Bat
   // Combine header + rows
   const csvContent = [headers.join(","), ...rows].join("\n");
 
-  // Trigger download - handle both web and mobile
+  // Trigger download - web browser and mobile support
   try {
     const dateStr = new Date().toISOString().split("T")[0];
     const fileName = `sessions_export_${academyId}_${dateStr}.csv`;
 
-    if (Capacitor.isNativePlatform()) {
-      // Mobile app - use Capacitor Share API with text
-      await Share.share({
-        title: 'Sessions Export',
-        text: csvContent,
-        dialogTitle: 'Export Sessions CSV',
-      });
+    // Detect mobile devices
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+    if (isMobile) {
+      // For mobile devices, use data URI to open in new tab
+      const dataUri = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvContent);
+      window.open(dataUri);
 
       toast({
         title: "Export Successful",
-        description: "Sessions data shared successfully",
+        description: `CSV opened in new tab. Save the file from your browser.`,
       });
     } else {
       // Web browser - use traditional download
@@ -660,9 +658,10 @@ export default function SessionsPage() {
 function SessionsContent() {
   const { user } = useAuth();  // Keep this at the top
   const { toast } = useToast();
-  
+
   // Move isPolling state declaration to the top with other states
   const [isPolling, setIsPolling] = useState<boolean>(true);
+  const [isClient, setIsClient] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [lastUpdate, setLastUpdate] = useState<number>(Date.now());
