@@ -787,7 +787,7 @@ export default function AboutPage() {
                   <span className="truncate">{selectedFile.name}</span>
                 </DialogTitle>
               </DialogHeader>
-              <div className="flex-1 overflow-y-auto py-4">
+              <div className="flex-1 overflow-y-scroll py-4">
                 {selectedFile.type.startsWith("image/") ? (
                   (selectedFile.size && selectedFile.size > 2 * 1024 * 1024) ? (
                     <div className="text-center py-8">
@@ -803,7 +803,7 @@ export default function AboutPage() {
                       </Button>
                     </div>
                   ) : (
-                    <div className="flex justify-center items-center min-h-0">
+                    <div className="flex justify-center items-center min-h-0 overflow-y-scroll">
                       <Image
                         src={selectedFile.url}
                         alt={selectedFile.name}
