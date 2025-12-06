@@ -224,88 +224,183 @@ export default function AboutPage() {
     setHasUnsavedChanges(true)
   }
 
-  // Enhanced file upload handler with better file processing and mobile compatibility
-  const handleFileUpload = (collateralIndex: number, files: FileList) => {
-    const updatedCollaterals = [...formData.collaterals]
+  // Add upload helper (similar to finances page)
+  const uploadFile = async (file: File) => {
+    try {
+      if (!user?.academyId) {
+        toast({
+          title: "Error",
+          description: "Academy ID not found. Please try again.",
+          variant: "destructive",
+        })
+        return null
+      }
+
+      const fd = new FormData()
+      fd.append('file', file)
+      fd.append('academyId', String(user.academyId).trim())
+
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        body: fd,
+      })
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || 'Failed to upload file')
+      }
+
+      const data = await res.json()
+      if (!data.docId) throw new Error('No document ID received from server')
+      return `/api/docs/${data.docId}`
+    } catch (error) {
+      console.error('Upload error:', error)
+      toast({
+        title: "Upload Failed",
+        description: error instanceof Error ? error.message : "Failed to upload file",
+        variant: "destructive",
+      })
+      return null
+    }
+  }
+
+  // Replace handleFileUpload: preview immediately, upload in background, replace preview URL with server URL when done
+  const handleFileUpload = async (collateralIndex: number, files: FileList) => {
     const filesArray = Array.from(files)
 
-    filesArray.forEach((file, index) => {
-      const reader = new FileReader()
-      reader.onload = (e) => {
-        const dataUrl = e.target?.result as string
-        const newFile: CollateralFile = {
-          academyId: user?.academyId || '',
-          id: Math.random().toString(36).substr(2, 9),
-          name: file.name,
-          url: dataUrl,
-          type: file.type,
-          size: file.size,
-          dateUploaded: new Date().toISOString(),
-        }
+    // helper to read file as data URL for immediate preview
+    const readFile = (file: File) =>
+      new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = (e) => resolve(e.target?.result as string)
+        reader.onerror = (e) => reject(e)
+        reader.readAsDataURL(file)
+      })
 
-        updatedCollaterals[collateralIndex].files = [...updatedCollaterals[collateralIndex].files, newFile]
-        setFormData(prev => ({
-          ...prev,
-          collaterals: updatedCollaterals
-        }))
-        setHasUnsavedChanges(true)
-
-        // Show toast only after all files are processed
-        if (index === filesArray.length - 1) {
-          toast({
-            title: "Files Uploaded",
-            description: `${filesArray.length} file(s) uploaded successfully`,
-          });
-        }
+    // process files sequentially but allow parallel uploads via Promise.all
+    const uploadPromises = filesArray.map(async (file) => {
+      const dataUrl = await readFile(file).catch(() => '')
+      const id = Math.random().toString(36).substr(2, 9)
+      const newFile: CollateralFile = {
+        academyId: user?.academyId || '',
+        id,
+        name: file.name,
+        url: dataUrl || '', // preview url
+        type: file.type || 'application/octet-stream',
+        size: file.size,
+        dateUploaded: new Date().toISOString(),
       }
-      reader.readAsDataURL(file)
+
+      // append preview to state (functional update to avoid stale state)
+      setFormData(prev => {
+        const updated = [...prev.collaterals]
+        // ensure collateral exists
+        if (!updated[collateralIndex]) updated[collateralIndex] = { name: "Unknown", files: [], acceptedTypes: "" }
+        updated[collateralIndex] = {
+          ...updated[collateralIndex],
+          files: [...updated[collateralIndex].files, newFile]
+        }
+        return { ...prev, collaterals: updated }
+      })
+      setHasUnsavedChanges(true)
+
+      // upload in background and replace preview URL with server URL when done
+      const uploadedUrl = await uploadFile(file)
+      if (uploadedUrl) {
+        setFormData(prev => {
+          const updated = [...prev.collaterals]
+          const filesList = updated[collateralIndex]?.files?.map(f => f.id === id ? { ...f, url: uploadedUrl } : f) || []
+          updated[collateralIndex] = { ...updated[collateralIndex], files: filesList }
+          return { ...prev, collaterals: updated }
+        })
+      }
+      return true
+    })
+
+    // wait for all uploads to at least attempt (they may have failed individually)
+    await Promise.all(uploadPromises)
+
+    toast({
+      title: "Files Processed",
+      description: `${filesArray.length} file(s) processed. Uploaded files are available for download.`,
     })
   }
 
-  // Enhanced file download handler with mobile compatibility
+  // Enhanced file download handler with support for server-hosted docs (/api/docs/...)
   const handleFileDownload = async (file: CollateralFile) => {
     try {
-      // For data URLs (base64 encoded files)
-      if (file.url.startsWith('data:')) {
-        // Convert data URL to blob for better download handling
-        const response = await fetch(file.url);
-        const blob = await response.blob();
-        const downloadUrl = window.URL.createObjectURL(blob);
+      // server-hosted files (use fetch + blob -> force download like finances)
+      if (file.url && file.url.includes('/api/docs/')) {
+        const response = await fetch(file.url)
+        if (!response.ok) throw new Error('Failed to fetch document from server')
+        const blob = await response.blob()
+        const downloadUrl = window.URL.createObjectURL(blob)
 
-        // Try modern download API first (works in most browsers)
-        if ('download' in document.createElement('a')) {
-          const a = document.createElement('a');
-          a.href = downloadUrl;
-          a.download = file.name;
-          a.style.display = 'none';
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
+        // create anchor and click to download
+        const a = document.createElement('a')
+        a.href = downloadUrl
+        a.download = file.name || 'download'
+        a.style.display = 'none'
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
 
-          // Clean up blob URL
-          window.URL.revokeObjectURL(downloadUrl);
-        } else {
-          // Fallback for mobile browsers and WebViews - open in new tab
-          window.open(downloadUrl, '_blank');
-          // Clean up blob URL after a delay to allow download to start
-          setTimeout(() => window.URL.revokeObjectURL(downloadUrl), 1000);
-        }
-      } else {
-        // For other URL types (shouldn't happen with current implementation)
-        window.open(file.url, '_blank');
+        // cleanup
+        window.URL.revokeObjectURL(downloadUrl)
+
+        toast({
+          title: "Download Started",
+          description: `Downloading ${file.name}`,
+        })
+        return
       }
 
-      toast({
-        title: "Download Started",
-        description: `Downloading ${file.name}`,
-      });
+      // For data URLs (base64 encoded files) - convert to blob then download
+      if (file.url && file.url.startsWith('data:')) {
+        const response = await fetch(file.url)
+        const blob = await response.blob()
+        const downloadUrl = window.URL.createObjectURL(blob)
+
+        if ('download' in document.createElement('a')) {
+          const a = document.createElement('a')
+          a.href = downloadUrl
+          a.download = file.name || 'download'
+          a.style.display = 'none'
+          document.body.appendChild(a)
+          a.click()
+          document.body.removeChild(a)
+          window.URL.revokeObjectURL(downloadUrl)
+        } else {
+          // fallback open in new tab
+          window.open(downloadUrl, '_blank')
+          setTimeout(() => window.URL.revokeObjectURL(downloadUrl), 1000)
+        }
+
+        toast({
+          title: "Download Started",
+          description: `Downloading ${file.name}`,
+        })
+        return
+      }
+
+      // For absolute urls or other types - open in new tab
+      if (file.url) {
+        window.open(file.url, '_blank')
+        toast({
+          title: "Opening",
+          description: `Opening ${file.name}`,
+        })
+        return
+      }
+
+      throw new Error('No file URL available')
     } catch (error) {
-      console.error('Download error:', error);
+      console.error('Download error:', error)
       toast({
         title: "Download Failed",
-        description: "Failed to download file. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to download file. Please try again.",
         variant: "destructive",
-      });
+      })
     }
   }
 
