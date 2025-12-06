@@ -615,7 +615,7 @@ export default function AboutPage() {
                 >
                   {formData.logo ? (
                     <>
-                      <Image src={formData.logo || "/placeholder.svg"} alt="Team Logo" width={128} height={128} />
+                      <Image src={formData.logo || "/placeholder.svg"} alt="Team Logo" width={128} height={128} objectFit="cover" />
                       {isEditing && (
                         <Button
                           variant="destructive"
