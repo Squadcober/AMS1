@@ -23,6 +23,7 @@ import { format } from "date-fns" // Import format from date-fns
 import { Calendar } from "@/components/ui/calendar"
 import { Capacitor } from '@capacitor/core'
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem'
+import { Share } from '@capacitor/share'
 
 import { toast, useToast } from "@/components/ui/use-toast"; // Import useToast hook
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs" // Add this import
@@ -223,6 +224,26 @@ const exportToFile = async (sessions: Session[], academyId: string, batches: Bat
         title: "Export Successful",
         description: `File saved to Documents folder as ${fileName}`,
       });
+
+      // Share the exported file
+      try {
+        const uriResult = await Filesystem.getUri({
+          path: fileName,
+          directory: Directory.Documents,
+        });
+        await Share.share({
+          title: 'Sessions Export',
+          text: 'Here is the exported sessions data',
+          files: [uriResult.uri],
+        });
+      } catch (shareError) {
+        console.error('Failed to share file:', shareError);
+        toast({
+          title: "Share Failed",
+          description: "File saved but could not be shared",
+          variant: "destructive",
+        });
+      }
     } else {
       // Web browser - use traditional download
       const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
@@ -837,7 +858,7 @@ function SessionsContent() {
   const [searchTerm, setSearchTerm] = useState<string>("")
   const [viewDetailsSessionId, setViewDetailsSessionId] = useState<number | null>(null)
   const [visibleSessionsCount, setVisibleSessionsCount] = useState(10)
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date()) // State for selected date
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined) // State for selected date
   const [showDeleteAlert, setShowDeleteAlert] = useState(false)
   const [trimDates, setTrimDates] = useState(false);
   const router = useRouter();
@@ -865,6 +886,7 @@ function SessionsContent() {
   const [dateLimits] = useState(getDateLimits());
   const [detailsPlayerSearchQuery, setDetailsPlayerSearchQuery] = useState("");
   const [timeValidationError, setTimeValidationError] = useState("");
+  const [currentDateString, setCurrentDateString] = useState("");
   const DAYS_OF_WEEK = [
     { label: "Sun", value: "sunday" },
     { label: "Mon", value: "monday" },
@@ -2473,13 +2495,55 @@ const handleConfirmExport = async () => {
   }
 };
 
+const handleExportOnly = async () => {
+  if (!user?.academyId) {
+    toast({
+      title: "Error",
+      description: "No academy ID found",
+      variant: "destructive",
+    });
+    return;
+  }
 
+  try {
+    // fetch sessions
+    const resp = await fetch(`/api/db/ams-sessions?academyId=${encodeURIComponent(user.academyId)}`, {
+      cache: "no-store",
+    });
+    if (!resp.ok) throw new Error("Failed to fetch sessions");
 
+    const result = await resp.json();
+    const sessions = Array.isArray(result.data) ? result.data : [];
 
-  // Reset visible count when changing tabs or search
-  useEffect(() => {
-    setVisibleSessionsCount(10)
-  }, [activeLog, searchTerm])
+    if (sessions.length === 0) {
+      toast({
+        title: "No sessions",
+        description: "No sessions found to export",
+      });
+      return;
+    }
+
+    // Generate CSV and trigger download
+    const exportedCount = await exportToFile(sessions, user.academyId, batches);
+
+    toast({
+      title: "Success",
+      description: `${exportedCount} sessions exported successfully`,
+    });
+  } catch (err) {
+    console.error("Error during export:", err);
+    toast({
+      title: "Error",
+      description: err instanceof Error ? err.message : "Failed to export sessions",
+      variant: "destructive",
+    });
+  }
+};
+
+// Reset visible count when changing tabs or search
+useEffect(() => {
+  setVisibleSessionsCount(10)
+}, [activeLog, searchTerm])
 
   const getPlayerCurrentMetrics = async (playerId: string, sessionId: number, sessions: Session[]) => {
   const cacheKey = `${playerId}-${sessionId}`;
