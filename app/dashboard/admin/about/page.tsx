@@ -521,39 +521,39 @@ export default function AboutPage() {
                               </div>
                             </div>
                             
-                            <div className="flex items-center space-x-1">
+                            <div className="flex flex-col space-y-1 sm:flex-row sm:space-y-0 sm:space-x-1">
                               {/* Preview button */}
                               <Button
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => handleFileClick(file)}
-                                className="h-8 w-8 p-0"
+                                className="h-6 w-6 p-0 sm:h-8 sm:w-8"
                                 title="Preview file"
                               >
-                                <Eye className="w-4 h-4" />
+                                <Eye className="w-3 h-3 sm:w-4 sm:h-4" />
                               </Button>
-                              
+
                               {/* Download button */}
                               <Button
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => handleFileDownload(file)}
-                                className="h-8 w-8 p-0"
+                                className="h-6 w-6 p-0 sm:h-8 sm:w-8"
                                 title="Download file"
                               >
-                                <Download className="w-4 h-4" />
+                                <Download className="w-3 h-3 sm:w-4 sm:h-4" />
                               </Button>
-                              
+
                               {/* Delete button (only in edit mode) */}
                               {isEditing && (
                                 <Button
                                   variant="ghost"
                                   size="sm"
                                   onClick={() => handleFileDelete(index, file.id)}
-                                  className="h-8 w-8 p-0 text-red-400 hover:text-red-300"
+                                  className="h-6 w-6 p-0 sm:h-8 sm:w-8 text-red-400 hover:text-red-300"
                                   title="Delete file"
                                 >
-                                  <X className="w-4 h-4" />
+                                  <X className="w-3 h-3 sm:w-4 sm:h-4" />
                                 </Button>
                               )}
                             </div>
