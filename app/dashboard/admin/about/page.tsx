@@ -453,28 +453,28 @@ export default function AboutPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {formData.collaterals.map((collateral, index) => {
             return (
-              <Card key={collateral.name} className="relative">
+              <Card key={collateral.name} className="relative overflow-hidden">
                 <CardHeader>
-                  <CardTitle className="flex items-center justify-between">
+                  <CardTitle className="flex items-center">
                     <span className="flex items-center space-x-2">
                       {collateral.name === "Images & Graphics" && <FileImage className="w-5 h-5" />}
                       {collateral.name === "Documents" && <FileText className="w-5 h-5" />}
                       <span>{collateral.name}</span>
                     </span>
-                    {isEditing && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => fileInputRefs.current[index]?.click()}
-                        className="ml-2"
-                      >
-                        <Upload className="w-4 h-4 mr-1" />
-                        Upload
-                      </Button>
-                    )}
                   </CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="relative">
+                  {isEditing && (
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => fileInputRefs.current[index]?.click()}
+                      className="absolute top-1 right-1 sm:top-2 sm:right-2 h-4 w-4 sm:h-6 sm:w-6 p-0"
+                      title="Upload files"
+                    >
+                      <Upload className="w-2 h-2 sm:w-3 sm:h-3" />
+                    </Button>
+                  )}
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-gray-400">
@@ -614,13 +614,18 @@ export default function AboutPage() {
               <h2 className="text-2xl font-bold mb-4">Team Logo</h2>
               <div className="relative">
                 <div
-                  className={`w-32 h-32 border-2 border-dashed border-gray-600 flex items-center justify-center bg-black 
+                  className={`w-24 h-24 sm:w-32 sm:h-32 border-2 border-dashed border-gray-600 flex items-center justify-center bg-black overflow-hidden
                     ${isEditing ? 'cursor-pointer' : ''}`}
                   onClick={isEditing ? () => fileInputRef.current?.click() : undefined}
                 >
                   {formData.logo ? (
                     <>
-                      <Image src={formData.logo || "/placeholder.svg"} alt="Team Logo" width={128} height={128} objectFit="cover" />
+                      <Image
+                        src={formData.logo || "/placeholder.svg"}
+                        alt="Team Logo"
+                        fill
+                        className="object-cover"
+                      />
                       {isEditing && (
                         <Button
                           variant="destructive"
@@ -639,18 +644,18 @@ export default function AboutPage() {
                       )}
                     </>
                   ) : (
-                    <span className="text-sm text-gray-400">
-                      {isEditing ? '  Click to add logo   within 2 MB limit' : 'No logo uploaded'}
+                    <span className="text-xs sm:text-sm text-gray-400 text-center px-2">
+                      {isEditing ? 'Click to add logo within 2 MB limit' : 'No logo uploaded'}
                     </span>
                   )}
                 </div>
                 {isEditing && (
-                  <input 
-                    type="file" 
-                    ref={fileInputRef} 
-                    className="hidden" 
-                    onChange={handleLogoUpload} 
-                    accept="image/*" 
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    className="hidden"
+                    onChange={handleLogoUpload}
+                    accept="image/*"
                   />
                 )}
               </div>
