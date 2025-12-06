@@ -809,7 +809,7 @@ export default function AboutPage() {
                         alt={selectedFile.name}
                         width={800}
                         height={600}
-                        className="w-auto h-auto object-contain rounded-lg"
+                        className="max-w-full max-h-[70vh] w-auto h-auto object-contain rounded-lg"
                         onError={(e) => {
                           // If image fails to load, show download option
                           e.currentTarget.style.display = 'none';
