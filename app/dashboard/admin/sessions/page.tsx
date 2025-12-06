@@ -211,39 +211,17 @@ const exportToFile = async (sessions: Session[], academyId: string, batches: Bat
     const fileName = `sessions_export_${academyId}_${dateStr}.csv`;
 
     if (Capacitor.isNativePlatform()) {
-      // Mobile app - use Capacitor Filesystem API
-      await Filesystem.writeFile({
-        path: fileName,
-        data: csvContent,
-        directory: Directory.Documents,
-        encoding: Encoding.UTF8,
+      // Mobile app - use Capacitor Share API with text
+      await Share.share({
+        title: 'Sessions Export',
+        text: csvContent,
+        dialogTitle: 'Export Sessions CSV',
       });
 
-      // Show success message for mobile
       toast({
         title: "Export Successful",
-        description: `File saved to Documents folder as ${fileName}`,
+        description: "Sessions data shared successfully",
       });
-
-      // Share the exported file
-      try {
-        const uriResult = await Filesystem.getUri({
-          path: fileName,
-          directory: Directory.Documents,
-        });
-        await Share.share({
-          title: 'Sessions Export',
-          text: 'Here is the exported sessions data',
-          files: [uriResult.uri],
-        });
-      } catch (shareError) {
-        console.error('Failed to share file:', shareError);
-        toast({
-          title: "Share Failed",
-          description: "File saved but could not be shared",
-          variant: "destructive",
-        });
-      }
     } else {
       // Web browser - use traditional download
       const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
@@ -255,6 +233,11 @@ const exportToFile = async (sessions: Session[], academyId: string, batches: Bat
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
+
+      toast({
+        title: "Export Successful",
+        description: `File downloaded as ${fileName}`,
+      });
     }
   } catch (e) {
     console.error("CSV export failed", e);
