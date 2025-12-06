@@ -483,8 +483,8 @@ export default function FinancesPage() {
                     <DialogTrigger asChild>
                       <Button variant="outline">Add Transaction</Button>
                     </DialogTrigger>
-                     <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col overflo-y-scroll">
-                      <DialogHeader className="flex-shrink-0">
+                     <DialogContent className="max-w-4xl max-h-[100vh] overflow-y-auto">
+                      <DialogHeader >
                         <DialogTitle>Add New Transaction</DialogTitle>
                       </DialogHeader>
                       <div className="grid gap-4 py-4 overflow-y-scroll flex-1 pr-2">
