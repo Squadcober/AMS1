@@ -5,13 +5,10 @@ import { ObjectId, Filter, Document, UpdateFilter } from 'mongodb';
 interface Rating {
   playerId: string;
   playerInfo: {
-    id: string;
-    name: string;
-    photoUrl: string;
+    rating: number;
+    date: string;
+    academyId: string;
   };
-  rating: number;
-  date: string;
-  academyId: string;
 }
 
 interface CoachDocument extends Document {
@@ -118,24 +115,11 @@ export async function POST(request: NextRequest) {
 
     const db = await getDatabase();
 
-    // Get player info first
-    const queryConditions: Filter<Document>[] = [
-      { id: playerId },
-      { userId: playerId }
-    ];
-    
-    if (ObjectId.isValid(playerId)) {
-      queryConditions.push({ _id: new ObjectId(playerId) });
-    }
-
-    const player = await db.collection('ams-player-data').findOne({
-      $or: queryConditions
-    });
-
+    // Create playerInfo with rating data as per task requirements
     const playerInfo = {
-      id: player?._id.toString() || playerId,
-      name: player?.name || player?.username || 'Unknown player',
-      photoUrl: player?.photoUrl || '/placeholder.svg'
+      rating,
+      date,
+      academyId
     };
 
     // Build query conditions
@@ -165,10 +149,7 @@ export async function POST(request: NextRequest) {
           $push: {
             ratings: {
               playerId,
-              playerInfo,
-              rating,
-              date,
-              academyId
+              playerInfo
             }
           },
           $inc: {
@@ -189,10 +170,7 @@ export async function POST(request: NextRequest) {
         id: coachId,
         ratings: [{
           playerId,
-          playerInfo,
-          rating,
-          date,
-          academyId
+          playerInfo
         }],
         totalRatings: 1,
         ratingSum: rating

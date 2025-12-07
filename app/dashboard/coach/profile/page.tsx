@@ -49,22 +49,22 @@ export default function CoachProfilePage() {
 
   const processRatings = (ratings: any[]) => {
     return ratings.map(rating => {
-      const playerName = rating.playerInfo?.name || 
-                         rating.playerName || 
+      const playerName = rating.playerInfo?.name ||
+                         rating.playerName ||
                          'Anonymous player'
 
-      const playerPhoto = rating.playerInfo?.photoUrl || 
-                         rating.playerPhoto || 
+      const playerPhoto = rating.playerInfo?.photoUrl ||
+                         rating.playerPhoto ||
                          undefined
 
       return {
         ...rating,
         playerName,
         playerPhoto,
-        rating: rating.rating || 0,
-        date: rating.date || new Date().toISOString(),
+        rating: rating.playerInfo?.rating || rating.rating || 0,
+        date: rating.playerInfo?.date || rating.date || new Date().toISOString(),
         playerId: rating.playerId,
-        academyId: rating.academyId || user?.academyId,
+        academyId: rating.playerInfo?.academyId || rating.academyId || user?.academyId,
         comment: rating.comment
       }
     })

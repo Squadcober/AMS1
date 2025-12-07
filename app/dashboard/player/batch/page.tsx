@@ -482,7 +482,7 @@ export default function playerBatches() {
         academyId: user.academyId
       });
 
-      const response = await fetch('/api/db/ams-coaches/rating', {
+      const response = await fetch('/api/db/ams-coaches/ratings', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -905,7 +905,7 @@ export default function playerBatches() {
                                     <p className="font-medium text-sm">{playerInfo.name}</p>
                                     <div className="flex items-center">
                                       <Star className="h-4 w-4 fill-yellow-400 text-yellow-400 mr-1" />
-                                      <span className="text-sm font-medium">{rating.rating}/5</span>
+                                      <span className="text-sm font-medium">{rating.playerInfo?.rating || rating.rating || 0}/5</span>
                                     </div>
                                   </div>
                                   <p className="text-xs text-muted-foreground mt-1">
