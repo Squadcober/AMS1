@@ -483,7 +483,7 @@ export default function FinancesPage() {
                     <DialogTrigger asChild>
                       <Button variant="outline">Add Transaction</Button>
                     </DialogTrigger>
-                     <DialogContent className={`max-w-[95vw] w-full overflow-hidden flex flex-col ${isLandscape ? 'max-h-[85vh]' : 'max-h-[90vh]'}`}>
+                     <DialogContent className={`max-w-[95vw] w-full overflow-hidden flex flex-col ${isLandscape ? 'max-h-[400px]' : 'max-h-[500px]'}`}>
                       <DialogHeader className="flex-shrink-0 pb-3">
                         <DialogTitle>Add New Transaction</DialogTitle>
                       </DialogHeader>
@@ -491,7 +491,7 @@ export default function FinancesPage() {
                         scrollbarWidth: 'thin',
                         scrollbarColor: '#888 #f1f1f1',
                         WebkitOverflowScrolling: 'touch',
-                        maxHeight: isLandscape ? 'calc(85vh - 120px)' : 'calc(90vh - 120px)', // Adjust based on header height
+                        maxHeight: isLandscape ? 'calc(400px - 120px)' : 'calc(500px - 120px)', // Adjust based on header height
                         minHeight: '250px'
                       }}>
                         <div className="grid grid-cols-4 items-center gap-4">
