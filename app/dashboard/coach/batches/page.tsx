@@ -652,16 +652,17 @@ export default function BatchesPage() {
                 <CardTitle>Your Assigned Batches</CardTitle>
               </CardHeader>
               <CardContent>
-                <ScrollArea className="h-[600px] pr-4">
-                  <div className="space-y-4">
+                <ScrollArea className="w-full">
+                  <div className="flex gap-4 pb-4" style={{ overflowX: 'auto' }}>
                     {localBatches.map(batch => (
                       <div
                         key={batch._id}
                         onClick={() => setSelectedBatch(batch)}
                         className={cn(
-                          "p-4 border rounded-lg hover:bg-accent cursor-pointer",
+                          "p-4 border rounded-lg hover:bg-accent cursor-pointer flex-shrink-0",
                           selectedBatch?._id === batch._id ? "bg-accent" : ""
                         )}
+                        style={{ minWidth: '300px', maxWidth: '350px' }}
                       >
                         <div className="flex justify-between items-center">
                           <h3 className="text-lg font-semibold">{batch.name}</h3>
@@ -789,61 +790,63 @@ export default function BatchesPage() {
 
         <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
           <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Create New Batch</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div>
-                <Label>Batch Name</Label>
-                <Input
-                  value={newBatchName}
-                  onChange={(e) => {
-                    setNewBatchName(e.target.value);
-                    setBatchNameError("");
-                  }}
-                  placeholder="Enter batch name"
-                />
-                {batchNameError && (
-                  <p className="text-red-500 text-sm mt-1">{batchNameError}</p>
-                )}
-              </div>
+            <ScrollArea className="max-h-[80vh]">
+              <DialogHeader>
+                <DialogTitle>Create New Batch</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div>
+                  <Label>Batch Name</Label>
+                  <Input
+                    value={newBatchName}
+                    onChange={(e) => {
+                      setNewBatchName(e.target.value);
+                      setBatchNameError("");
+                    }}
+                    placeholder="Enter batch name"
+                  />
+                  {batchNameError && (
+                    <p className="text-red-500 text-sm mt-1">{batchNameError}</p>
+                  )}
+                </div>
 
-              <div>
-                <Label>Players</Label>
-                <div className="border rounded-md p-4">
-                  <div className="mb-2 pb-2 border-b">
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        checked={allPlayersSelected}
-                        onCheckedChange={handleSelectAllPlayers}
-                      />
-                      <Label>Select All Players</Label>
-                    </div>
-                  </div>
-                  <ScrollArea className="h-[200px]">
-                    {players.map((player) => (
-                      <div key={player.id} className="flex items-center space-x-2 py-2">
+                <div>
+                  <Label>Players</Label>
+                  <div className="border rounded-md p-4">
+                    <div className="mb-2 pb-2 border-b">
+                      <div className="flex items-center space-x-2">
                         <Checkbox
-                          checked={selectedPlayers.includes(player.id)}
-                          onCheckedChange={(checked) => {
-                            if (checked) {
-                              setSelectedPlayers(prev => [...prev, player.id]);
-                            } else {
-                              setSelectedPlayers(prev => prev.filter(id => id !== player.id));
-                              setAllPlayersSelected(false);
-                            }
-                          }}
+                          checked={allPlayersSelected}
+                          onCheckedChange={handleSelectAllPlayers}
                         />
-                        <span>{player.name}</span>
+                        <Label>Select All Players</Label>
                       </div>
-                    ))}
-                  </ScrollArea>
+                    </div>
+                    <ScrollArea className="h-[200px]">
+                      {players.map((player) => (
+                        <div key={player.id} className="flex items-center space-x-2 py-2">
+                          <Checkbox
+                            checked={selectedPlayers.includes(player.id)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setSelectedPlayers(prev => [...prev, player.id]);
+                              } else {
+                                setSelectedPlayers(prev => prev.filter(id => id !== player.id));
+                                setAllPlayersSelected(false);
+                              }
+                            }}
+                          />
+                          <span>{player.name}</span>
+                        </div>
+                      ))}
+                    </ScrollArea>
+                  </div>
                 </div>
               </div>
-            </div>
-            <DialogFooter>
-              <Button onClick={handleCreateBatch}>Create Batch</Button>
-            </DialogFooter>
+              <DialogFooter>
+                <Button onClick={handleCreateBatch}>Create Batch</Button>
+              </DialogFooter>
+            </ScrollArea>
           </DialogContent>
         </Dialog>
 
