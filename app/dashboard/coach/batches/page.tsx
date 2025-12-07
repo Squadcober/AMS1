@@ -652,22 +652,22 @@ export default function BatchesPage() {
                 <CardTitle>Your Assigned Batches</CardTitle>
               </CardHeader>
               <CardContent>
-                <ScrollArea className="w-full">
-                  <div className="flex gap-4 pb-4" style={{ overflowX: 'auto' }}>
+                <ScrollArea className="w-full rounded-md border">
+                  <div className="flex gap-4 p-4" style={{ overflowX: 'auto' }}>
                     {localBatches.map(batch => (
                       <div
                         key={batch._id}
                         onClick={() => setSelectedBatch(batch)}
                         className={cn(
-                          "p-4 border rounded-lg hover:bg-accent cursor-pointer flex-shrink-0",
-                          selectedBatch?._id === batch._id ? "bg-accent" : ""
+                          "p-4 border rounded-lg hover:bg-accent cursor-pointer flex-shrink-0 transition-colors",
+                          selectedBatch?._id === batch._id ? "bg-accent border-primary" : ""
                         )}
                         style={{ minWidth: '300px', maxWidth: '350px' }}
                       >
-                        <div className="flex justify-between items-center">
-                          <h3 className="text-lg font-semibold">{batch.name}</h3>
+                        <div className="flex justify-between items-start gap-2">
+                          <h3 className="text-lg font-semibold flex-1">{batch.name}</h3>
                           {isCoachOwner(batch) && (
-                            <div className="flex gap-2">
+                            <div className="flex gap-1 flex-shrink-0">
                               <Button
                                 variant="outline"
                                 size="sm"
