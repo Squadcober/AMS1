@@ -103,8 +103,14 @@ export default function MyBatch() {
   }
 
   const handlePreview = (documentData: string) => {
-    const type = documentData.split(";")[0].split(":")[1]
-    setPreviewDoc({ url: documentData, type })
+    // For mobile compatibility, open documents in a new tab instead of modal
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+    if (isMobile) {
+      window.open(documentData, '_blank')
+    } else {
+      const type = documentData.split(";")[0].split(":")[1]
+      setPreviewDoc({ url: documentData, type })
+    }
   }
 
   if (!batchData) {
