@@ -6,7 +6,20 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Button } from "@/components/ui/button"
 import { Sidebar } from "@/components/Sidebar"
+import { Eye } from "lucide-react"
+
+interface Credential {
+  _id: string
+  title: string
+  issuer: string
+  date: string
+  document?: string
+  userId: string
+  academyId: string
+  createdAt: string
+}
 
 interface Coach {
   id: string
@@ -16,11 +29,7 @@ interface Coach {
   specialization?: string
   experience?: string
   achievements?: string[]
-  credentials?: {
-    certification: string
-    issuedBy: string
-    year: string
-  }[]
+  credentials?: Credential[]
 }
 
 interface BatchData {
@@ -35,6 +44,7 @@ export default function MyBatch() {
   const [coachData, setCoachData] = useState<Coach | null>(null)
   const [showCoachProfile, setShowCoachProfile] = useState(false)
   const [selectedCoach, setSelectedCoach] = useState<Coach | null>(null)
+  const [previewDoc, setPreviewDoc] = useState<{ url: string; type: string } | null>(null)
 
   useEffect(() => {
     // Load user's batch data
@@ -55,19 +65,29 @@ export default function MyBatch() {
     loadBatchData()
   }, [])
 
-  const loadCoachData = (coachId: string) => {
+  const loadCoachData = async (coachId: string) => {
     try {
       const users = JSON.parse(localStorage.getItem('users') || '[]')
       const coaches = JSON.parse(localStorage.getItem('ams-coaches') || '[]')
-      
+
       const userData = users.find((u: any) => u.id === coachId)
       const coachData = coaches.find((c: any) => c.id === coachId)
-      
+
       if (userData) {
+        // Fetch credentials from database
+        const credentialsResponse = await fetch(`/api/db/ams-credentials?userId=${coachId}&academyId=${userData.academyId}`)
+        let credentials = []
+        if (credentialsResponse.ok) {
+          const credentialsResult = await credentialsResponse.json()
+          if (credentialsResult.success) {
+            credentials = credentialsResult.data
+          }
+        }
+
         setCoachData({
           ...userData,
           ...coachData,
-          credentials: coachData?.credentials || []
+          credentials: credentials
         })
       }
     } catch (error) {
@@ -80,6 +100,11 @@ export default function MyBatch() {
       setSelectedCoach(coachData)
       setShowCoachProfile(true)
     }
+  }
+
+  const handlePreview = (documentData: string) => {
+    const type = documentData.split(";")[0].split(":")[1]
+    setPreviewDoc({ url: documentData, type })
   }
 
   if (!batchData) {
@@ -171,14 +196,27 @@ export default function MyBatch() {
               <TabsContent value="credentials" className="space-y-4">
                 {selectedCoach?.credentials?.length ? (
                   selectedCoach.credentials.map((credential, index) => (
-                    <Card key={index}>
+                    <Card key={credential._id || index}>
                       <CardHeader>
-                        <CardTitle>{credential.certification}</CardTitle>
+                        <CardTitle>{credential.title}</CardTitle>
                       </CardHeader>
                       <CardContent>
-                        <p className="text-sm text-gray-500">
-                          Issued by {credential.issuedBy} • {credential.year}
-                        </p>
+                        <div className="space-y-2">
+                          <p className="text-sm text-gray-500">
+                            Issued by {credential.issuer} • {new Date(credential.date).toLocaleDateString()}
+                          </p>
+                          {credential.document && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handlePreview(credential.document!)}
+                              className="flex items-center gap-2"
+                            >
+                              <Eye className="h-4 w-4" />
+                              View Document
+                            </Button>
+                          )}
+                        </div>
                       </CardContent>
                     </Card>
                   ))
@@ -187,6 +225,26 @@ export default function MyBatch() {
                 )}
               </TabsContent>
             </Tabs>
+          </DialogContent>
+        </Dialog>
+
+        {/* Document Preview Dialog */}
+        <Dialog open={previewDoc !== null} onOpenChange={(open) => !open && setPreviewDoc(null)}>
+          <DialogContent className="max-w-4xl max-h-[90vh]">
+            <DialogHeader>
+              <DialogTitle>Document Preview</DialogTitle>
+            </DialogHeader>
+            <div className="relative w-full h-[70vh] overflow-auto">
+              {previewDoc?.type.startsWith("image/") ? (
+                <img src={previewDoc.url || "/placeholder.svg"} alt="Document preview" className="max-w-full h-auto" />
+              ) : previewDoc?.type === "application/pdf" ? (
+                <iframe src={previewDoc.url} className="w-full h-full" title="PDF preview" />
+              ) : (
+                <div className="flex items-center justify-center h-full">
+                  <p>Preview not available for this file type. Please download to view.</p>
+                </div>
+              )}
+            </div>
           </DialogContent>
         </Dialog>
       </div>
