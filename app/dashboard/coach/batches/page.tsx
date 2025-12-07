@@ -652,8 +652,8 @@ export default function BatchesPage() {
                 <CardTitle>Your Assigned Batches</CardTitle>
               </CardHeader>
               <CardContent>
-                <ScrollArea className="w-full rounded-md border">
-                  <div className="flex gap-4 p-4" style={{ overflowX: 'auto' }}>
+                <div className="w-full overflow-x-auto">
+                  <div className="flex gap-4 pb-4">
                     {localBatches.map(batch => (
                       <div
                         key={batch._id}
@@ -700,7 +700,7 @@ export default function BatchesPage() {
                       </div>
                     ))}
                   </div>
-                </ScrollArea>
+                </div>
               </CardContent>
             </Card>
 

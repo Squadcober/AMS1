@@ -2847,8 +2847,7 @@ const METRICS_CONFIG = [
   { key: "Physicality", label: "Physicality" },
   { key: "Defense", label: "Defense" },
   { key: "passing", label: "passing" },
-  { key: "Technique", label: "Technique" },
-  { key: "sessionRating", label: "Session Rating" }
+  { key: "Technique", label: "Technique" }
 ] as const;
 
 
