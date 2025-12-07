@@ -243,9 +243,7 @@ const saveToCache = (key: string, data: any) => {
           ratings: processedRatings,
           about: profileData.about || "",
           photoUrl: profileData.photoUrl || "/placeholder.svg",
-          sessionsCount: typeof profileData.sessionsCount === 'number' && profileData.sessionsCount > 0
-            ? profileData.sessionsCount
-            : finishedSessionsCount, // use computed count if profile doesn't provide it
+          sessionsCount: finishedSessionsCount, // Always use computed count from sessions data
           experience: parseInt(userInfoData.experience) || 0 // Get experience from user info
         })
 
