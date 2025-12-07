@@ -210,18 +210,21 @@ export default function playerBatches() {
       try {
         const response = await fetch(`/api/db/ams-player-data/batch?ids=${playerIds.join(',')}`);
         if (!response.ok) return;
-        
+
         const data = await response.json();
         const playersMap: {[key: string]: any} = {};
-        
+
         data.data.forEach((player: any) => {
-          playersMap[player.id] = {
+          const playerInfo = {
             name: player.name || 'Unknown player',
             photoUrl: player.photoUrl || '/placeholder.svg',
             position: player.position || 'Unknown Position'
           };
+          if (player.id) playersMap[player.id] = playerInfo;
+          if (player.userId) playersMap[player.userId] = playerInfo;
+          if (player._id) playersMap[player._id.toString()] = playerInfo;
         });
-        
+
         setplayersInfo(playersMap);
       } catch (error) {
         console.error('Error fetching player info:', error);
@@ -606,9 +609,15 @@ export default function playerBatches() {
   };
 
   const getplayerInfo = (rating: any) => {
+    // First check if the API already included player info
+    if (rating.player && rating.player.name) {
+      return rating.player;
+    }
+    // Fallback to playerInfo if available
     if (rating.playerInfo && rating.playerInfo.name) {
       return rating.playerInfo;
     }
+    // Final fallback to playersInfo cache
     const fallback = playersInfo[rating.playerId] || {
       name: 'Unknown player',
       photoUrl: '/placeholder.svg'

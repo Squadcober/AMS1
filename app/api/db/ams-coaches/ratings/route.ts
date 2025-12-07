@@ -68,16 +68,17 @@ export async function GET(request: NextRequest) {
       })
       .toArray();
 
-    // Create a map of player info
-    const playerMap = new Map(
-      players.map(player => [
-        player.id || player._id.toString(),
-        {
-          name: player.name || player.username || 'Unknown player',
-          photoUrl: player.photoUrl || '/placeholder.svg'
-        }
-      ])
-    );
+    // Create a map of player info with all possible ID keys
+    const playerMap = new Map();
+    players.forEach(player => {
+      const playerInfo = {
+        name: player.name || player.username || 'Unknown player',
+        photoUrl: player.photoUrl || '/placeholder.svg'
+      };
+      if (player.id) playerMap.set(player.id, playerInfo);
+      if (player.userId) playerMap.set(player.userId, playerInfo);
+      if (player._id) playerMap.set(player._id.toString(), playerInfo);
+    });
 
     // Combine ratings with player info
     const ratingsWithplayerInfo = coach.ratings.map((rating: any) => ({
