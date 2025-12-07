@@ -81,13 +81,17 @@ export async function GET(request: NextRequest) {
     });
 
     // Combine ratings with player info
-    const ratingsWithplayerInfo = coach.ratings.map((rating: any) => ({
-      ...rating,
-      player: playerMap.get(rating.playerId) || {
-        name: 'Unknown player',
+    const ratingsWithplayerInfo = coach.ratings.map((rating: any) => {
+      const playerData = playerMap.get(rating.playerId) || {
+        name: 'Anonymous Player',
         photoUrl: '/placeholder.svg'
-      }
-    }));
+      };
+      return {
+        ...rating,
+        playerName: playerData.name,
+        playerPhoto: playerData.photoUrl
+      };
+    });
 
     return NextResponse.json({
       success: true,
