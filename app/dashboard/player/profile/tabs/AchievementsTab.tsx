@@ -540,7 +540,7 @@ export default function Achievements() {
         </div>
 
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent>
+          <DialogContent className="max-h-[80vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Add New Achievement</DialogTitle>
             </DialogHeader>
