@@ -644,97 +644,103 @@ export default function BatchPerformancePage() {
           )}
 
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogContent className="max-h-[80vh] max-w-[80vw] md:max-w-[80vw] sm:max-w-[95vw] overflow-y-auto">
+            <DialogContent className="max-h-[90vh] max-w-[95vw] overflow-hidden flex flex-col">
               <DialogHeader>
                 <DialogTitle>
                   Compare Players in {getBatchName()}
                   ({filteredPlayers?.length || 0} players)
                 </DialogTitle>
               </DialogHeader>
-              <CardContent>
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
-                  <Input
-                    placeholder="Search players"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full sm:w-64"
-                  />
-                  <div className="flex gap-2 w-full sm:w-auto">
-                    <Button
-                      variant="outline"
-                      onClick={() => setSelectedPlayers(batchPlayers.map(p => p.id.toString()))}
-                      className="flex-1 sm:flex-none"
-                    >
-                      Select All
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={() => setSelectedPlayers([])}
-                      className="flex-1 sm:flex-none"
-                    >
-                      Deselect All
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Attribute Filter Toggle */}
-                <div className="flex justify-center mb-6">
-                  <div className="flex items-center space-x-4 bg-muted p-2 rounded-lg">
-                    <span className="text-sm font-medium">View:</span>
-                    <div className="flex space-x-2">
+              <div className="flex-1 overflow-hidden flex flex-col lg:flex-row gap-4">
+                {/* Player List Section */}
+                <div className="lg:w-1/3 flex flex-col">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
+                    <Input
+                      placeholder="Search players"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="w-full sm:w-64"
+                    />
+                    <div className="flex gap-2 w-full sm:w-auto">
                       <Button
-                        variant={attributeFilter === "latest" ? "default" : "outline"}
-                        onClick={() => setAttributeFilter("latest")}
-                        size="sm"
+                        variant="outline"
+                        onClick={() => setSelectedPlayers(batchPlayers.map(p => p.id.toString()))}
+                        className="flex-1 sm:flex-none"
                       >
-                        Latest Values
+                        Select All
                       </Button>
                       <Button
-                        variant={attributeFilter === "overall" ? "default" : "outline"}
-                        onClick={() => setAttributeFilter("overall")}
-                        size="sm"
+                        variant="outline"
+                        onClick={() => setSelectedPlayers([])}
+                        className="flex-1 sm:flex-none"
                       >
-                        Overall Average
+                        Deselect All
                       </Button>
                     </div>
                   </div>
-                </div>
 
-                <div className="border rounded-md p-4 mb-6">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 max-h-[200px] overflow-y-auto">
-                    {filteredPlayers.map((player) => (
-                      <div key={player.id} className="flex items-center space-x-2 p-2 hover:bg-accent rounded-md">
-                        <input
-                          type="checkbox"
-                          checked={selectedPlayers.includes(player.id.toString())}
-                          onChange={() => handlePlayerSelection(player.id.toString())}
-                          id={`player-${player.id}`}
-                          className="mr-2"
-                        />
-                        <label
-                          htmlFor={`player-${player.id}`}
-                          className="flex-1 cursor-pointer"
+                  {/* Attribute Filter Toggle */}
+                  <div className="flex justify-center mb-4">
+                    <div className="flex items-center space-x-4 bg-muted p-2 rounded-lg">
+                      <span className="text-sm font-medium">View:</span>
+                      <div className="flex space-x-2">
+                        <Button
+                          variant={attributeFilter === "latest" ? "default" : "outline"}
+                          onClick={() => setAttributeFilter("latest")}
+                          size="sm"
                         >
-                          {player.name}
-                        </label>
+                          Latest Values
+                        </Button>
+                        <Button
+                          variant={attributeFilter === "overall" ? "default" : "outline"}
+                          onClick={() => setAttributeFilter("overall")}
+                          size="sm"
+                        >
+                          Overall Average
+                        </Button>
                       </div>
-                    ))}
-                  </div>
-                  {filteredPlayers.length === 0 && (
-                    <div className="text-center text-muted-foreground py-4">
-                      No players found in this batch
                     </div>
-                  )}
-                </div>
+                  </div>
 
-                <div className="mt-6">
-                  <div className="w-full h-[500px]">
-                    <Radar data={radarData} options={radarOptions} />
+                  <div className="border rounded-md p-4 flex-1 overflow-y-auto max-h-[300px] lg:max-h-none">
+                    <div className="grid grid-cols-1 gap-2">
+                      {filteredPlayers.map((player) => (
+                        <div key={player.id} className="flex items-center space-x-2 p-2 hover:bg-accent rounded-md">
+                          <input
+                            type="checkbox"
+                            checked={selectedPlayers.includes(player.id.toString())}
+                            onChange={() => handlePlayerSelection(player.id.toString())}
+                            id={`player-${player.id}`}
+                            className="mr-2"
+                          />
+                          <label
+                            htmlFor={`player-${player.id}`}
+                            className="flex-1 cursor-pointer"
+                          >
+                            {player.name}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                    {filteredPlayers.length === 0 && (
+                      <div className="text-center text-muted-foreground py-4">
+                        No players found in this batch
+                      </div>
+                    )}
                   </div>
                 </div>
 
-                <div className="mt-6">
-                  <Card>
+                {/* Charts and Table Section */}
+                <div className="lg:w-2/3 flex flex-col gap-4 overflow-y-auto">
+                  <div className="flex justify-center">
+                    <div className="w-full max-w-4xl">
+                      <div className="h-[300px] md:h-[500px]">
+                        <Radar data={radarData} options={radarOptions} />
+                      </div>
+                    </div>
+                  </div>
+
+                  <Card className="flex-1">
                     <CardHeader>
                       <CardTitle>Attribute Comparison</CardTitle>
                       <p className="text-sm text-muted-foreground">
@@ -742,15 +748,36 @@ export default function BatchPerformancePage() {
                         <span className="text-red-500 font-bold"> Red</span> = Lowest value
                       </p>
                     </CardHeader>
-                    <CardContent>
-                      <div className="overflow-x-auto">
+                    <CardContent className="overflow-y-auto max-h-[300px]">
+                      {/* Mobile Card Layout */}
+                      <div className="block md:hidden space-y-4">
+                        {selectedPlayers.map((playerId) => {
+                          const player = batchPlayers.find((p) => p._id.toString() === playerId || p.id.toString() === playerId);
+                          return (
+                            <Card key={playerId} className="p-4">
+                              <h4 className="font-semibold mb-2">{player?.name || player?.username}</h4>
+                              <div className="grid grid-cols-2 gap-2">
+                                {["Attack", "pace", "Physicality", "Defense", "passing", "Technique"].map((attr) => {
+                                  const value = getAttributeValue(player, attr);
+                                  return (
+                                    <div key={attr} className={`flex justify-between ${getColorForAttribute(attr, value)}`}>
+                                      <span>{attr.charAt(0).toUpperCase() + attr.slice(1)}:</span>
+                                      <span>{value.toFixed(1)}</span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </Card>
+                          );
+                        })}
+                      </div>
+                      {/* Desktop Table Layout */}
+                      <div className="hidden md:block overflow-x-auto">
                         {renderAttributeComparison()}
                       </div>
                     </CardContent>
                   </Card>
-                </div>
 
-                <div className="mt-6">
                   <Card>
                     <CardHeader>
                       <CardTitle>Performance Over Time - {selectedAttribute.charAt(0).toUpperCase() + selectedAttribute.slice(1)}</CardTitle>
@@ -771,16 +798,18 @@ export default function BatchPerformancePage() {
                           </Button>
                         ))}
                       </div>
-                      <div className="h-[400px]">
-                        <Line
-                          data={generateComparisonData(selectedPlayers)}
-                          options={lineOptions}
-                        />
+                      <div className="flex justify-center">
+                        <div className="w-full max-w-4xl h-[250px] md:h-[400px]">
+                          <Line
+                            data={generateComparisonData(selectedPlayers)}
+                            options={lineOptions}
+                          />
+                        </div>
                       </div>
                     </CardContent>
                   </Card>
                 </div>
-              </CardContent>
+              </div>
             </DialogContent>
           </Dialog>
         </div>
