@@ -48,7 +48,8 @@ interface CollateralFile {
   academyId: string;
   id: string;
   name: string;
-  url: string;
+  documentId?: string; // For uploaded documents
+  url?: string; // For backward compatibility with base64 data
   type: string;
   dateUploaded: string;
   size?: number; // Add file size for better UX
@@ -224,20 +225,40 @@ export default function AboutPage() {
     setHasUnsavedChanges(true)
   }
 
-  // Enhanced file upload handler with better file processing and mobile compatibility
-  const handleFileUpload = (collateralIndex: number, files: FileList) => {
+  // Enhanced file upload handler using server-side upload like finance page
+  const handleFileUpload = async (collateralIndex: number, files: FileList) => {
     const updatedCollaterals = [...formData.collaterals]
     const filesArray = Array.from(files)
 
-    filesArray.forEach((file, index) => {
-      const reader = new FileReader()
-      reader.onload = (e) => {
-        const dataUrl = e.target?.result as string
+    for (const file of filesArray) {
+      try {
+        // Upload file to server using same method as finance page
+        const formDataUpload = new FormData()
+        formDataUpload.append('file', file)
+        const academyId = String(user?.academyId).trim()
+        formDataUpload.append('academyId', academyId)
+
+        const response = await fetch('/api/upload', {
+          method: 'POST',
+          body: formDataUpload,
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json()
+          throw new Error(errorData.error || 'Failed to upload file')
+        }
+
+        const data = await response.json()
+        if (!data.docId) {
+          throw new Error('No document ID received from server')
+        }
+
+        // Create file entry with documentId for server-side download
         const newFile: CollateralFile = {
           academyId: user?.academyId || '',
           id: Math.random().toString(36).substr(2, 9),
           name: file.name,
-          url: dataUrl,
+          documentId: data.docId, // Store document ID for server-side download
           type: file.type,
           size: file.size,
           dateUploaded: new Date().toISOString(),
@@ -250,25 +271,42 @@ export default function AboutPage() {
         }))
         setHasUnsavedChanges(true)
 
-        // Show toast only after all files are processed
-        if (index === filesArray.length - 1) {
-          toast({
-            title: "Files Uploaded",
-            description: `${filesArray.length} file(s) uploaded successfully`,
-          });
-        }
+      } catch (error) {
+        console.error('Error uploading file:', error)
+        toast({
+          title: "Upload Failed",
+          description: error instanceof Error ? error.message : "Failed to upload file",
+          variant: "destructive",
+        })
       }
-      reader.readAsDataURL(file)
-    })
+    }
+
+    // Show success toast if any files were uploaded successfully
+    const uploadedCount = updatedCollaterals[collateralIndex].files.length - formData.collaterals[collateralIndex].files.length
+    if (uploadedCount > 0) {
+      toast({
+        title: "Files Uploaded",
+        description: `${uploadedCount} file(s) uploaded successfully`,
+      });
+    }
   }
 
-  // Enhanced file download handler for base64 stored files
+  // Enhanced file download handler using server-side download like finance page
   const handleFileDownload = async (file: CollateralFile) => {
     try {
-      // Since files are stored as base64 data URLs, we need to convert them back to blobs for download
-      if (file.url.startsWith('data:')) {
-        // Extract the base64 data and MIME type
-        const [mimeInfo, base64Data] = file.url.split(',');
+      if (file.documentId) {
+        // Use server-side download for uploaded files
+        const downloadUrl = `/api/docs/${file.documentId}`;
+        const a = document.createElement('a');
+        a.href = downloadUrl;
+        a.download = file.name;
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      } else if (file.url && file.url.startsWith('data:')) {
+        // Fallback for base64 data URLs (backward compatibility)
+        const [mimeInfo, base64Data] = (file.url as string).split(',');
         const mimeType = mimeInfo.split(':')[1].split(';')[0];
 
         // Convert base64 to blob
@@ -293,14 +331,7 @@ export default function AboutPage() {
         // Clean up the object URL to prevent memory leaks
         setTimeout(() => URL.revokeObjectURL(url), 100);
       } else {
-        // Fallback for non-base64 URLs (shouldn't happen with current implementation)
-        const a = document.createElement('a');
-        a.href = file.url;
-        a.download = file.name;
-        a.style.display = 'none';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
+        throw new Error('No download method available for this file');
       }
 
       toast({
@@ -320,10 +351,10 @@ export default function AboutPage() {
   const handleFileDelete = (collateralIndex: number, fileId: string) => {
     const updatedCollaterals = [...formData.collaterals]
     const fileToDelete = updatedCollaterals[collateralIndex].files.find(f => f.id === fileId);
-    
+
     // Clean up blob URL to prevent memory leaks
-    if (fileToDelete && fileToDelete.url.startsWith('blob:')) {
-      URL.revokeObjectURL(fileToDelete.url);
+    if (fileToDelete?.url?.startsWith('blob:')) {
+      URL.revokeObjectURL(fileToDelete.url!);
     }
     
     updatedCollaterals[collateralIndex].files = updatedCollaterals[collateralIndex].files.filter(
@@ -824,7 +855,7 @@ export default function AboutPage() {
                         Download to View
                       </Button>
                     </div>
-                  ) : (
+                  ) : selectedFile.url ? (
                     <div className="flex justify-center items-center min-h-0 overflow-y-scroll">
                       <Image
                         src={selectedFile.url}
@@ -857,6 +888,19 @@ export default function AboutPage() {
                           }
                         }}
                       />
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <FileImage className="w-16 h-16 mx-auto mb-4 text-gray-400" />
+                      <p className="mb-2 text-lg font-medium">Preview not available</p>
+                      <p className="mb-4 text-gray-400">
+                        Image preview is not available for this file.<br />
+                        File size: {formatFileSize(selectedFile.size)}
+                      </p>
+                      <Button onClick={() => handleFileDownload(selectedFile)}>
+                        <Download className="w-4 h-4 mr-2" />
+                        Download to View
+                      </Button>
                     </div>
                   )
                 ) : (
