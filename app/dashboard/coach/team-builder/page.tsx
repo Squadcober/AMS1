@@ -543,6 +543,39 @@ export default function TeamBuilder() {
     }
   }
 
+  const renderAttributeComparison = () => (
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Attribute</TableHead>
+            {selectedPlayers.map((playerId) => (
+              <TableHead key={playerId}>
+                {players.find((p) => p.id.toString() === playerId)?.name }
+              </TableHead>
+            ))}
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {["Attack", "pace", "Physicality", "Defense", "passing", "Technique"].map((attr) => (
+            <TableRow key={attr}>
+              <TableCell className="font-medium">
+                {attr.charAt(0).toUpperCase() + attr.slice(1)}
+              </TableCell>
+              {selectedPlayers.map((playerId) => {
+                const player = players.find((p) => p.id.toString() === playerId);
+                const value = getAttributeValue(player, attr);
+                return (
+                  <TableCell key={playerId} className={getColorForAttribute(attr, value)}>
+                    {value.toFixed(1)}
+                  </TableCell>
+                );
+              })}
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    );
+
   // Replace saveGamePlan handler
   const handleSaveGamePlans = async () => {
   try {
@@ -3238,8 +3271,8 @@ const lineOptions = {
             <div className="space-y-4">
   <Button onClick={() => setIsDialogOpen(true)}>Compare Players</Button>
   <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-    <DialogContent className="max-h-[80vh] max-w-[80vw] overflow-y-auto bg-gray-900 text-white border-gray-700">
-      <DialogHeader className="border-b border-gray-700 pb-4">
+    <DialogContent className="max-h-[90vh] max-w-[95vw] h-[90vh] overflow-y-auto flex flex-col">
+      <DialogHeader>
         <DialogTitle className="text-white text-xl font-bold">Compare Players</DialogTitle>
       </DialogHeader>
       <CardContent className="pt-6">
@@ -3316,7 +3349,7 @@ const lineOptions = {
                         <span className="text-red-500 font-bold"> Red</span> = Lowest value
                       </p>
                     </CardHeader>
-    <CardContent className="overflow-y-auto max-h-[300px]">
+    <CardContent className="overflow-y-auto max-h-[300px] overflow-x-auto max-w-[100dvh]">
       <div className="block md:hidden space-y-4">
                               {selectedPlayers.map((playerId) => {
                                 const player = players.find((p) => p.id.toString() === playerId);
@@ -3338,41 +3371,9 @@ const lineOptions = {
                                 );
                               })}
                             </div>
-      <ScrollArea className="hidden md:block overflow-x-auto">
-        <Table >
-                  <TableHeader>
-                    <TableRow className=" border-b border-gray-700">
-                      <TableHead className="text-white font-bold text-base">Attribute</TableHead>
-                      {selectedPlayers.map((playerId) => (
-                        <TableHead key={playerId} className="text-white font-bold text-base">
-                          {players.find((p) => p.id.toString() === playerId)?.name}
-                        </TableHead>
-                      ))}
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {["Attack", "pace", "Physicality", "Defense", "passing", "Technique"].map((attr) => (
-                      <TableRow key={attr} className="border-b border-gray-700">
-                        <TableCell className="text-white font-semibold text-base">
-                          {attr.charAt(0).toUpperCase() + attr.slice(1)}
-                        </TableCell>
-                        {selectedPlayers.map((playerId) => {
-                          const player = players.find((p) => p.id.toString() === playerId)
-                          const value = getAttributeValue(player, attr, attributeFilter)
-                          return (
-                            <TableCell
-                              key={playerId}
-                              className={`text-white font-bold text-base ${getColorForAttribute(attr, value)}`}
-                            >
-                              {typeof value === "number" ? value.toFixed(1) : "0.0"}
-                            </TableCell>
-                          )
-                        })}
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </ScrollArea>
+      <div className="hidden md:block overflow-x-auto">
+                        {renderAttributeComparison()}
+                      </div>
             </CardContent>
           </Card>
         </div>
