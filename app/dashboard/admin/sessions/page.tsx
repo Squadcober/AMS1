@@ -3901,18 +3901,16 @@ const handleSaveChanges = async () => {
                   ) : (
                     <div className="grid grid-cols-4 items-center gap-4">
                       <Label htmlFor="date" className="text-right">Date</Label>
-                      {isClient && (
-                        <Calendar
-                          mode="single"
-                          selected={selectedDate}
-                          onSelect={handleDateSelect} // Use the new handler
-                          disabled={(date) => {
-                            const dateStr = date.toISOString().split('T')[0];
-                            return dateStr < dateLimits.minDate || dateStr > dateLimits.maxDate;
-                          }}
-                          className="col-span-3"
-                        />
-                      )}
+                      <div className="col-span-3 grid grid-cols-2 gap-4">
+                          <Input
+                            type="date"
+                            value={newSession.date}
+                            min={dateLimits.minDate}
+                            max={dateLimits.maxDate}
+                            onChange={(e) => setNewSession({ ...newSession, date: e.target.value })}
+                            className="col-span-1"
+                          />
+                      </div>
                     </div>
                   )}
                   {/* Time, Batch, Coach selections */}
