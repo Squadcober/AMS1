@@ -212,16 +212,28 @@ const saveToCache = (key: string, data: any) => {
         const processedRatings = processRatings(enrichedRatingsData, playerMap)
 
         // --- NEW: compute sessions conducted by this coach (count of finished sessions) ---
+        // Helper to check if this coach is assigned to the session
         const sessionHasCoach = (s: any) => {
-          const coachField = s?.coachId
-          const coachIds = Array.isArray(coachField) ? coachField : (coachField ? [coachField] : [])
-          const matches = (idToMatch?: string) => !!idToMatch && coachIds.includes(idToMatch)
-          return matches(user?.id) || matches(userId)
-        }
+          if (!id) return false;
+          const coachField = s?.coachId;
+          const coachIds = Array.isArray(coachField) ? coachField : (coachField ? [coachField] : []);
+          return coachIds.includes(id);
+        };
+
+        // Helper to check if a session is finished (based on date and time, not status field)
+        const isSessionFinished = (s: any) => {
+          const now = new Date();
+          const sessionDate = new Date(s.date);
+          const [endHour, endMinute] = (s.endTime || "").split(':').map(Number);
+          
+          const sessionEnd = new Date(sessionDate);
+          sessionEnd.setHours(endHour, endMinute, 0);
+          
+          return now > sessionEnd;
+        };
+
         const finishedSessionsCount = sessionsData.filter((s: any) => {
-          // consider occurrences and normal sessions; rely on status field being set
-          const status = (s?.status || "").toString()
-          return sessionHasCoach(s) && status.toLowerCase() === "finished"
+          return sessionHasCoach(s) && isSessionFinished(s);
         }).length
         // --- end new ---
         setCoachData({
