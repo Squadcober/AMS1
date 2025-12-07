@@ -3349,7 +3349,7 @@ const lineOptions = {
                         <span className="text-red-500 font-bold"> Red</span> = Lowest value
                       </p>
                     </CardHeader>
-    <CardContent className="overflow-y-auto max-h-[300px]">
+    <CardContent className="overflow-y-auto max-h-[400px]">
       <div className="block md:hidden space-y-4">
                               {selectedPlayers.map((playerId) => {
                                 const player = players.find((p) => p.id.toString() === playerId);
