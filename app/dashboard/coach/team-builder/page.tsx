@@ -318,6 +318,7 @@ export default function TeamBuilder() {
   const [searchTerm, setSearchTerm] = useState<string>("")
   const [selectedAttribute, setSelectedAttribute] = useState<string>("Attack")
   const [activeTab, setActiveTab] = useState<number>(0)
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const fieldRef = useRef<HTMLDivElement>(null) // Add this ref
   const [customPositions, setCustomPositions] = useState<Position[]>([])
@@ -3242,7 +3243,7 @@ const lineOptions = {
         <DialogTitle className="text-white text-xl font-bold">Compare Players</DialogTitle>
       </DialogHeader>
       <CardContent className="pt-6">
-        <DropdownMenu>
+        <DropdownMenu open={isDropdownOpen} onOpenChange={setIsDropdownOpen}>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" className="bg-gray-800 text-white border-gray-600 hover:bg-gray-700">
               Select Players

@@ -644,7 +644,7 @@ export default function BatchPerformancePage() {
           )}
 
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogContent className="max-h-[90vh] max-w-[95vw] overflow-hidden flex flex-col">
+            <DialogContent className="max-h-[90vh] max-w-[95vw] overflow-y-auto flex flex-col">
               <DialogHeader>
                 <DialogTitle>
                   Compare Players in {getBatchName()}
