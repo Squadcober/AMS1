@@ -35,7 +35,9 @@ export async function GET(request: NextRequest) {
     // Create base query conditions
     const queryConditions: Filter<Document>['$or'] = [
       { id: coachId },
-      { userId: coachId }
+      { userId: coachId },
+      { username: coachId },
+      { coachId: coachId }
     ];
 
     // Only add ObjectId condition if valid
@@ -139,7 +141,9 @@ export async function POST(request: NextRequest) {
     // Build query conditions
     const coachQueryConditions: Filter<Document>[] = [
       { id: coachId },
-      { userId: coachId }
+      { userId: coachId },
+      { username: coachId },
+      { coachId: coachId }
     ];
 
     // Only add ObjectId condition if valid
@@ -167,7 +171,7 @@ export async function POST(request: NextRequest) {
     const result = await db.collection<CoachDocument>('ams-coaches').findOneAndUpdate(
       { $or: coachQueryConditions },
       updateDoc,
-      { returnDocument: 'after' }
+      { returnDocument: 'after', upsert: true }
     );
 
     if (!result) {
