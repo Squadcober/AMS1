@@ -47,13 +47,16 @@ export default function CoachProfilePage() {
   const [ratings, setRatings] = useState<Rating[]>([])
   const [userId, setUserId] = useState<string | undefined>(undefined)
 
-  const processRatings = (ratings: any[]) => {
+  const processRatings = (ratings: any[], playerMap: { [key: string]: { name: string; photoUrl: string } } = {}) => {
     return ratings.map(rating => {
-      const playerName = rating.playerInfo?.name ||
+      const playerData = playerMap[rating.playerId];
+      const playerName = playerData?.name ||
+                         rating.playerInfo?.name ||
                          rating.playerName ||
                          'Anonymous player'
 
-      const playerPhoto = rating.playerInfo?.photoUrl ||
+      const playerPhoto = playerData?.photoUrl ||
+                         rating.playerInfo?.photoUrl ||
                          rating.playerPhoto ||
                          undefined
 
@@ -157,8 +160,21 @@ const saveToCache = (key: string, data: any) => {
         const ratingsData = Array.isArray(ratingsJson?.data) ? ratingsJson.data : []
         const userInfoData = userInfoJson?.data || {}
 
+        // 4) fetch player data for ratings
+        const playerIds = [...new Set(ratingsData.map((r: any) => r.playerId))];
+        let playerMap: { [key: string]: { name: string; photoUrl: string } } = {};
+        if (playerIds.length > 0) {
+          const playersResp = await fetch(`/api/db/players?playerIds=${playerIds.join(',')}`, { signal });
+          if (playersResp.ok) {
+            const playersJson = await playersResp.json();
+            if (playersJson.success) {
+              playerMap = playersJson.data;
+            }
+          }
+        }
+
         // process and set states
-        const processedRatings = processRatings(ratingsData)
+        const processedRatings = processRatings(ratingsData, playerMap)
         setCoachData({
           name: profileData.name || user.name || "",
           age: profileData.age || 0,
