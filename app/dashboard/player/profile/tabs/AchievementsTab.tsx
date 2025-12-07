@@ -513,23 +513,48 @@ export default function Achievements() {
             </DialogHeader>
             <div className="w-full h-[calc(90vh-8rem)] bg-white rounded-lg overflow-hidden">
               {selectedPdfUrl && (
-                <object
-                  data={selectedPdfUrl}
-                  type="application/pdf"
+                <iframe
+                  src={selectedPdfUrl}
                   className="w-full h-full"
+                  title="Certificate PDF"
                 >
-                  <div className="w-full h-full flex items-center justify-center">
-                    <Button 
+                  <div className="w-full h-full flex items-center justify-center flex-col gap-4">
+                    <p>Unable to display PDF in this browser.</p>
+                    <Button
+                      onClick={() => {
+                        const link = document.createElement('a');
+                        link.href = selectedPdfUrl;
+                        link.download = 'certificate.pdf';
+                        link.click();
+                      }}
+                      className="px-8 py-4"
+                    >
+                      Download PDF
+                    </Button>
+                    <Button
                       onClick={() => window.open(selectedPdfUrl, '_blank')}
                       className="px-8 py-4"
                     >
                       Open PDF in new tab
                     </Button>
                   </div>
-                </object>
+                </iframe>
               )}
             </div>
             <DialogFooter>
+              <Button
+                onClick={() => {
+                  if (selectedPdfUrl) {
+                    const link = document.createElement('a');
+                    link.href = selectedPdfUrl;
+                    link.download = 'certificate.pdf';
+                    link.click();
+                  }
+                }}
+                variant="outline"
+              >
+                Download PDF
+              </Button>
               <Button onClick={() => setShowPdfViewer(false)}>Close</Button>
             </DialogFooter>
           </DialogContent>
