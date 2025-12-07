@@ -715,7 +715,7 @@ export default function BatchPerformancePage() {
                           htmlFor={`player-${player.id}`}
                           className="flex-1 cursor-pointer"
                         >
-                          {player.name} (ID: {player.id})
+                          {player.name}
                         </label>
                       </div>
                     ))}

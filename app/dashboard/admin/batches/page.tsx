@@ -829,20 +829,21 @@ export default function BatchesPage() {
               <CardTitle>Your Batches</CardTitle>
             </CardHeader>
             <CardContent>
-              <ScrollArea className="h-[600px] pr-4">
-                <div className="space-y-4">
+              <div className="w-full overflow-x-auto">
+                <div className="flex flex-col gap-3 min-w-max md:min-w-0">
                   {localBatches.map(batch => (
                     <div
                       key={batch._id}
                       onClick={() => setSelectedBatch(batch)}
                       className={cn(
-                        "p-4 border rounded-lg hover:bg-accent cursor-pointer",
-                        selectedBatch?._id === batch._id ? "bg-accent" : ""
+                        "p-4 border rounded-lg hover:bg-accent cursor-pointer transition-colors",
+                        selectedBatch?._id === batch._id ? "bg-accent border-primary" : ""
                       )}
+                      style={{ minWidth: '320px' }}
                     >
-                      <div className="flex justify-between items-center">
-                        <h3 className="text-lg font-semibold">{batch.name}</h3>
-                        <div className="flex gap-2">
+                      <div className="flex justify-between items-start gap-2">
+                        <h3 className="text-lg font-semibold flex-1">{batch.name}</h3>
+                        <div className="flex gap-2 flex-shrink-0">
                           <Button
                             variant="outline"
                             size="sm"
@@ -871,7 +872,7 @@ export default function BatchesPage() {
                     </div>
                   ))}
                 </div>
-              </ScrollArea>
+              </div>
             </CardContent>
           </Card>
 
@@ -997,108 +998,110 @@ export default function BatchesPage() {
         </div>
 
         <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Create New Batch</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div>
-                <Label>Batch Name</Label>
-                <Input
-                  value={newBatchName}
-                  onChange={(e) => {
-                    setNewBatchName(e.target.value);
-                    setBatchNameError("");
-                  }}
-                  placeholder="Enter batch name"
-                />
-                {batchNameError && (
-                  <p className="text-red-500 text-sm mt-1">{batchNameError}</p>
-                )}
-              </div>
+          <DialogContent className="max-w-[90vw] sm:max-w-lg">
+            <ScrollArea className="max-h-[80vh]">
+              <DialogHeader>
+                <DialogTitle>Create New Batch</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 px-2 py-1">
+                <div>
+                  <Label>Batch Name</Label>
+                  <Input
+                    value={newBatchName}
+                    onChange={(e) => {
+                      setNewBatchName(e.target.value);
+                      setBatchNameError("");
+                    }}
+                    placeholder="Enter batch name"
+                  />
+                  {batchNameError && (
+                    <p className="text-red-500 text-sm mt-1">{batchNameError}</p>
+                  )}
+                </div>
 
-              <div>
-                <Label>Assign Coaches</Label>
-                <div className="border rounded-md p-4">
-                  <div className="mb-2 pb-2 border-b">
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        checked={allCoachesSelected}
-                        onCheckedChange={handleSelectAllCoaches}
-                      />
-                      <Label>Select All Coaches</Label>
-                    </div>
-                  </div>
-                  <ScrollArea className="h-[150px]">
-                    {coaches.map((coach) => (
-                      <div key={coach._id} className="flex items-center space-x-2 py-2">
+                <div>
+                  <Label>Assign Coaches</Label>
+                  <div className="border rounded-md p-4">
+                    <div className="mb-2 pb-2 border-b">
+                      <div className="flex items-center space-x-2">
                         <Checkbox
-                          checked={selectedCoaches.includes(coach._id)}
-                          onCheckedChange={(checked) => {
-                            if (checked) {
-                              setSelectedCoaches(prev => [...prev, coach._id]);
-                            } else {
-                              setSelectedCoaches(prev => prev.filter(id => id !== coach._id));
-                              setAllCoachesSelected(false);
-                            }
-                          }}
+                          checked={allCoachesSelected}
+                          onCheckedChange={handleSelectAllCoaches}
                         />
-                        <div className="flex flex-col">
-                          <span>{coach.name || coach.email}</span>
-                          <span className="text-sm text-muted-foreground">{coach.email}</span>
+                        <Label>Select All Coaches</Label>
+                      </div>
+                    </div>
+                    <ScrollArea className="h-[150px]">
+                      {coaches.map((coach) => (
+                        <div key={coach._id} className="flex items-center space-x-2 py-2">
+                          <Checkbox
+                            checked={selectedCoaches.includes(coach._id)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setSelectedCoaches(prev => [...prev, coach._id]);
+                              } else {
+                                setSelectedCoaches(prev => prev.filter(id => id !== coach._id));
+                                setAllCoachesSelected(false);
+                              }
+                            }}
+                          />
+                          <div className="flex flex-col">
+                            <span>{coach.name || coach.email}</span>
+                            <span className="text-sm text-muted-foreground">{coach.email}</span>
+                          </div>
                         </div>
-                      </div>
-                    ))}
-                    {coaches.length === 0 && (
-                      <div className="text-center text-muted-foreground py-2">
-                        No coaches available
-                      </div>
-                    )}
-                  </ScrollArea>
-                </div>
-              </div>
-
-              <div>
-                <Label>Players</Label>
-                <div className="border rounded-md p-4">
-                  <div className="mb-2 pb-2 border-b">
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        checked={allPlayersSelected}
-                        onCheckedChange={handleSelectAllPlayers}
-                      />
-                      <Label>Select All Players</Label>
-                    </div>
+                      ))}
+                      {coaches.length === 0 && (
+                        <div className="text-center text-muted-foreground py-2">
+                          No coaches available
+                        </div>
+                      )}
+                    </ScrollArea>
                   </div>
-                  <ScrollArea className="h-[200px]">
-                    {players.map((player) => (
-                      <div key={player.id} className="flex items-center space-x-2 py-2">
+                </div>
+
+                <div>
+                  <Label>Players</Label>
+                  <div className="border rounded-md p-4">
+                    <div className="mb-2 pb-2 border-b">
+                      <div className="flex items-center space-x-2">
                         <Checkbox
-                          checked={selectedPlayers.includes(player.id)}
-                          onCheckedChange={(checked) => {
-                            if (checked) {
-                              setSelectedPlayers(prev => [...prev, player.id]);
-                            } else {
-                              setSelectedPlayers(prev => prev.filter(id => id !== player.id));
-                              setAllPlayersSelected(false);
-                            }
-                          }}
+                          checked={allPlayersSelected}
+                          onCheckedChange={handleSelectAllPlayers}
                         />
-                        <span>{player.name}</span>
+                        <Label>Select All Players</Label>
                       </div>
-                    ))}
-                  </ScrollArea>
+                    </div>
+                    <ScrollArea className="h-[200px]">
+                      {players.map((player) => (
+                        <div key={player.id} className="flex items-center space-x-2 py-2">
+                          <Checkbox
+                            checked={selectedPlayers.includes(player.id)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setSelectedPlayers(prev => [...prev, player.id]);
+                              } else {
+                                setSelectedPlayers(prev => prev.filter(id => id !== player.id));
+                                setAllPlayersSelected(false);
+                              }
+                            }}
+                          />
+                          <span>{player.name}</span>
+                        </div>
+                      ))}
+                    </ScrollArea>
+                  </div>
                 </div>
               </div>
-            </div>
-            <DialogFooter>
-  <Button 
-    onClick={handleCreateBatch}
-    disabled={isCreatingBatch}
-  >
-    {isCreatingBatch ? "Creating..." : "Create Batch"}
-  </Button>
-</DialogFooter>
+              <DialogFooter>
+                <Button 
+                  onClick={handleCreateBatch}
+                  disabled={isCreatingBatch}
+                >
+                  {isCreatingBatch ? "Creating..." : "Create Batch"}
+                </Button>
+              </DialogFooter>
+            </ScrollArea>
           </DialogContent>
         </Dialog>
 
