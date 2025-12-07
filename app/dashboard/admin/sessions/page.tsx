@@ -26,6 +26,7 @@ import { Calendar } from "@/components/ui/calendar"
 import { toast, useToast } from "@/components/ui/use-toast"; // Import useToast hook
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs" // Add this import
 import type { User } from "@/types/user" // Add User interface import
+import { saveAs } from 'file-saver';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -662,6 +663,7 @@ function SessionsContent() {
   // Move isPolling state declaration to the top with other states
   const [isPolling, setIsPolling] = useState<boolean>(true);
   const [isClient, setIsClient] = useState(false);
+  const [currentDate, setCurrentDate] = useState<string>("");
   const [isLoading, setIsLoading] = useState(true);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [lastUpdate, setLastUpdate] = useState<number>(Date.now());

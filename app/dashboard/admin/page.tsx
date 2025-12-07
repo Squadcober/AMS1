@@ -48,7 +48,8 @@ interface CollateralFile {
   academyId: string;
   id: string;
   name: string;
-  url: string;
+  documentId?: string; // For uploaded documents
+  url?: string; // For backward compatibility with base64 data
   type: string;
   dateUploaded: string;
   size?: number; // Add file size for better UX
@@ -224,20 +225,40 @@ export default function AboutPage() {
     setHasUnsavedChanges(true)
   }
 
-  // Enhanced file upload handler with better file processing and mobile compatibility
-  const handleFileUpload = (collateralIndex: number, files: FileList) => {
+  // Enhanced file upload handler using server-side upload like finance page
+  const handleFileUpload = async (collateralIndex: number, files: FileList) => {
     const updatedCollaterals = [...formData.collaterals]
     const filesArray = Array.from(files)
 
-    filesArray.forEach((file, index) => {
-      const reader = new FileReader()
-      reader.onload = (e) => {
-        const dataUrl = e.target?.result as string
+    for (const file of filesArray) {
+      try {
+        // Upload file to server using same method as finance page
+        const formDataUpload = new FormData()
+        formDataUpload.append('file', file)
+        const academyId = String(user?.academyId).trim()
+        formDataUpload.append('academyId', academyId)
+
+        const response = await fetch('/api/upload', {
+          method: 'POST',
+          body: formDataUpload,
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json()
+          throw new Error(errorData.error || 'Failed to upload file')
+        }
+
+        const data = await response.json()
+        if (!data.docId) {
+          throw new Error('No document ID received from server')
+        }
+
+        // Create file entry with documentId for server-side download
         const newFile: CollateralFile = {
           academyId: user?.academyId || '',
           id: Math.random().toString(36).substr(2, 9),
           name: file.name,
-          url: dataUrl,
+          documentId: data.docId, // Store document ID for server-side download
           type: file.type,
           size: file.size,
           dateUploaded: new Date().toISOString(),
@@ -250,49 +271,67 @@ export default function AboutPage() {
         }))
         setHasUnsavedChanges(true)
 
-        // Show toast only after all files are processed
-        if (index === filesArray.length - 1) {
-          toast({
-            title: "Files Uploaded",
-            description: `${filesArray.length} file(s) uploaded successfully`,
-          });
-        }
+      } catch (error) {
+        console.error('Error uploading file:', error)
+        toast({
+          title: "Upload Failed",
+          description: error instanceof Error ? error.message : "Failed to upload file",
+          variant: "destructive",
+        })
       }
-      reader.readAsDataURL(file)
-    })
+    }
+
+    // Show success toast if any files were uploaded successfully
+    const uploadedCount = updatedCollaterals[collateralIndex].files.length - formData.collaterals[collateralIndex].files.length
+    if (uploadedCount > 0) {
+      toast({
+        title: "Files Uploaded",
+        description: `${uploadedCount} file(s) uploaded successfully`,
+      });
+    }
   }
 
-  // Enhanced file download handler with mobile compatibility
+  // Enhanced file download handler using server-side download like finance page
   const handleFileDownload = async (file: CollateralFile) => {
     try {
-      // For data URLs (base64 encoded files)
-      if (file.url.startsWith('data:')) {
-        // Convert data URL to blob for better download handling
-        const response = await fetch(file.url);
-        const blob = await response.blob();
-        const downloadUrl = window.URL.createObjectURL(blob);
+      if (file.documentId) {
+        // Use server-side download for uploaded files
+        const downloadUrl = `/api/docs/${file.documentId}`;
+        const a = document.createElement('a');
+        a.href = downloadUrl;
+        a.download = file.name;
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      } else if (file.url && file.url.startsWith('data:')) {
+        // Fallback for base64 data URLs (backward compatibility)
+        const [mimeInfo, base64Data] = (file.url as string).split(',');
+        const mimeType = mimeInfo.split(':')[1].split(';')[0];
 
-        // Try modern download API first (works in most browsers)
-        if ('download' in document.createElement('a')) {
-          const a = document.createElement('a');
-          a.href = downloadUrl;
-          a.download = file.name;
-          a.style.display = 'none';
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-
-          // Clean up blob URL
-          window.URL.revokeObjectURL(downloadUrl);
-        } else {
-          // Fallback for mobile browsers and WebViews - open in new tab
-          window.open(downloadUrl, '_blank');
-          // Clean up blob URL after a delay to allow download to start
-          setTimeout(() => window.URL.revokeObjectURL(downloadUrl), 1000);
+        // Convert base64 to blob
+        const byteCharacters = atob(base64Data);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
         }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: mimeType });
+
+        // Create download link
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = file.name;
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+
+        // Clean up the object URL to prevent memory leaks
+        setTimeout(() => URL.revokeObjectURL(url), 100);
       } else {
-        // For other URL types (shouldn't happen with current implementation)
-        window.open(file.url, '_blank');
+        throw new Error('No download method available for this file');
       }
 
       toast({
@@ -312,10 +351,10 @@ export default function AboutPage() {
   const handleFileDelete = (collateralIndex: number, fileId: string) => {
     const updatedCollaterals = [...formData.collaterals]
     const fileToDelete = updatedCollaterals[collateralIndex].files.find(f => f.id === fileId);
-    
+
     // Clean up blob URL to prevent memory leaks
-    if (fileToDelete && fileToDelete.url.startsWith('blob:')) {
-      URL.revokeObjectURL(fileToDelete.url);
+    if (fileToDelete?.url?.startsWith('blob:')) {
+      URL.revokeObjectURL(fileToDelete.url!);
     }
     
     updatedCollaterals[collateralIndex].files = updatedCollaterals[collateralIndex].files.filter(
@@ -464,11 +503,11 @@ export default function AboutPage() {
     return (
       <section className="mb-12">
         <h2 className="text-2xl font-bold mb-6">Social Media Collaterals</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-h-[700px] overflow-y-auto pr-4">
           {formData.collaterals.map((collateral, index) => {
             return (
               <Card key={collateral.name} className="relative overflow-hidden">
-                <CardHeader>
+                <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle className="flex items-center">
                     <span className="flex items-center space-x-2">
                       {collateral.name === "Images & Graphics" && <FileImage className="w-5 h-5" />}
@@ -476,19 +515,20 @@ export default function AboutPage() {
                       <span>{collateral.name}</span>
                     </span>
                   </CardTitle>
-                </CardHeader>
-                <CardContent className="relative">
                   {isEditing && (
                     <Button
                       variant="outline"
-                      size="icon"
+                      size="sm"
                       onClick={() => fileInputRefs.current[index]?.click()}
-                      className="absolute top-1 right-1 sm:top-2 sm:right-2 h-4 w-4 sm:h-6 sm:w-6 p-0"
+                      className="ml-2"
                       title="Upload files"
                     >
-                      <Upload className="w-2 h-2 sm:w-3 sm:h-3" />
+                      <Upload className="w-4 h-4 mr-1" />
+                      Upload
                     </Button>
                   )}
+                </CardHeader>
+                <CardContent className="relative">
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-gray-400">
@@ -793,21 +833,21 @@ export default function AboutPage() {
         {/* File Content Modal */}
         {selectedFile && (
           <Dialog open={true} onOpenChange={() => setSelectedFile(null)}>
-            <DialogContent className={`w-[95vw] max-w-4xl h-[90dvh] ${isMobile ? 'max-h-[70dvh]' : 'max-h-[90dvh]'} overflow-hidden flex flex-col`}>
+            <DialogContent className="w-full h-[90vh] sm:w-[95vw] sm:max-w-4xl sm:max-h-[100dvh] overflow-hidden flex flex-col">
               <DialogHeader className="flex-shrink-0">
                 <DialogTitle className="flex items-center space-x-2 text-sm sm:text-base">
                   {getFileIcon(selectedFile.type)}
                   <span className="truncate">{selectedFile.name}</span>
                 </DialogTitle>
               </DialogHeader>
-              <div className="flex-1 overflow-y-auto py-4">
+              <div className="flex-1 overflow-y-scroll py-4">
                 {selectedFile.type.startsWith("image/") ? (
-                  (selectedFile.size && selectedFile.size > 1024 * 1024) ? (
+                  (selectedFile.size && selectedFile.size > 2 * 1024 * 1024) ? (
                     <div className="text-center py-8">
                       <FileImage className="w-16 h-16 mx-auto mb-4 text-gray-400" />
                       <p className="mb-2 text-lg font-medium">File too large to preview</p>
                       <p className="mb-4 text-gray-400">
-                        Files larger than 1MB cannot be previewed.<br />
+                        Files larger than 2MB cannot be previewed.<br />
                         File size: {formatFileSize(selectedFile.size)}
                       </p>
                       <Button onClick={() => handleFileDownload(selectedFile)}>
@@ -815,24 +855,46 @@ export default function AboutPage() {
                         Download to View
                       </Button>
                     </div>
-                  ) : (
-                    <div className="flex justify-center items-center min-h-0">
+                  ) : selectedFile.url ? (
+                    <div className="flex justify-center items-center min-h-0 overflow-y-scroll">
                       <Image
                         src={selectedFile.url}
                         alt={selectedFile.name}
                         width={800}
                         height={600}
-                        className="w-auto h-auto object-contain rounded-lg"
+                        className="max-w-full max-h-[70vh] w-auto h-auto object-contain rounded-lg"
+                        onError={(e) => {
+                          // If image fails to load, show download option
+                          e.currentTarget.style.display = 'none';
+                          const parent = e.currentTarget.parentElement;
+                          if (parent) {
+                            parent.innerHTML = `
+                              <div class="text-center py-8">
+                                <div class="w-16 h-16 mx-auto mb-4 text-gray-400">
+                                  <svg class="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V5a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                  </svg>
+                                </div>
+                                <p class="mb-2 text-lg font-medium">Preview not available</p>
+                                <p class="mb-4 text-gray-400">Unable to load image preview</p>
+                                <button onclick="window.open('/api/db/ams-about/download?fileId=${selectedFile.id}&academyId=${user?.academyId}', '_blank')" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+                                  <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                  </svg>
+                                  Download to View
+                                </button>
+                              </div>
+                            `;
+                          }
+                        }}
                       />
                     </div>
-                  )
-                ) : (
-                  (selectedFile.size && selectedFile.size > 1024 * 1024) ? (
+                  ) : (
                     <div className="text-center py-8">
-                      <FileText className="w-16 h-16 mx-auto mb-4 text-gray-400" />
-                      <p className="mb-2 text-lg font-medium">Document too large to preview</p>
+                      <FileImage className="w-16 h-16 mx-auto mb-4 text-gray-400" />
+                      <p className="mb-2 text-lg font-medium">Preview not available</p>
                       <p className="mb-4 text-gray-400">
-                        Files larger than 1MB cannot be previewed.<br />
+                        Image preview is not available for this file.<br />
                         File size: {formatFileSize(selectedFile.size)}
                       </p>
                       <Button onClick={() => handleFileDownload(selectedFile)}>
@@ -840,16 +902,20 @@ export default function AboutPage() {
                         Download to View
                       </Button>
                     </div>
-                  ) : (
-                    <div className="text-center py-8">
-                      <FileText className="w-16 h-16 mx-auto mb-4 text-gray-400" />
-                      <p className="mb-4">Preview not available for this file type</p>
-                      <Button onClick={() => handleFileDownload(selectedFile)}>
-                        <Download className="w-4 h-4 mr-2" />
-                        Download to View
-                      </Button>
-                    </div>
                   )
+                ) : (
+                  <div className="text-center py-8">
+                    <FileText className="w-16 h-16 mx-auto mb-4 text-gray-400" />
+                    <p className="mb-2 text-lg font-medium">Preview not available</p>
+                    <p className="mb-4 text-gray-400">
+                      Document preview is not supported.<br />
+                      File size: {formatFileSize(selectedFile.size)}
+                    </p>
+                    <Button onClick={() => handleFileDownload(selectedFile)}>
+                      <Download className="w-4 h-4 mr-2" />
+                      Download to View
+                    </Button>
+                  </div>
                 )}
               </div>
               <DialogFooter className="flex-shrink-0 flex flex-col sm:flex-row justify-between gap-4 border-t pt-4">
