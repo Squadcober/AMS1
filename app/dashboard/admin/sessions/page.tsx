@@ -4096,7 +4096,7 @@ const handleSaveChanges = async () => {
               </DialogContent>
             </Dialog>
             <Button variant="destructive" size="sm" className="w-full sm:w-auto" onClick={handleRemoveSession}>
-              Remove Selected Sessions
+              {showCheckboxes ? `Remove (${selectedSessions.length}) sessions` : 'Remove Selected Sessions'}
             </Button>
           </div>
           <div className="flex flex-col sm:flex-row sm:justify-between lg:justify-end items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-4">
