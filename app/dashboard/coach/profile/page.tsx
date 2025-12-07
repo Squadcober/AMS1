@@ -22,6 +22,9 @@ interface Rating {
   comment?: string
 }
 
+// Add default avatar constant used as a safe fallback for player photos
+const DEFAULT_PLAYER_AVATAR = "/default-avatar.png"
+
 export default function CoachProfilePage() {
   const { user } = useAuth()
   const [isEditing, setIsEditing] = useState(false)
@@ -142,11 +145,12 @@ const saveToCache = (key: string, data: any) => {
           }))
         }
 
-        // 3) fetch profile, ratings, and user info in parallel to save time
-        const [profileResp, ratingsResp, userInfoResp] = await Promise.all([
+        // 3) fetch profile, ratings, user info, and sessions in parallel to save time
+        const [profileResp, ratingsResp, userInfoResp, sessionsResp] = await Promise.all([
           fetch(`/api/db/coach-profile/${id}`, { signal }),
           fetch(`/api/db/coach-ratings?coachId=${id}`, { signal }),
-          fetch(`/api/db/ams-users-info?userId=${id}`, { signal })
+          fetch(`/api/db/ams-users-info?userId=${id}`, { signal }),
+          fetch(`/api/db/ams-sessions?academyId=${encodeURIComponent(user.academyId)}`, { signal })
         ])
 
         if (!profileResp.ok) throw new Error("Failed to fetch coach profile")
@@ -155,10 +159,13 @@ const saveToCache = (key: string, data: any) => {
         const profileJson = await profileResp.json()
         const ratingsJson = await ratingsResp.json()
         const userInfoJson = userInfoResp.ok ? await userInfoResp.json() : { data: {} }
+        // sessionsResp may fail without blocking profile/ratings display
+        const sessionsJson = sessionsResp && sessionsResp.ok ? await sessionsResp.json() : { data: [] }
 
         const profileData = profileJson?.data || {}
         const ratingsData = Array.isArray(ratingsJson?.data) ? ratingsJson.data : []
         const userInfoData = userInfoJson?.data || {}
+        const sessionsData = Array.isArray(sessionsJson?.data) ? sessionsJson.data : []
 
         // 4) fetch player data for ratings (use ams-player-data route which returns an array)
         const playerIds = [...new Set(ratingsData.map((r: any) => r.playerId).filter(Boolean))];
@@ -170,9 +177,23 @@ const saveToCache = (key: string, data: any) => {
               const playersJson = await playersResp.json();
               if (playersJson && playersJson.success && Array.isArray(playersJson.data)) {
                 playersJson.data.forEach((p: any) => {
-                  if (p && p.id) {
-                    playerMap[p.id] = p;
+                  // Normalize a minimal player object and map multiple keys to it
+                  const normalized = {
+                    id: p.id || p.pid || (p._id ? p._id.toString() : undefined) || p.userId,
+                    name: p.name || p.username || 'Unknown player',
+                    photoUrl: p.photoUrl || DEFAULT_PLAYER_AVATAR,
+                    position: p.position || 'Not specified',
+                    academyId: p.academyId
                   }
+                  const keys = [
+                    p.id,
+                    p.pid,
+                    p.userId,
+                    p._id ? p._id.toString() : undefined
+                  ].filter(Boolean)
+                  keys.forEach(k => {
+                    playerMap[k as string] = normalized
+                  })
                 });
               }
             }
@@ -189,6 +210,20 @@ const saveToCache = (key: string, data: any) => {
 
         // process and set states (use enriched ratings so we have player names/photos)
         const processedRatings = processRatings(enrichedRatingsData, playerMap)
+
+        // --- NEW: compute sessions conducted by this coach (count of finished sessions) ---
+        const sessionHasCoach = (s: any) => {
+          const coachField = s?.coachId
+          const coachIds = Array.isArray(coachField) ? coachField : (coachField ? [coachField] : [])
+          const matches = (idToMatch?: string) => !!idToMatch && coachIds.includes(idToMatch)
+          return matches(user?.id) || matches(userId)
+        }
+        const finishedSessionsCount = sessionsData.filter((s: any) => {
+          // consider occurrences and normal sessions; rely on status field being set
+          const status = (s?.status || "").toString()
+          return sessionHasCoach(s) && status.toLowerCase() === "finished"
+        }).length
+        // --- end new ---
         setCoachData({
           name: profileData.name || user.name || "",
           age: profileData.age || 0,
@@ -196,14 +231,16 @@ const saveToCache = (key: string, data: any) => {
           ratings: processedRatings,
           about: profileData.about || "",
           photoUrl: profileData.photoUrl || "/placeholder.svg",
-          sessionsCount: profileData.sessionsCount || 0,
+          sessionsCount: typeof profileData.sessionsCount === 'number' && profileData.sessionsCount > 0
+            ? profileData.sessionsCount
+            : finishedSessionsCount, // use computed count if profile doesn't provide it
           experience: parseInt(userInfoData.experience) || 0 // Get experience from user info
         })
 
         setRatings(processedRatings)
 
-        // save to cache for next load (store enriched ratings so cached UI shows player names)
-        saveToCache(id, { profile: profileData, ratings: enrichedRatingsData, userInfo: userInfoData })
+        // save to cache for next load (store enriched ratings + sessions so cached UI shows player names & session count)
+        saveToCache(id, { profile: profileData, ratings: enrichedRatingsData, userInfo: userInfoData, sessions: sessionsData })
       } catch (err) {
         if ((err as any)?.name === "AbortError") {
           // aborted, ignore
@@ -638,13 +675,14 @@ const saveToCache = (key: string, data: any) => {
                   <div key={index} className="bg-gray-700 p-4 rounded-lg">
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center">
-                        {rating.playerPhoto ? (
-                          <Image
-                            src={rating.playerPhoto}
+                        {(rating.playerPhoto || DEFAULT_PLAYER_AVATAR) ? (
+                          // Use plain <img> to avoid Next/Image domain/hydration issues for external URLs
+                          <img
+                            src={rating.playerPhoto || DEFAULT_PLAYER_AVATAR}
                             alt={rating.playerName || 'player photo'}
                             width={32}
                             height={32}
-                            className="rounded-full mr-2"
+                            className="rounded-full mr-2 object-cover w-8 h-8"
                             loading="lazy"
                           />
                         ) : (
