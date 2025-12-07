@@ -209,35 +209,14 @@ const exportToFile = async (sessions: Session[], academyId: string, batches: Bat
     const dateStr = new Date().toISOString().split("T")[0];
     const fileName = `sessions_export_${academyId}_${dateStr}.csv`;
 
-    // Detect mobile devices
-    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    // Use file-saver library for consistent cross-platform downloads
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    saveAs(blob, fileName);
 
-    if (isMobile) {
-      // For mobile devices, use data URI to open in new tab
-      const dataUri = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvContent);
-      window.open(dataUri);
-
-      toast({
-        title: "Export Successful",
-        description: `CSV opened in new tab. Save the file from your browser.`,
-      });
-    } else {
-      // Web browser - use traditional download
-      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.setAttribute("download", fileName);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-
-      toast({
-        title: "Export Successful",
-        description: `File downloaded as ${fileName}`,
-      });
-    }
+    toast({
+      title: "Export Successful",
+      description: `File downloaded as ${fileName}`,
+    });
   } catch (e) {
     console.error("CSV export failed", e);
     toast({
@@ -2179,9 +2158,9 @@ const SessionTable = ({
     </TableHeader>
     <TableBody>
       {sessions.map((session) => (
-        <TableRow 
-          key={`${session.id}-${session.date}-${session.isOccurrence ? 'occ' : 'reg'}-${Date.now()}`}
-        >
+                        <TableRow
+                          key={`${session.id}-${session.date}-${session.isOccurrence ? 'occ' : 'reg'}`}
+                        >
           <TableCell>{session.date}</TableCell>
           {showStatus && (
             <TableCell>
@@ -3922,16 +3901,18 @@ const handleSaveChanges = async () => {
                   ) : (
                     <div className="grid grid-cols-4 items-center gap-4">
                       <Label htmlFor="date" className="text-right">Date</Label>
-                      <Calendar
-                        mode="single"
-                        selected={selectedDate}
-                        onSelect={handleDateSelect} // Use the new handler
-                        disabled={(date) => {
-                          const dateStr = date.toISOString().split('T')[0];
-                          return dateStr < dateLimits.minDate || dateStr > dateLimits.maxDate;
-                        }}
-                        className="col-span-3"
-                      />
+                      {isClient && (
+                        <Calendar
+                          mode="single"
+                          selected={selectedDate}
+                          onSelect={handleDateSelect} // Use the new handler
+                          disabled={(date) => {
+                            const dateStr = date.toISOString().split('T')[0];
+                            return dateStr < dateLimits.minDate || dateStr > dateLimits.maxDate;
+                          }}
+                          className="col-span-3"
+                        />
+                      )}
                     </div>
                   )}
                   {/* Time, Batch, Coach selections */}
@@ -4244,14 +4225,20 @@ const handleSaveChanges = async () => {
         <AlertDialog open={showExportAlert} onOpenChange={setShowExportAlert}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Are you sure you want to clear all sessions?</AlertDialogTitle>
+              <AlertDialogTitle>Export Sessions</AlertDialogTitle>
               <AlertDialogDescription>
-                This will export all sessions to a CSV file and then clear them from the system.
+                Choose to export only or export and clear all sessions from the system.
                 Make sure to keep the exported file safe as this action cannot be undone.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleExportOnly}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                Export Only
+              </AlertDialogAction>
               <AlertDialogAction
                 onClick={handleConfirmExport}
                 className="bg-red-600 hover:bg-red-700"
