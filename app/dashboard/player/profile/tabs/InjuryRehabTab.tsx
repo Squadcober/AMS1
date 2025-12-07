@@ -13,6 +13,7 @@ import { useAuth } from "@/contexts/AuthContext"
 import Image from "next/image"
 import { useToast } from "@/components/ui/use-toast"
 import { FileText, Trash2, Upload, Eye } from "lucide-react"
+import { isMobileWebView } from "@/utils/mobileDetection"
 
 const STORAGE_KEY = 'player-injuries-data'
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
@@ -1121,16 +1122,54 @@ export default function InjuryRehab({ playerData }: InjuryRehabProps) {
           <DialogHeader>
             <DialogTitle>PDF Viewer</DialogTitle>
           </DialogHeader>
-          {selectedPdfUrl && (
-            <div className="w-full h-[calc(90vh-6rem)] bg-white rounded-lg overflow-hidden">
-              <embed
-                src={selectedPdfUrl}
-                type="application/pdf"
-                width="100%"
-                height="100%"
-              />
-            </div>
-          )}
+          <div className="w-full h-[calc(90vh-8rem)] bg-white rounded-lg overflow-hidden">
+            {selectedPdfUrl && (
+              <>
+                {isMobileWebView() ? (
+                  <div className="w-full h-full flex items-center justify-center flex-col gap-6">
+                    <div className="text-center">
+                      <p className="text-lg mb-4">PDF Preview not available on mobile app</p>
+                      <p className="text-muted-foreground">Please download the document to view it</p>
+                    </div>
+                    <Button
+                      onClick={() => {
+                        const link = document.createElement('a');
+                        link.href = selectedPdfUrl;
+                        link.download = 'document.pdf';
+                        link.click();
+                      }}
+                      className="px-8 py-4 text-lg"
+                    >
+                      Download Document
+                    </Button>
+                  </div>
+                ) : (
+                  <embed
+                    src={selectedPdfUrl}
+                    type="application/pdf"
+                    width="100%"
+                    height="100%"
+                  />
+                )}
+              </>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              onClick={() => {
+                if (selectedPdfUrl) {
+                  const link = document.createElement('a');
+                  link.href = selectedPdfUrl;
+                  link.download = 'document.pdf';
+                  link.click();
+                }
+              }}
+              variant="outline"
+            >
+              Download PDF
+            </Button>
+            <Button onClick={() => setShowPdfViewer(false)}>Close</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

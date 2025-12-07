@@ -16,6 +16,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select"
 import { toast } from "@/components/ui/use-toast"
 import { format } from "date-fns"
+import { isMobileWebView } from "@/utils/mobileDetection"
 
 const formatDate = (dateString: string) => {
   try {
@@ -513,32 +514,54 @@ export default function Achievements() {
             </DialogHeader>
             <div className="w-full h-[calc(90vh-8rem)] bg-white rounded-lg overflow-hidden">
               {selectedPdfUrl && (
-                <iframe
-                  src={selectedPdfUrl}
-                  className="w-full h-full"
-                  title="Certificate PDF"
-                >
-                  <div className="w-full h-full flex items-center justify-center flex-col gap-4">
-                    <p>Unable to display PDF in this browser.</p>
-                    <Button
-                      onClick={() => {
-                        const link = document.createElement('a');
-                        link.href = selectedPdfUrl;
-                        link.download = 'certificate.pdf';
-                        link.click();
-                      }}
-                      className="px-8 py-4"
+                <>
+                  {isMobileWebView() ? (
+                    <div className="w-full h-full flex items-center justify-center flex-col gap-6">
+                      <div className="text-center">
+                        <p className="text-lg mb-4">PDF Preview not available on mobile app</p>
+                        <p className="text-muted-foreground">Please download the certificate to view it</p>
+                      </div>
+                      <Button
+                        onClick={() => {
+                          const link = document.createElement('a');
+                          link.href = selectedPdfUrl;
+                          link.download = 'certificate.pdf';
+                          link.click();
+                        }}
+                        className="px-8 py-4 text-lg"
+                      >
+                        Download Certificate
+                      </Button>
+                    </div>
+                  ) : (
+                    <iframe
+                      src={selectedPdfUrl}
+                      className="w-full h-full"
+                      title="Certificate PDF"
                     >
-                      Download PDF
-                    </Button>
-                    <Button
-                      onClick={() => window.open(selectedPdfUrl, '_blank')}
-                      className="px-8 py-4"
-                    >
-                      Open PDF in new tab
-                    </Button>
-                  </div>
-                </iframe>
+                      <div className="w-full h-full flex items-center justify-center flex-col gap-4">
+                        <p>Unable to display PDF in this browser.</p>
+                        <Button
+                          onClick={() => {
+                            const link = document.createElement('a');
+                            link.href = selectedPdfUrl;
+                            link.download = 'certificate.pdf';
+                            link.click();
+                          }}
+                          className="px-8 py-4"
+                        >
+                          Download PDF
+                        </Button>
+                        <Button
+                          onClick={() => window.open(selectedPdfUrl, '_blank')}
+                          className="px-8 py-4"
+                        >
+                          Open PDF in new tab
+                        </Button>
+                      </div>
+                    </iframe>
+                  )}
+                </>
               )}
             </div>
             <DialogFooter>
