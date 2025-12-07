@@ -160,21 +160,35 @@ const saveToCache = (key: string, data: any) => {
         const ratingsData = Array.isArray(ratingsJson?.data) ? ratingsJson.data : []
         const userInfoData = userInfoJson?.data || {}
 
-        // 4) fetch player data for ratings
-        const playerIds = [...new Set(ratingsData.map((r: any) => r.playerId))];
-        let playerMap: { [key: string]: { name: string; photoUrl: string } } = {};
+        // 4) fetch player data for ratings (use ams-player-data route which returns an array)
+        const playerIds = [...new Set(ratingsData.map((r: any) => r.playerId).filter(Boolean))];
+        let playerMap: { [key: string]: any } = {};
         if (playerIds.length > 0) {
-          const playersResp = await fetch(`/api/db/players?playerIds=${playerIds.join(',')}`, { signal });
-          if (playersResp.ok) {
-            const playersJson = await playersResp.json();
-            if (playersJson.success) {
-              playerMap = playersJson.data;
+          try {
+            const playersResp = await fetch(`/api/db/ams-player-data?ids=${encodeURIComponent(playerIds.join(','))}`, { signal });
+            if (playersResp.ok) {
+              const playersJson = await playersResp.json();
+              if (playersJson && playersJson.success && Array.isArray(playersJson.data)) {
+                playersJson.data.forEach((p: any) => {
+                  if (p && p.id) {
+                    playerMap[p.id] = p;
+                  }
+                });
+              }
             }
+          } catch (e) {
+            console.warn("Failed to fetch player data for ratings", e);
           }
         }
 
-        // process and set states
-        const processedRatings = processRatings(ratingsData, playerMap)
+        // enrich ratings with any playerInfo we fetched (so processRatings can pick real names/photos)
+        const enrichedRatingsData = ratingsData.map((r: any) => ({
+          ...r,
+          playerInfo: r.playerInfo || playerMap[r.playerId] || null
+        }));
+
+        // process and set states (use enriched ratings so we have player names/photos)
+        const processedRatings = processRatings(enrichedRatingsData, playerMap)
         setCoachData({
           name: profileData.name || user.name || "",
           age: profileData.age || 0,
@@ -188,8 +202,8 @@ const saveToCache = (key: string, data: any) => {
 
         setRatings(processedRatings)
 
-        // save to cache for next load
-        saveToCache(id, { profile: profileData, ratings: ratingsData, userInfo: userInfoData })
+        // save to cache for next load (store enriched ratings so cached UI shows player names)
+        saveToCache(id, { profile: profileData, ratings: enrichedRatingsData, userInfo: userInfoData })
       } catch (err) {
         if ((err as any)?.name === "AbortError") {
           // aborted, ignore
