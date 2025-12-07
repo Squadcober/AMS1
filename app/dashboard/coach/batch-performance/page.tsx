@@ -644,14 +644,14 @@ export default function BatchPerformancePage() {
           )}
 
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogContent className="max-h-[90vh] max-w-[95vw] overflow-y-auto flex flex-col">
+            <DialogContent className="max-h-[90vh] max-w-[95vw] h-[90vh] overflow-y-auto flex flex-col">
               <DialogHeader>
                 <DialogTitle>
                   Compare Players in {getBatchName()}
                   ({filteredPlayers?.length || 0} players)
                 </DialogTitle>
               </DialogHeader>
-              <div className="flex-1 overflow-hidden flex flex-col lg:flex-row gap-4">
+              <div className="flex-1 overflow-auto flex flex-col lg:flex-row gap-4">
                 {/* Player List Section */}
                 <div className="lg:w-1/3 flex flex-col">
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
