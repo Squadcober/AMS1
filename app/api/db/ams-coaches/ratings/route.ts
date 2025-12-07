@@ -104,12 +104,15 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const { coachId, playerId, rating, academyId, date } = await request.json();
+    const body = await request.json();
+    console.log('Received rating request body:', body);
+    const { coachId, playerId, rating, academyId, date } = body;
 
-    if (!coachId || !playerId || !rating || !academyId) {
-      return NextResponse.json({ 
-        success: false, 
-        error: 'Missing required fields' 
+    if (!coachId || !playerId || !rating || !academyId || !date) {
+      console.log('Missing fields:', { coachId, playerId, rating, academyId, date });
+      return NextResponse.json({
+        success: false,
+        error: 'Missing required fields'
       }, { status: 400 });
     }
 
@@ -142,6 +145,15 @@ export async function POST(request: NextRequest) {
 
     let result;
     if (coach) {
+      // Ensure ratings field is an array
+      if (!Array.isArray(coach.ratings)) {
+        await db.collection('ams-coaches').updateOne(
+          { _id: coach._id },
+          { $set: { ratings: [] } }
+        );
+        coach.ratings = [];
+      }
+
       // Update existing coach
       result = await db.collection('ams-coaches').updateOne(
         { _id: coach._id },
@@ -152,9 +164,9 @@ export async function POST(request: NextRequest) {
               playerInfo
             }
           },
-          $inc: {
-            totalRatings: 1,
-            ratingSum: rating
+          $set: {
+            totalRatings: (parseInt(coach.totalRatings) || 0) + 1,
+            ratingSum: (parseFloat(coach.ratingSum) || 0) + rating
           }
         } as any
       );

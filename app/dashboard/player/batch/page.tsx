@@ -132,11 +132,29 @@ export default function playerBatches() {
 
         const coachResponses = await Promise.all(coachPromises);
         const coachDataMap: { [key: string]: any } = {};
-        
+
         coachResponses.forEach((response, index) => {
           const coachId = Array.from(coachIds)[index];
           if (response.data) {
             coachDataMap[coachId] = response.data;
+          }
+        });
+
+        // Fetch ratings for each coach to ensure ratings are included
+        const ratingsPromises = Array.from(coachIds).map(id =>
+          fetch(`/api/db/ams-coaches/ratings?coachId=${id}`).then(res => res.json())
+        );
+
+        const ratingsResponses = await Promise.all(ratingsPromises);
+
+        ratingsResponses.forEach((response, index) => {
+          const coachId = Array.from(coachIds)[index];
+          if (response.success && response.data) {
+            // Merge ratings into coach data
+            coachDataMap[coachId] = {
+              ...coachDataMap[coachId],
+              ratings: response.data
+            };
           }
         });
 
@@ -291,6 +309,17 @@ export default function playerBatches() {
         ratings: coachData.data?.ratings || [],
       };
 
+      // Fetch ratings separately to ensure they are included
+      try {
+        const ratingsResponse = await fetch(`/api/db/ams-coaches/ratings?coachId=${coachId}`);
+        const ratingsData = await ratingsResponse.json();
+        if (ratingsData.success) {
+          combinedData.ratings = ratingsData.data;
+        }
+      } catch (error) {
+        console.error('Error fetching ratings:', error);
+      }
+
       // Load existing player rating for this coach
       const playerId = currentPlayer?.id || user?.id;
       if (playerId && combinedData.ratings) {
@@ -298,7 +327,7 @@ export default function playerBatches() {
         if (existingRating) {
           setRatings(prev => ({
             ...prev,
-            [coachId]: existingRating.rating
+            [coachId]: existingRating.playerInfo?.rating || existingRating.rating || 0
           }));
         }
       }
@@ -415,7 +444,7 @@ export default function playerBatches() {
     // If missing, try to use ratings array to calculate average
     if ((!averageRating || averageRating === "N/A") && Array.isArray(coach?.ratings) && coach.ratings.length > 0) {
       averageRating = (
-        coach.ratings.reduce((sum: number, r: any) => sum + (r.rating || 0), 0) / coach.ratings.length
+        coach.ratings.reduce((sum: number, r: any) => sum + (r.playerInfo?.rating || r.rating || 0), 0) / coach.ratings.length
       ).toFixed(1);
     }
 
@@ -577,12 +606,16 @@ export default function playerBatches() {
   };
 
   const getplayerInfo = (rating: any) => {
-    if (rating.playerInfo) {
+    if (rating.playerInfo && rating.playerInfo.name) {
       return rating.playerInfo;
     }
-    return playersInfo[rating.playerId] || {
+    const fallback = playersInfo[rating.playerId] || {
       name: 'Unknown player',
       photoUrl: '/placeholder.svg'
+    };
+    return {
+      ...fallback,
+      name: fallback.name || 'Unknown player'
     };
   };
 
