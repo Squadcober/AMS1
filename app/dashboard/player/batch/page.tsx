@@ -482,7 +482,7 @@ export default function playerBatches() {
         academyId: user.academyId
       });
 
-      const response = await fetch('/api/db/ams-coaches/ratings', {
+      const response = await fetch('/api/db/ams-coaches/rating', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
