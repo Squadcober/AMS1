@@ -2677,7 +2677,7 @@ const renderSessionDetails = (session: Session | undefined) => {
   };
 
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex h-screen overflow-y-auto">
       <Sidebar /> {/* Add the Sidebar component here */}
       <div className="flex-1 flex flex flex-col space-y-6 overflow-auto">
         <h1 className="text-3xl font-bold text-white p-4">Sessions</h1>
