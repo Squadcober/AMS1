@@ -731,7 +731,7 @@ export default function BatchPerformancePage() {
                 </div>
 
                 {/* Charts and Table Section */}
-                <div className="lg:w-2/3 flex flex-col gap-4 overflow-y-auto">
+                <div className="lg:w-2/3 flex flex-col gap-4">
                   <div className="flex justify-center">
                     <div className="w-full max-w-4xl">
                       <div className="h-[300px] md:h-[500px]">

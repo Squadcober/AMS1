@@ -3249,7 +3249,7 @@ const lineOptions = {
               Select Players
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent className="w-64 bg-gray-800 border-gray-600">
+        <DropdownMenuContent className="w-64 max-h-96 overflow-y-auto bg-gray-800 border-gray-600">
             <Input
               placeholder="Search players"
               value={searchTerm}
