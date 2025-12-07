@@ -3313,39 +3313,41 @@ const lineOptions = {
               <CardTitle className="text-white text-lg font-bold">Attribute Comparison</CardTitle>
             </CardHeader>
             <CardContent className="pt-4">
-              <Table>
-                <TableHeader>
-                  <TableRow className="border-b border-gray-700">
-                    <TableHead className="text-white font-bold text-base">Attribute</TableHead>
-                    {selectedPlayers.map((playerId) => (
-                      <TableHead key={playerId} className="text-white font-bold text-base">
-                        {players.find((p) => p.id.toString() === playerId)?.name}
-                      </TableHead>
-                    ))}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {["Attack", "pace", "Physicality", "Defense", "passing", "Technique"].map((attr) => (
-                    <TableRow key={attr} className="border-b border-gray-700">
-                      <TableCell className="text-white font-semibold text-base">
-                        {attr.charAt(0).toUpperCase() + attr.slice(1)}
-                      </TableCell>
-                      {selectedPlayers.map((playerId) => {
-                        const player = players.find((p) => p.id.toString() === playerId)
-                        const value = getAttributeValue(player, attr, attributeFilter)
-                        return (
-                          <TableCell 
-                            key={playerId} 
-                            className={`text-white font-bold text-base ${getColorForAttribute(attr, value)}`}
-                          >
-                            {typeof value === "number" ? value.toFixed(1) : "0.0"}
-                          </TableCell>
-                        )
-                      })}
+              <ScrollArea className="w-full">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-b border-gray-700">
+                      <TableHead className="text-white font-bold text-base">Attribute</TableHead>
+                      {selectedPlayers.map((playerId) => (
+                        <TableHead key={playerId} className="text-white font-bold text-base">
+                          {players.find((p) => p.id.toString() === playerId)?.name}
+                        </TableHead>
+                      ))}
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {["Attack", "pace", "Physicality", "Defense", "passing", "Technique"].map((attr) => (
+                      <TableRow key={attr} className="border-b border-gray-700">
+                        <TableCell className="text-white font-semibold text-base">
+                          {attr.charAt(0).toUpperCase() + attr.slice(1)}
+                        </TableCell>
+                        {selectedPlayers.map((playerId) => {
+                          const player = players.find((p) => p.id.toString() === playerId)
+                          const value = getAttributeValue(player, attr, attributeFilter)
+                          return (
+                            <TableCell
+                              key={playerId}
+                              className={`text-white font-bold text-base ${getColorForAttribute(attr, value)}`}
+                            >
+                              {typeof value === "number" ? value.toFixed(1) : "0.0"}
+                            </TableCell>
+                          )
+                        })}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </ScrollArea>
             </CardContent>
           </Card>
         </div>

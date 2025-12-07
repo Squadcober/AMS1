@@ -311,7 +311,8 @@ export default function UserManagementPage() {
               <DialogTrigger asChild>
                 <Button className="w-full sm:w-auto">Add New User</Button>
               </DialogTrigger>
-              <DialogContent>
+              {/* Make the dialog vertically scrollable when content is tall */}
+              <DialogContent className="max-h-[80vh] w-full sm:w-[520px] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle>Add New User</DialogTitle>
                 </DialogHeader>
