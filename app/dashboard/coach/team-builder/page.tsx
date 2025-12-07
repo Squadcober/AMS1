@@ -1462,21 +1462,22 @@ export default function TeamBuilder() {
       return availablePlayers.filter((player) => !positionPlayers.includes(player))
     }, [availablePlayers, positionPlayers])
 
-    return (
-      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader className="space-y-4">
-            <DialogTitle>Select Player for {selectedPosition?.name}</DialogTitle>
-            {selectedBatch && (
-              <div className="text-sm text-blue-400">
-                Showing players from: {filteredBatches.find((b) => b.id === selectedBatch)?.name}
-              </div>
-            )}
-            {showAllPositions && (
-              <div className="text-sm text-muted-foreground">Showing players from all positions</div>
-            )}
-          </DialogHeader>
+  return (
+    <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+      <DialogContent className="max-w-md overflow-hidden">
+        <DialogHeader className="space-y-4">
+          <DialogTitle>Select Player for {selectedPosition?.name}</DialogTitle>
+          {selectedBatch && (
+            <div className="text-sm text-blue-400">
+              Showing players from: {filteredBatches.find((b) => b.id === selectedBatch)?.name}
+            </div>
+          )}
+          {showAllPositions && (
+            <div className="text-sm text-muted-foreground">Showing players from all positions</div>
+          )}
+        </DialogHeader>
 
+        <ScrollArea className="max-h-[50vh] sm:max-h-[60vh] pr-4">
           {positionPlayers.length === 0 ? (
             <div className="text-center py-8">
               <h3 className="text-lg font-semibold mb-2">No Players Available</h3>
@@ -1492,33 +1493,31 @@ export default function TeamBuilder() {
               )}
             </div>
           ) : (
-            <ScrollArea className="h-[400px] pr-4">
-              <div className="space-y-2">
-                {(showAllPositions ? availablePlayers : positionPlayers).map((player) => (
-                  <div
-                    key={player.id}
-                    onClick={() => handlePlayerSelect(player.id.toString())}
-                    className="flex items-center justify-between p-3 hover:bg-accent rounded-lg cursor-pointer group"
-                  >
-                    <div className="flex items-center gap-3">
-                      <Avatar className="h-10 w-10">
-                        <AvatarImage src={player.photoUrl || "/placeholder.svg"} alt={player.name} />
-                        <AvatarFallback className="text-lg bg-gray-900 w-full h-full flex items-center justify-center rounded-full">
-                          {player.name?.charAt(0)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <p className="font-medium group-hover:text-primary">{player.name}</p>
-                        <p className="text-sm text-muted-foreground">{player.position}</p>
-                      </div>
+            <div className="space-y-2">
+              {(showAllPositions ? availablePlayers : positionPlayers).map((player) => (
+                <div
+                  key={player.id}
+                  onClick={() => handlePlayerSelect(player.id.toString())}
+                  className="flex items-center justify-between p-3 hover:bg-accent rounded-lg cursor-pointer group"
+                >
+                  <div className="flex items-center gap-3">
+                    <Avatar className="h-10 w-10">
+                      <AvatarImage src={player.photoUrl || "/placeholder.svg"} alt={player.name} />
+                      <AvatarFallback className="text-lg bg-gray-900 w-full h-full flex items-center justify-center rounded-full">
+                        {player.name?.charAt(0)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <p className="font-medium group-hover:text-primary">{player.name}</p>
+                      <p className="text-sm text-muted-foreground">{player.position}</p>
                     </div>
-                    {showAllPositions && (
-                      <span className="text-xs px-2 py-1 rounded-full bg-secondary">{player.position}</span>
-                    )}
                   </div>
-                ))}
-              </div>
-            </ScrollArea>
+                  {showAllPositions && (
+                    <span className="text-xs px-2 py-1 rounded-full bg-secondary">{player.position}</span>
+                  )}
+                </div>
+              ))}
+            </div>
           )}
 
           {positionPlayers.length > 0 && !showAllPositions && remainingPlayers.length > 0 && (
@@ -1536,9 +1535,10 @@ export default function TeamBuilder() {
               </Button>
             </div>
           )}
-        </DialogContent>
-      </Dialog>
-    )
+        </ScrollArea>
+      </DialogContent>
+    </Dialog>
+  )
   }
 
   const filteredBatches = useMemo(() => {

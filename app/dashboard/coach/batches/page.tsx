@@ -653,16 +653,16 @@ export default function BatchesPage() {
               </CardHeader>
               <CardContent>
                 <div className="w-full overflow-x-auto">
-                  <div className="flex gap-4 pb-4">
+                  <div className="flex flex-col gap-3 min-w-max md:min-w-0">
                     {localBatches.map(batch => (
                       <div
                         key={batch._id}
                         onClick={() => setSelectedBatch(batch)}
                         className={cn(
-                          "p-4 border rounded-lg hover:bg-accent cursor-pointer flex-shrink-0 transition-colors",
+                          "p-4 border rounded-lg hover:bg-accent cursor-pointer transition-colors",
                           selectedBatch?._id === batch._id ? "bg-accent border-primary" : ""
                         )}
-                        style={{ minWidth: '300px', maxWidth: '350px' }}
+                        style={{ minWidth: '320px' }}
                       >
                         <div className="flex justify-between items-start gap-2">
                           <h3 className="text-lg font-semibold flex-1">{batch.name}</h3>
