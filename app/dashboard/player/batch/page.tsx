@@ -957,9 +957,8 @@ export default function playerBatches() {
                             {cred.document && (
                               <div className="mt-2">
                                 <a
-                                  href={cred.document}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
+                                  href={cred.document.startsWith('/api/docs/') ? cred.document : `/api/docs/${cred.document}`}
+                                  download
                                   className="text-blue-600 underline text-sm"
                                 >
                                   View Document
