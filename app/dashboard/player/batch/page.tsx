@@ -291,6 +291,18 @@ export default function playerBatches() {
         ratings: coachData.data?.ratings || [],
       };
 
+      // Load existing player rating for this coach
+      const playerId = currentPlayer?.id || user?.id;
+      if (playerId && combinedData.ratings) {
+        const existingRating = combinedData.ratings.find((rating: any) => rating.playerId === playerId);
+        if (existingRating) {
+          setRatings(prev => ({
+            ...prev,
+            [coachId]: existingRating.rating
+          }));
+        }
+      }
+
       setCoachProfileCache(prev => ({ ...prev, [coachId]: combinedData }));
 
       // Remove from pending fetches
