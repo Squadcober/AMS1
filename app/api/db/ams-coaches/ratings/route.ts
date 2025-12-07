@@ -151,7 +151,17 @@ export async function POST(request: NextRequest) {
       coachQueryConditions.push({ _id: new ObjectId(coachId) });
     }
 
-    const updateDoc: UpdateFilter<CoachDocument> = {
+    // Find existing coach
+    const coach = await db.collection('ams-coaches').findOne({
+      $or: coachQueryConditions
+    });
+
+    let result;
+    if (coach) {
+      // Update existing coach
+      result = await db.collection('ams-coaches').updateOne(
+        { _id: coach._id },
+        {
           $push: {
             ratings: {
               playerId,
@@ -159,31 +169,46 @@ export async function POST(request: NextRequest) {
               rating,
               date,
               academyId
-            } as any // Use 'any' to satisfy the MongoDB driver type
+            }
           },
           $inc: {
             totalRatings: 1,
             ratingSum: rating
           }
-        };
-
-    // Update coach ratings with properly typed query
-    const result = await db.collection<CoachDocument>('ams-coaches').findOneAndUpdate(
-      { $or: coachQueryConditions },
-      updateDoc,
-      { returnDocument: 'after', upsert: true }
-    );
-
-    if (!result) {
-      return NextResponse.json({
-        success: false,
-        error: 'Failed to update rating'
-      }, { status: 500 });
+        } as any
+      );
+      if (result.modifiedCount === 0) {
+        return NextResponse.json({
+          success: false,
+          error: 'Failed to update rating'
+        }, { status: 500 });
+      }
+    } else {
+      // Insert new coach document
+      const newCoach = {
+        id: coachId,
+        ratings: [{
+          playerId,
+          playerInfo,
+          rating,
+          date,
+          academyId
+        }],
+        totalRatings: 1,
+        ratingSum: rating
+      };
+      result = await db.collection('ams-coaches').insertOne(newCoach);
+      if (!result.insertedId) {
+        return NextResponse.json({
+          success: false,
+          error: 'Failed to update rating'
+        }, { status: 500 });
+      }
     }
 
     return NextResponse.json({
       success: true,
-      data: result.value
+      data: result
     });
 
   } catch (error) {
