@@ -3280,7 +3280,7 @@ const lineOptions = {
           </DropdownMenuContent>
         </DropdownMenu>
         <div className="mt-4">
-          <div className="flex justify-center mb-4">
+          <div className="flex justify-center mb-4 ">
             <div className="flex items-center space-x-2 bg-gray-800 p-3 rounded-lg border border-gray-600">
               <span className="text-sm font-bold text-white">View:</span>
               <div className="flex space-x-2">
@@ -3303,20 +3303,45 @@ const lineOptions = {
               </div>
             </div>
           </div>
-          <div className="w-full h-[500px] bg-gray-800 p-4 rounded-lg">
+          <div className="min-h-[500px] max-w-[80vw] overflow-y-auto overflow-x-auto bg-gray-800 p-4 rounded-lg">
             <Radar data={radarData} options={radarOptions} />
           </div>
         </div>
         <div className="mt-6">
-          <Card className="bg-gray-800 border-gray-700">
-            <CardHeader className="border-b border-gray-700">
-              <CardTitle className="text-white text-lg font-bold">Attribute Comparison</CardTitle>
-            </CardHeader>
-    <CardContent className="pt-4">
-      <ScrollArea className="w-full">
-        <Table>
+          <Card className="flex-1 bg-gray-800 border-gray-700">
+             <CardHeader>
+                      <CardTitle>Attribute Comparison</CardTitle>
+                      <p className="text-sm text-muted-foreground">
+                        <span className="text-green-500 font-bold">Green</span> = Highest value,
+                        <span className="text-red-500 font-bold"> Red</span> = Lowest value
+                      </p>
+                    </CardHeader>
+    <CardContent className="overflow-y-auto max-h-[300px]">
+      <div className="block md:hidden space-y-4">
+                              {selectedPlayers.map((playerId) => {
+                                const player = players.find((p) => p.id.toString() === playerId);
+                                return (
+                                  <Card key={playerId} className="p-4">
+                                    <h4 className="font-semibold mb-2">{player?.name || player?.name}</h4>
+                                    <div className="grid grid-cols-2 gap-2">
+                                      {["Attack", "pace", "Physicality", "Defense", "passing", "Technique"].map((attr) => {
+                                        const value = getAttributeValue(player, attr);
+                                        return (
+                                          <div key={attr} className={`flex justify-between ${getColorForAttribute(attr, value)}`}>
+                                            <span>{attr.charAt(0).toUpperCase() + attr.slice(1)}:</span>
+                                            <span>{value.toFixed(1)}</span>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  </Card>
+                                );
+                              })}
+                            </div>
+      <ScrollArea className="hidden md:block overflow-x-auto">
+        <Table >
                   <TableHeader>
-                    <TableRow className="border-b border-gray-700">
+                    <TableRow className=" border-b border-gray-700">
                       <TableHead className="text-white font-bold text-base">Attribute</TableHead>
                       {selectedPlayers.map((playerId) => (
                         <TableHead key={playerId} className="text-white font-bold text-base">
@@ -3352,7 +3377,7 @@ const lineOptions = {
           </Card>
         </div>
         <div className="mt-6">
-          <Card className="bg-gray-800 border-gray-700">
+          <Card className="max-w-[80vw] overflow-y-auto overflow-x-auto bg-gray-800 border-gray-700">
             <CardHeader className="border-b border-gray-700">
               <CardTitle className="text-white text-lg font-bold">Performance Graph</CardTitle>
             </CardHeader>
