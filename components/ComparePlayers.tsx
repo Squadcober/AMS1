@@ -295,12 +295,33 @@ export default function ComparePlayers({ batchId }: Props) {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        {/* New layout: left = horizontally scrollable player list, right = filters + comparison + radar */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left column: horizontally scrollable player list */}
-          <div className="lg:col-span-1">
-            <h4 className="text-sm font-medium mb-2">Players</h4>
-            <div className="overflow-x-auto -mx-2 px-2">
+        <div className="space-y-8">
+          {/* Section 1: Player List with Horizontal Scrolling */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold">Select Players</h3>
+                <p className="text-sm text-muted-foreground">
+                  Choose players to compare (up to 11). Scroll horizontally to browse all players.
+                </p>
+              </div>
+              {playersToCompare.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary">
+                    {playersToCompare.length} selected
+                  </Badge>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={clearAllSelections}
+                  >
+                    Clear All
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            <div className="overflow-x-auto -mx-2 px-2 pb-4">
               <div className="flex gap-3 py-2 min-w-full">
                 {batchPlayers.map((player) => {
                   const isSelected = playersToCompare.includes(player.id.toString())
@@ -309,10 +330,9 @@ export default function ComparePlayers({ batchId }: Props) {
                   return (
                     <div
                       key={player.id}
-                      // Make each player a card with a min width so horizontal scroll appears
-                      className={`min-w-[220px] flex-shrink-0 flex items-center p-3 rounded-lg border transition-colors cursor-pointer ${
+                      className={`min-w-[240px] flex-shrink-0 flex items-center p-4 rounded-lg border transition-all cursor-pointer hover:shadow-md ${
                         isSelected
-                          ? "bg-primary/10 border-primary"
+                          ? "bg-primary/10 border-primary shadow-sm"
                           : "bg-card hover:bg-accent"
                       }`}
                       onClick={() => handlePlayerSelect(player.id.toString())}
@@ -321,18 +341,18 @@ export default function ComparePlayers({ batchId }: Props) {
                         type="checkbox"
                         checked={isSelected}
                         onChange={(e) => handlePlayerSelect(player.id.toString())}
-                        className="mr-3"
+                        className="mr-3 flex-shrink-0"
                         onClick={(e) => e.stopPropagation()}
                       />
-                      <Avatar className="h-8 w-8 mr-3">
+                      <Avatar className="h-10 w-10 mr-3 flex-shrink-0">
                         <AvatarImage src={player.photoUrl} alt={player.name} />
-                        <AvatarFallback className="text-xs">
+                        <AvatarFallback className="text-sm">
                           {player.name?.charAt(0).toUpperCase()}
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium truncate">{player.name}</p>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 mt-1">
                           {player.position && (
                             <p className="text-xs text-muted-foreground">
                               {player.position}
@@ -346,7 +366,7 @@ export default function ComparePlayers({ batchId }: Props) {
                         </div>
                       </div>
                       {isSelected && (
-                        <Badge variant="outline" className="ml-2">
+                        <Badge variant="outline" className="ml-2 flex-shrink-0">
                           Selected
                         </Badge>
                       )}
@@ -355,27 +375,20 @@ export default function ComparePlayers({ batchId }: Props) {
                 })}
               </div>
             </div>
-            {/* Small helper line */}
-            <p className="text-xs text-muted-foreground mt-2">
-              Scroll horizontally to browse players. Click a card or checkbox to select (up to 11).
-            </p>
           </div>
 
-          {/* Right column: filters + comparison table + radar */}
-          <div className="lg:col-span-2">
-            <div className="space-y-6">
+          {/* Section 2: Radar Chart Area */}
+          {playersToCompare.length > 0 && (
+            <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-lg font-semibold mb-1">Attribute Comparison</h3>
+                  <h3 className="text-lg font-semibold">Radar Chart Comparison</h3>
                   <p className="text-sm text-muted-foreground">
-                    {playersToCompare.length === 0 
-                      ? "Select players above to see comparison" 
-                      : `Comparing ${playersToCompare.length} player${playersToCompare.length > 1 ? 's' : ''}`
-                    }
+                    Visual comparison of player attributes
                   </p>
                 </div>
-                
-                {/* Enhanced filter buttons */}
+
+                {/* Filter buttons for radar chart */}
                 <div className="flex gap-1 p-1 bg-muted rounded-lg">
                   <Button
                     variant={attributeFilter === 'latest' ? 'default' : 'ghost'}
@@ -397,8 +410,8 @@ export default function ComparePlayers({ batchId }: Props) {
                   </Button>
                 </div>
               </div>
-              
-              {/* Enhanced filter description */}
+
+              {/* Filter description */}
               <div className="p-4 bg-muted/50 rounded-lg border-l-4 border-primary/50">
                 <div className="flex items-start gap-2">
                   {attributeFilter === 'latest' ? (
@@ -411,7 +424,7 @@ export default function ComparePlayers({ batchId }: Props) {
                       {attributeFilter === 'latest' ? 'Latest Values' : 'Overall Average'}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {attributeFilter === 'latest' 
+                      {attributeFilter === 'latest'
                         ? "Shows the most recent attribute values for each player from their latest assessment or performance record"
                         : "Shows averaged attribute values calculated from all available performance history data points"
                       }
@@ -420,96 +433,114 @@ export default function ComparePlayers({ batchId }: Props) {
                 </div>
               </div>
 
-              {/* Conditional rendering for comparison content */}
-              {playersToCompare.length > 0 ? (
-                <div className="space-y-6">
-                  {/* Enhanced comparison table */}
-                  <div className="overflow-x-auto">
-                    <table className="w-full border-collapse border border-gray-700 text-sm">
-                      <thead>
-                        <tr className="bg-gray-800">
-                          <th className="border border-gray-700 px-3 py-2 text-left font-semibold">Attribute</th>
+              {/* Radar chart container */}
+              <div className="h-96 bg-card/50 rounded-lg p-4 border">
+                <Radar data={generateRadarData()} options={radarOptions} />
+              </div>
+            </div>
+          )}
+
+          {/* Section 3: Attribute Comparison Table with Horizontal Scrolling */}
+          {playersToCompare.length > 0 && (
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-lg font-semibold">Detailed Attribute Comparison</h3>
+                <p className="text-sm text-muted-foreground">
+                  Scroll horizontally to view all player comparisons. Scroll vertically for all attributes.
+                </p>
+              </div>
+
+              <div
+                className="overflow-x-auto overflow-y-auto max-h-96 border rounded-lg"
+                style={{ WebkitOverflowScrolling: "touch" }}
+              >
+                <div className="min-w-[800px]">
+                  <table className="w-full border-collapse border border-gray-700 text-sm">
+                    <thead className="sticky top-0 bg-gray-800 z-10">
+                      <tr>
+                        <th className="border border-gray-700 px-4 py-3 text-left font-semibold min-w-[120px]">
+                          Attribute
+                        </th>
+                        {playersToCompare.map((playerId) => {
+                          const player = players.find((p) => p.id.toString() === playerId)
+                          const dataPoints = getDataPointsCount(player);
+                          return (
+                            <th key={playerId} className="border border-gray-700 px-4 py-3 text-left min-w-[150px]">
+                              <div>
+                                <div className="font-semibold">{player?.name}</div>
+                                {attributeFilter === 'overall' && dataPoints > 1 && (
+                                  <div className="text-xs text-muted-foreground font-normal mt-1">
+                                    {dataPoints} data points
+                                  </div>
+                                )}
+                              </div>
+                            </th>
+                          )
+                        })}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {["Attack", "pace", "Physicality", "Defense", "passing", "Technique"].map((attr) => (
+                        <tr key={attr} className="even:bg-gray-900/50 hover:bg-gray-800/30">
+                          <td className="border border-gray-700 px-4 py-3 font-semibold capitalize sticky left-0 bg-gray-800">
+                            {attr === 'passing' ? 'Passing' : attr}
+                          </td>
                           {playersToCompare.map((playerId) => {
                             const player = players.find((p) => p.id.toString() === playerId)
-                            const dataPoints = getDataPointsCount(player);
+                            const value = attributeFilter === 'latest'
+                              ? getLatestAttributeValue(player, attr)
+                              : getAverageAttributeValue(player, attr)
+
+                            // Find max value for highlighting
+                            const allValues = playersToCompare.map(id => {
+                              const p = players.find(player => player.id.toString() === id);
+                              return attributeFilter === 'latest'
+                                ? getLatestAttributeValue(p, attr)
+                                : getAverageAttributeValue(p, attr);
+                            });
+                            const maxValue = Math.max(...allValues);
+                            const isHighest = value === maxValue && value > 0;
+
                             return (
-                              <th key={playerId} className="border border-gray-700 px-3 py-2 text-left">
-                                <div>
-                                  <div className="font-semibold">{player?.name}</div>
-                                  {attributeFilter === 'overall' && dataPoints > 1 && (
-                                    <div className="text-xs text-muted-foreground font-normal">
-                                      {dataPoints} data points
-                                    </div>
+                              <td
+                                key={playerId}
+                                className={`border border-gray-700 px-4 py-3 text-center ${
+                                  isHighest ? 'bg-green-500/20 font-semibold' : ''
+                                }`}
+                              >
+                                <div className="flex items-center justify-center gap-2">
+                                  <span>{attributeFilter === 'overall' ? value.toFixed(1) : value}</span>
+                                  {isHighest && value > 0 && (
+                                    <span className="text-green-400 text-lg">★</span>
                                   )}
                                 </div>
-                              </th>
+                              </td>
                             )
                           })}
                         </tr>
-                      </thead>
-                      <tbody>
-                        {["Attack", "pace", "Physicality", "Defense", "passing", "Technique"].map((attr) => (
-                          <tr key={attr} className="even:bg-gray-900 hover:bg-gray-800/50">
-                            <td className="border border-gray-700 px-3 py-2 font-semibold capitalize">
-                              {attr === 'passing' ? 'passing' : attr}
-                            </td>
-                            {playersToCompare.map((playerId) => {
-                              const player = players.find((p) => p.id.toString() === playerId)
-                              const value = attributeFilter === 'latest'
-                                ? getLatestAttributeValue(player, attr)
-                                : getAverageAttributeValue(player, attr)
-                              
-                              // Find max value for highlighting
-                              const allValues = playersToCompare.map(id => {
-                                const p = players.find(player => player.id.toString() === id);
-                                return attributeFilter === 'latest'
-                                  ? getLatestAttributeValue(p, attr)
-                                  : getAverageAttributeValue(p, attr);
-                              });
-                              const maxValue = Math.max(...allValues);
-                              const isHighest = value === maxValue && value > 0;
-                              
-                              return (
-                                <td 
-                                  key={playerId} 
-                                  className={`border border-gray-700 px-3 py-2 ${
-                                    isHighest ? 'bg-green-500/20 font-semibold' : ''
-                                  }`}
-                                >
-                                  {attributeFilter === 'overall' ? value.toFixed(1) : value}
-                                  {isHighest && value > 0 && (
-                                    <span className="ml-1 text-green-400">★</span>
-                                  )}
-                                </td>
-                              )
-                            })}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                  
-                  {/* Radar chart separated into its own container (independent scrolling) */}
-                  <div className="h-96 bg-card/50 rounded-lg p-4 overflow-auto">
-                    <Radar data={generateRadarData()} options={radarOptions} />
-                  </div>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-              ) : (
-                <div className="text-center py-12 text-muted-foreground">
-                  <div className="max-w-sm mx-auto">
-                    <TrendingUp className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                    <h4 className="text-lg font-medium mb-2">No Players Selected</h4>
-                    <p className="text-sm">
-                      Select players from the list above to see their attribute comparison chart and detailed analysis
-                    </p>
-                    <p className="text-xs mt-2 opacity-75">
-                      You can select up to 11 players at once
-                    </p>
-                  </div>
-                </div>
-              )}
+              </div>
             </div>
-          </div>
+          )}
+
+          {/* Empty state when no players selected */}
+          {playersToCompare.length === 0 && (
+            <div className="text-center py-12 text-muted-foreground">
+              <div className="max-w-sm mx-auto">
+                <TrendingUp className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <h4 className="text-lg font-medium mb-2">No Players Selected</h4>
+                <p className="text-sm">
+                  Select players from the list above to see their attribute comparison chart and detailed analysis
+                </p>
+                <p className="text-xs mt-2 opacity-75">
+                  You can select up to 11 players at once
+                </p>
+              </div>
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>
