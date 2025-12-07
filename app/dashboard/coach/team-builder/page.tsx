@@ -3336,7 +3336,7 @@ const lineOptions = {
               </div>
             </div>
           </div>
-          <div className="min-h-[500px] max-w-[80vw] overflow-y-auto overflow-x-auto bg-gray-800 p-4 rounded-lg">
+          <div className="min-h-[500px] max-w-[100vw] overflow-y-auto overflow-x-auto bg-gray-800 p-4 rounded-lg">
             <Radar data={radarData} options={radarOptions} />
           </div>
         </div>
@@ -3349,7 +3349,7 @@ const lineOptions = {
                         <span className="text-red-500 font-bold"> Red</span> = Lowest value
                       </p>
                     </CardHeader>
-    <CardContent className="overflow-y-auto max-h-[300px] overflow-x-auto max-w-[100dvh]">
+    <CardContent className="overflow-y-auto max-h-[300px]">
       <div className="block md:hidden space-y-4">
                               {selectedPlayers.map((playerId) => {
                                 const player = players.find((p) => p.id.toString() === playerId);
@@ -3378,7 +3378,7 @@ const lineOptions = {
           </Card>
         </div>
         <div className="mt-6">
-          <Card className="max-w-[80vw] overflow-y-auto overflow-x-auto bg-gray-800 border-gray-700">
+          <Card className="max-w-[100vw] overflow-y-auto overflow-x-auto bg-gray-800 border-gray-700">
             <CardHeader className="border-b border-gray-700">
               <CardTitle className="text-white text-lg font-bold">Performance Graph</CardTitle>
             </CardHeader>
