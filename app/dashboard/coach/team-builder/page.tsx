@@ -3312,9 +3312,9 @@ const lineOptions = {
             <CardHeader className="border-b border-gray-700">
               <CardTitle className="text-white text-lg font-bold">Attribute Comparison</CardTitle>
             </CardHeader>
-    <CardContent className="pt-4 overflow-x-auto">
-      <div className="w-full">
-        <Table className="min-w-full">
+    <CardContent className="pt-4">
+      <ScrollArea className="w-full">
+        <Table>
                   <TableHeader>
                     <TableRow className="border-b border-gray-700">
                       <TableHead className="text-white font-bold text-base">Attribute</TableHead>
@@ -3347,7 +3347,7 @@ const lineOptions = {
                     ))}
                   </TableBody>
                 </Table>
-              </div>
+              </ScrollArea>
             </CardContent>
           </Card>
         </div>

@@ -150,7 +150,7 @@ const saveToCache = (key: string, data: any) => {
           fetch(`/api/db/coach-profile/${id}`, { signal }),
           fetch(`/api/db/coach-ratings?coachId=${id}`, { signal }),
           fetch(`/api/db/ams-users-info?userId=${id}`, { signal }),
-          fetch(`/api/db/ams-sessions?academyId=${encodeURIComponent(user.academyId)}`, { signal })
+          fetch(`/api/db/ams-sessions/coach?coachId=${encodeURIComponent(id)}&academyId=${encodeURIComponent(user.academyId)}`, { signal })
         ])
 
         if (!profileResp.ok) throw new Error("Failed to fetch coach profile")
@@ -243,7 +243,9 @@ const saveToCache = (key: string, data: any) => {
           ratings: processedRatings,
           about: profileData.about || "",
           photoUrl: profileData.photoUrl || "/placeholder.svg",
-          sessionsCount: finishedSessionsCount, // Always use computed count from sessions data
+          sessionsCount: typeof profileData.sessionsCount === 'number' && profileData.sessionsCount > 0
+            ? profileData.sessionsCount
+            : finishedSessionsCount, // use computed count if profile doesn't provide it
           experience: parseInt(userInfoData.experience) || 0 // Get experience from user info
         })
 
