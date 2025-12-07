@@ -262,24 +262,45 @@ export default function AboutPage() {
     })
   }
 
-  // Enhanced file download handler using server-side API for cross-platform compatibility
+  // Enhanced file download handler for base64 stored files
   const handleFileDownload = async (file: CollateralFile) => {
     try {
-      // Use the new download API endpoint for consistent cross-platform downloads
-      const downloadUrl = `/api/db/ams-about/download?fileId=${file.id}&academyId=${user?.academyId}`;
+      // Since files are stored as base64 data URLs, we need to convert them back to blobs for download
+      if (file.url.startsWith('data:')) {
+        // Extract the base64 data and MIME type
+        const [mimeInfo, base64Data] = file.url.split(',');
+        const mimeType = mimeInfo.split(':')[1].split(';')[0];
 
-      // Try modern download API first (works in most browsers)
-      if ('download' in document.createElement('a')) {
+        // Convert base64 to blob
+        const byteCharacters = atob(base64Data);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: mimeType });
+
+        // Create download link
+        const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
-        a.href = downloadUrl;
+        a.href = url;
         a.download = file.name;
         a.style.display = 'none';
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
+
+        // Clean up the object URL to prevent memory leaks
+        setTimeout(() => URL.revokeObjectURL(url), 100);
       } else {
-        // Fallback for mobile browsers and WebViews - open in new tab
-        window.open(downloadUrl, '_blank');
+        // Fallback for non-base64 URLs (shouldn't happen with current implementation)
+        const a = document.createElement('a');
+        a.href = file.url;
+        a.download = file.name;
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
       }
 
       toast({
